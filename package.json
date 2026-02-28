@@ -54,5 +54,12 @@
   "main": "eslint.config.js",
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "overrides": {
+    "form-data": "^4.0.5",
+    "qs": "^6.15.0",
+    "tough-cookie": "^4.1.3",
+    "nth-check": "^2.0.1",
+    "cheerio": "1.0.0-rc.12"
+  }
 }
