@@ -522,7 +522,7 @@ app.post("/api/update-balance", authenticateToken, async (req, res) => {
 
 import fetch from 'node-fetch';
 
-app.get("/api/steam-inventory/:steamId", async (req, res) => {
+app.get("/api/steam-inventory/:steamId", authenticateToken, async (req, res) => {
   const steamId = req.params.steamId;
   console.log(`[STEAM] Solicitando inventario para: ${steamId}`);
 

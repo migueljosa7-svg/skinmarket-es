@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { getPlaceholderImage } from "../services/ImageService";
 
 const Footer = () => {
     return (
@@ -13,7 +14,15 @@ const Footer = () => {
         }}>
             <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
                 <div style={{ marginBottom: '20px' }}>
-                    <img src="/logo.png" alt="SkinMarket ES" style={{ height: '40px', marginBottom: '10px' }} />
+                    <img
+                        src="/logo.png"
+                        alt="SkinMarket ES"
+                        onError={(e) => {
+                            e.target.src = getPlaceholderImage("SkinMarket");
+                            e.target.style.height = '30px';
+                        }}
+                        style={{ height: '40px', marginBottom: '10px' }}
+                    />
                     <p style={{ fontSize: '14px' }}>El mejor mercado de skins de CS2 en España. Abre cajas, gana batallas y mejora tu inventario.</p>
                 </div>
 

@@ -13,11 +13,11 @@ export const THEME_COLORS = {
 };
 
 export const RARITIES = {
-  'mil-spec': { color: '#64748b', bg: 'rgba(100,116,139,0.2)', label: 'Mil-Spec' },
-  'restricted': { color: '#3b82f6', bg: 'rgba(59,130,246,0.2)', label: 'Restringida' },
-  'classified': { color: '#a855f7', bg: 'rgba(168,85,247,0.2)', label: 'Clasificada' },
-  'covert': { color: '#ef4444', bg: 'rgba(239,68,68,0.2)', label: 'Oculta' },
-  'exceedingly-rare': { color: '#fbbf24', bg: 'rgba(251,191,36,0.2)', label: 'Extremadamente Rara' }
+  'mil-spec': { color: '#64748b', bg: 'rgba(100,116,139,0.2)', label: 'Mil-Spec Grade' },
+  'restricted': { color: '#3b82f6', bg: 'rgba(59,130,246,0.2)', label: 'Restricted' },
+  'classified': { color: '#a855f7', bg: 'rgba(168,85,247,0.2)', label: 'Classified' },
+  'covert': { color: '#ef4444', bg: 'rgba(239,68,68,0.2)', label: 'Covert' },
+  'exceedingly-rare': { color: '#fbbf24', bg: 'rgba(251,191,36,0.2)', label: 'Extraordinary' }
 };
 
 export const getRarityColor = (rarity) => {

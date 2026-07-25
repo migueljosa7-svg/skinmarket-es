@@ -14,21 +14,28 @@ export default function ProtectedRoute({ children, adminOnly = false }) {
         background: "#0f1115"
       }}>
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: "4rem", marginBottom: "20px", animation: "bounce 2s infinite" }}>💎</div>
+          <div style={{
+            width: '48px', height: '48px',
+            border: '3px solid rgba(245, 172, 59, 0.1)',
+            borderTop: '3px solid #f5ac3b',
+            borderRadius: '50%',
+            margin: '0 auto 20px',
+            animation: 'spin 1s linear infinite'
+          }} />
           <div style={{
             color: "#f5ac3b",
-            fontSize: "1.5rem",
+            fontSize: "0.85rem",
             fontWeight: "900",
-            letterSpacing: '2px'
+            letterSpacing: '2px',
+            textTransform: 'uppercase'
           }}>
             AUTENTICANDO...
           </div>
         </div>
         <style>{`
-          @keyframes bounce {
-            0%, 20%, 50%, 80%, 100% {transform: translateY(0);}
-            40% {transform: translateY(-30px);}
-            60% {transform: translateY(-15px);}
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
           }
         `}</style>
       </div>

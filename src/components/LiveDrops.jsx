@@ -1,149 +1,172 @@
-import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+// src/components/LiveDrops.jsx
+import { useState, useEffect } from "react";
+import { motion as Motion, AnimatePresence } from "framer-motion";
 import { getRarityColor } from "../constants/colors";
-import { getSkins } from "../hooks/useFetchSkins";
+import { StorageService } from "../services/StorageService";
+import { getPlaceholderImage, handleImageError } from "../services/ImageService";
+
+const BOT_NAMES = [
+  "CSGO_Pro", "CryptoKing", "SkinHunter", "Viper", "Zeus",
+  "Shadow_Ninja", "LuckyStrike", "NeonRider", "Phoenix_ES", "AlphaGamer"
+];
+
+const MOCK_FALLBACK_DROPS = [
+  { id: "d_1", name: "★ Karambit | Doppler", price: 1250.00, rarity: "Extraordinary", user: "CSGO_Pro", image: "" },
+  { id: "d_2", name: "AWP | Dragon Lore", price: 3400.00, rarity: "Contraband", user: "CryptoKing", image: "" },
+  { id: "d_3", name: "AK-47 | Fire Serpent", price: 680.00, rarity: "Covert", user: "SkinHunter", image: "" },
+  { id: "d_4", name: "M4A4 | Howl", price: 2100.00, rarity: "Contraband", user: "ProPlayer", image: "" }
+];
 
 export default function LiveDrops() {
-    const [drops, setDrops] = useState([]);
-    const [expensiveSkins, setExpensiveSkins] = useState([]);
-    const dropsRef = useRef([]);
+  const [drops, setDrops] = useState([]);
 
-    useEffect(() => {
-        const loadSkins = async () => {
-            try {
-                const allSkins = await getSkins();
-                // Filtrar por raras o caras (> 20€)
-                const filtered = allSkins.filter(s =>
-                    s.rarity === "Covert" ||
-                    s.rarity === "Extraordinary" ||
-                    s.rarity === "Contraband" ||
-                    s.price > 20
-                );
+  useEffect(() => {
+    // Subscribe to StorageService live drops
+    const unsubscribe = StorageService.subscribe((data) => {
+      const formatted = (data.liveDrops || []).map((d) => ({
+        id: d.id,
+        name: d.item?.name || "Skin",
+        price: d.item?.price || 10,
+        rarity: d.item?.rarity || "Mil-Spec",
+        user: d.user || "Jugador",
+        image: d.item?.image || ""
+      }));
+      setDrops(formatted.length > 0 ? formatted : MOCK_FALLBACK_DROPS);
+    });
 
-                // Si por alguna razón el filtro es muy estricto, relajarlo
-                const finalPool = filtered.length > 50 ? filtered : allSkins.filter(s => s.price > 5);
-                setExpensiveSkins(finalPool);
+    // Background community drop generator interval
+    const interval = setInterval(() => {
+      const randomUser = BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)];
+      const sampleSkins = [
+        { name: "M4A1-S | Printstream", price: 145.00, rarity: "Covert" },
+        { name: "Desert Eagle | Printstream", price: 65.00, rarity: "Covert" },
+        { name: "AK-47 | Inheritance", price: 120.00, rarity: "Covert" },
+        { name: "AWP | Chromatic Aberration", price: 38.00, rarity: "Classified" },
+        { name: "USP-S | Printstream", price: 85.00, rarity: "Covert" },
+        { name: "★ Specialist Gloves | Fade", price: 850.00, rarity: "Extraordinary" }
+      ];
+      const picked = sampleSkins[Math.floor(Math.random() * sampleSkins.length)];
+      StorageService.addLiveDrop({
+        user: randomUser,
+        item: { ...picked, image: "" },
+        caseName: "Live Feed"
+      });
+    }, 6000);
 
-                // Inicializar con algunos drops reales
-                const initial = Array.from({ length: 6 }).map((_, i) => ({
-                    ...finalPool[Math.floor(Math.random() * finalPool.length)],
-                    id: Date.now() - i * 1000,
-                    user: ["UserX", "CryptoBro", "Gamer77", "SkinHunter", "ProPlayer"][Math.floor(Math.random() * 5)]
-                }));
-                setDrops(initial);
-                dropsRef.current = initial;
-            } catch (err) {
-                console.error("Error loading skins for LiveDrops:", err);
-            }
-        };
+    return () => {
+      unsubscribe();
+      clearInterval(interval);
+    };
+  }, []);
 
-        loadSkins();
-    }, []);
+  return (
+    <div
+      style={{
+        height: "75px",
+        background: "#0c0d10",
+        borderBottomWidth: "1px",
+        borderBottomStyle: "solid",
+        borderBottomColor: "rgba(255,255,255,0.05)",
+        display: "flex",
+        alignItems: "center",
+        padding: "0 20px",
+        gap: "15px",
+        overflow: "hidden",
+        position: "relative",
+        zIndex: 100
+      }}
+    >
+      <div
+        style={{
+          background: "rgba(245,172,59,0.1)",
+          color: "#f5ac3b",
+          padding: "6px 12px",
+          borderRadius: "8px",
+          fontSize: "0.7rem",
+          fontWeight: "900",
+          letterSpacing: "1px",
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          gap: "6px"
+        }}
+      >
+        <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#10b981", boxShadow: "0 0 10px #10b981" }} />
+        LIVE DROPS
+      </div>
 
-    useEffect(() => {
-        if (expensiveSkins.length === 0) return;
-
-        const interval = setInterval(() => {
-            const randomUser = ["UserX", "CryptoBro", "Gamer77", "SkinHunter", "ProPlayer", "Winner99", "LuckyStrike", "DrorpMaster", "Viper", "Zeus"][Math.floor(Math.random() * 10)];
-            const skin = expensiveSkins[Math.floor(Math.random() * expensiveSkins.length)];
-
-            const newDrop = {
-                ...skin,
-                id: Date.now(),
-                user: randomUser
-            };
-
-            setDrops(prev => {
-                const updated = [newDrop, ...prev.slice(0, 10)];
-                dropsRef.current = updated;
-                return updated;
-            });
-        }, 4000);
-        return () => clearInterval(interval);
-    }, [expensiveSkins]);
-
-    return (
-        <div style={{
-            height: "80px",
-            background: "#0c0d10",
-            borderBottom: "1px solid rgba(255,255,255,0.05)",
-            display: "flex",
-            alignItems: "center",
-            padding: "0 20px",
-            gap: "15px",
-            overflow: "hidden",
-            position: 'relative',
-            zIndex: 100
-        }}>
-            <div style={{
-                background: "rgba(245,172,59,0.1)",
-                color: "#f5ac3b",
-                padding: "4px 12px",
-                borderRadius: "8px",
-                fontSize: "0.7rem",
-                fontWeight: "900",
-                letterSpacing: "1px",
-                flexShrink: 0
-            }}>LIVE DROPS</div>
-            <div style={{ display: "flex", gap: "10px", flex: 1, overflow: "hidden" }}>
-                <AnimatePresence>
-                    {drops.map((drop) => {
-                        const color = getRarityColor(drop.rarity);
-                        return (
-                            <motion.div
-                                key={drop.id}
-                                initial={{ opacity: 0, x: -30, scale: 0.9 }}
-                                animate={{ opacity: 1, x: 0, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.8 }}
-                                style={{
-                                    height: "60px",
-                                    minWidth: "180px",
-                                    background: "rgba(255,255,255,0.02)",
-                                    border: `1px solid rgba(255,255,255,0.05)`,
-                                    borderBottom: `3px solid ${color}`,
-                                    borderRadius: "12px",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    padding: "0 12px",
-                                    gap: "10px",
-                                    flexShrink: 0,
-                                    position: 'relative',
-                                    overflow: 'hidden'
-                                }}
-                            >
-                                <div style={{
-                                    position: 'absolute', inset: 0, background: `linear-gradient(45deg, ${color}11 0%, transparent 100%)`, zIndex: 0
-                                }} />
-                                <img
-                                    src={drop.image}
-                                    alt={drop.name}
-                                    style={{ width: "45px", height: "45px", objectFit: "contain", zIndex: 1, filter: `drop-shadow(0 0 5px ${color})` }}
-                                    onError={(e) => {
-                                        e.target.src = "https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpou-6kejhjx_33YzhW692_nI_ImaH3NrrXm35D4Npyjud_3_n4oUDg-Es6N272II-VdwU8ZAzT_li6x7_rjJ_t7Zybm3Vl7HQr43ePzhLj10pLcKUx0vFm35nE";
-                                    }}
-                                />
-                                <div style={{ zIndex: 1, overflow: 'hidden', flex: 1 }}>
-                                    <div style={{
-                                        fontSize: "0.7rem",
-                                        fontWeight: "900",
-                                        color: "white",
-                                        whiteSpace: "nowrap",
-                                        overflow: "hidden",
-                                        textOverflow: "ellipsis",
-                                        letterSpacing: '0.2px'
-                                    }}>
-                                        {drop.name}
-                                    </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px' }}>
-                                        <div style={{ fontSize: "0.6rem", color: "rgba(255,255,255,0.4)", fontWeight: '800' }}>{drop.user}</div>
-                                        <div style={{ fontSize: "0.7rem", color: "#f5ac3b", fontWeight: '900' }}>€{parseFloat(drop.price).toFixed(2)}</div>
-                                    </div>
-                                </div>
-                            </motion.div>
-                        );
-                    })}
-                </AnimatePresence>
-            </div>
-        </div>
-    );
+      <div style={{ display: "flex", gap: "10px", flex: 1, overflow: "hidden" }}>
+        <AnimatePresence mode="popLayout">
+          {drops.slice(0, 10).map((drop) => {
+            const color = getRarityColor(drop.rarity);
+            return (
+              <Motion.div
+                key={drop.id}
+                initial={{ opacity: 0, x: -30, scale: 0.9 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                transition={{ duration: 0.3 }}
+                style={{
+                  height: "55px",
+                  minWidth: "170px",
+                  background: "rgba(255,255,255,0.02)",
+                  borderWidth: "1px 1px 3px 1px",
+                  borderStyle: "solid",
+                  borderColor: `rgba(255,255,255,0.05) rgba(255,255,255,0.05) ${color} rgba(255,255,255,0.05)`,
+                  borderRadius: "10px",
+                  display: "flex",
+                  alignItems: "center",
+                  padding: "0 10px",
+                  gap: "8px",
+                  flexShrink: 0,
+                  position: "relative",
+                  overflow: "hidden"
+                }}
+              >
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    background: `linear-gradient(45deg, ${color}15 0%, transparent 100%)`,
+                    zIndex: 0
+                  }}
+                />
+                <img
+                  src={drop.image || getPlaceholderImage(drop.name)}
+                  alt={drop.name}
+                  onError={(e) => handleImageError(e, drop.name, drop.image)}
+                  style={{
+                    width: "40px",
+                    height: "40px",
+                    objectFit: "contain",
+                    zIndex: 1,
+                    filter: `drop-shadow(0 0 5px ${color})`,
+                    opacity: drop.image ? 1 : 0.3
+                  }}
+                />
+                <div style={{ zIndex: 1, overflow: "hidden", flex: 1 }}>
+                  <div
+                    style={{
+                      fontSize: "0.7rem",
+                      fontWeight: "800",
+                      color: "white",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis"
+                    }}
+                  >
+                    {drop.name}
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "2px" }}>
+                    <div style={{ fontSize: "0.6rem", color: "rgba(255,255,255,0.4)", fontWeight: "700" }}>{drop.user}</div>
+                    <div style={{ fontSize: "0.7rem", color: "#f5ac3b", fontWeight: "900" }}>€{Number(drop.price).toFixed(2)}</div>
+                  </div>
+                </div>
+              </Motion.div>
+            );
+          })}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
 }
