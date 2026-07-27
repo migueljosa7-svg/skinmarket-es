@@ -92,13 +92,6 @@ export const CASE_IMAGES = {
   ]
 };
 
-// Alias de nombres para cada categoría
-export const CASE_EMOJIS = {
-  económica: CASE_IMAGES.económica.map(c => c.icon),
-  intermedia: CASE_IMAGES.intermedia.map(c => c.icon),
-  premium: CASE_IMAGES.premium.map(c => c.icon)
-};
-
 // Función para obtener una caja aleatoria según la categoría
 export const getCaseImage = (category) => {
   if (!CASE_IMAGES[category]) return { name: "Mystery Box", icon: "?", color: "#6366f1", bgGradient: "linear-gradient(135deg, #6366f1 0%, #818cf8 100%)" };

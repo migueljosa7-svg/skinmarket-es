@@ -1,11 +1,14 @@
 // src/hooks/useFetchSkins.js
+import { useState, useEffect } from "react";
+
 const SKINS_API = 'https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/en/skins.json';
 
 let cachedSkins = null;
 let priceMap = null;
 
 export const getSkins = async () => {
-  if (cachedSkins && priceMap) return cachedSkins;
+  // Return cached skins if we have them (with or without priceMap)
+  if (cachedSkins) return cachedSkins;
 
   try {
     const res = await fetch(SKINS_API);
@@ -57,8 +60,6 @@ export const getSkins = async () => {
     throw err; // Re-throw to be caught by hook
   }
 };
-
-import { useState, useEffect } from "react";
 
 export const useFetchSkins = (count = 6, random = true) => {
   const [skins, setSkins] = useState([]);

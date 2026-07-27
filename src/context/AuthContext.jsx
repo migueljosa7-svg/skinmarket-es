@@ -1,310 +1,156 @@
 // src/context/AuthContext.jsx
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useEffect, useState, useCallback } from "react";
+import { StorageService } from "../services/StorageService";
 
-export const AuthContext = createContext();
-export const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
+export const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(() => StorageService.getUser());
+  const [inventory, setInventory] = useState(() => StorageService.getInventory());
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Verificar si hay un token guardado al iniciar
-    const token = localStorage.getItem("skinmarket_token");
-    if (token) {
-      checkAuth(token);
-    } else {
+    // Subscribe to StorageService state changes
+    const unsubscribe = StorageService.subscribe((data) => {
+      setUser(data.user);
+      setInventory(data.inventory);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const login = useCallback(async (email) => {
+    // Simulated local login
+    setLoading(true);
+    try {
+      const currentUser = StorageService.getUser();
+      const updatedUser = StorageService.updateUser({
+        email: email || currentUser.email,
+        nombre_usuario: email ? email.split("@")[0] : currentUser.nombre_usuario
+      });
+      return updatedUser;
+    } finally {
       setLoading(false);
     }
   }, []);
 
-  const checkAuth = async (token) => {
+  const register = useCallback(async (nombre_usuario, email) => {
+    setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/me`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      const updatedUser = StorageService.updateUser({
+        nombre_usuario,
+        email
       });
-      if (response.ok) {
-        const userData = await response.json();
-        const mappedInventory = (userData.inventory || []).map(item => ({ ...item, price: Number(item.price) }));
-
-        setUser({
-          ...userData,
-          balance: parseFloat(userData.saldo),
-          level: userData.nivel || 0,
-          exp: userData.experiencia || 0,
-          inventory: mappedInventory
-        });
-      } else {
-        localStorage.removeItem("skinmarket_token");
-        setUser(null);
-      }
-    } catch (error) {
-      console.error("Error verifying auth:", error);
+      return updatedUser;
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const register = async (nombre_usuario, email, password) => {
-    const response = await fetch(`${API_URL}/register`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nombre_usuario, email, password }),
+  const logout = useCallback(() => {
+    StorageService.updateUser({
+      nombre_usuario: "Invitado",
+      email: "guest@skinmarket.es"
+    });
+  }, []);
+
+  const updateUser = useCallback((updatedUserOrFn) => {
+    StorageService.updateUser(updatedUserOrFn);
+  }, []);
+
+  const fetchInventory = useCallback(() => {
+    setInventory(StorageService.getInventory());
+  }, []);
+
+  const sellSkin = useCallback((skinId) => {
+    return StorageService.sellSkin(skinId);
+  }, []);
+
+  const sellAllSkins = useCallback(() => {
+    return StorageService.sellAllSkins();
+  }, []);
+
+  const withdrawSkin = useCallback((skinId) => {
+    return StorageService.withdrawSkin(skinId);
+  }, []);
+
+  const depositSkins = useCallback((skins) => {
+    return StorageService.addSkinsToInventory(skins);
+  }, []);
+
+  const updateProfile = useCallback((tradeLink, steamId) => {
+    const patch = {};
+    if (tradeLink) patch.link_intercambio = tradeLink;
+    if (steamId) patch.steam_id = steamId;
+    StorageService.updateUser(patch);
+    return true;
+  }, []);
+
+  const addToBalance = useCallback((amount) => {
+    const newBal = StorageService.addBalance(amount);
+    return newBal !== false;
+  }, []);
+
+  const claimDaily = useCallback(() => {
+    const currentUser = StorageService.getUser();
+    const now = new Date();
+    const lastClaim = currentUser.ultimo_reclamo_diario ? new Date(currentUser.ultimo_reclamo_diario) : null;
+
+    if (lastClaim && now - lastClaim < 86400000) {
+      const remainingMs = 86400000 - (now - lastClaim);
+      const hours = Math.floor(remainingMs / (1000 * 60 * 60));
+      return { success: false, error: `Debes esperar ${hours}h para reclamar de nuevo.` };
+    }
+
+    const reward = 5.00;
+    const expReward = 100;
+    StorageService.addBalance(reward);
+    StorageService.updateUser({
+      experiencia: (currentUser.experiencia || 0) + expReward,
+      ultimo_reclamo_diario: now.toISOString()
     });
 
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Error al registrar");
-
-    localStorage.setItem("skinmarket_token", data.token);
-    const mappedUser = {
-      ...data.user,
-      balance: parseFloat(data.user.saldo),
-      level: 0,
-      exp: 0
+    return {
+      success: true,
+      reward,
+      expReward,
+      message: "¡Recompensa diaria de $5.00 reclamada!"
     };
-    setUser(mappedUser);
-    return mappedUser;
-  };
+  }, []);
 
-  const login = async (email, password) => {
-    const response = await fetch(`${API_URL}/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
-
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Error al iniciar sesión");
-
-    localStorage.setItem("skinmarket_token", data.token);
-    const mappedUser = {
-      ...data.user,
-      balance: parseFloat(data.user.saldo),
-      level: data.user.nivel || 0,
-      exp: data.user.experiencia || 0
-    };
-    setUser(mappedUser);
-    return mappedUser;
-  };
-
-
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem("skinmarket_token");
-  };
-
-  const updateUser = (updatedUserOrFn) => {
-    setUser((prev) => {
-      const next = typeof updatedUserOrFn === "function" ? updatedUserOrFn(prev) : updatedUserOrFn;
-      return next;
-    });
-  };
-
-  const fetchInventory = async () => {
-    const token = localStorage.getItem("skinmarket_token");
-    if (!token) return;
-    try {
-      const res = await fetch(`${API_URL}/inventory`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-      const data = await res.json();
-      const mappedInventory = data.map(item => ({ ...item, price: Number(item.price) }));
-      setUser(prev => ({ ...prev, inventory: mappedInventory }));
-    } catch (err) {
-      console.error("Error fetching inventory:", err);
-    }
-  };
-
-  const sellSkin = async (skinId) => {
-    const token = localStorage.getItem("skinmarket_token");
-    if (!token) return;
-
-    try {
-      const res = await fetch(`${API_URL}/inventory/sell`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({ itemId: skinId })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setUser(prev => ({
-          ...prev,
-          balance: parseFloat(data.newBalance),
-          inventory: (prev.inventory || []).filter(s => s.id !== skinId)
-        }));
-        return true;
-      }
-    } catch (err) {
-      console.error("Error selling skin:", err);
-    }
-    return false;
-  };
-
-  const withdrawSkin = async (skinId) => {
-    const token = localStorage.getItem("skinmarket_token");
-    if (!token) return;
-
-    try {
-      const res = await fetch(`${API_URL}/inventory/withdraw`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({ itemId: skinId })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setUser(prev => ({
-          ...prev,
-          inventory: (prev.inventory || []).map(s => s.id === skinId ? { ...s, status: data.message?.includes("real") ? "withdrawn" : "withdrawing" } : s)
-        }));
-
-        // Si no es real, al cabo de un tiempo marcamos como completado
-        if (!data.message?.includes("real")) {
-          setTimeout(fetchInventory, 10000);
-        }
-        return data;
-      }
-    } catch (err) {
-      console.error("Error withdrawing skin:", err);
-    }
-    return { success: false, error: "Error de conexión" };
-  };
-
-  const depositSkins = async (skins) => {
-    const token = localStorage.getItem("skinmarket_token");
-    if (!token) return;
-
-    try {
-      const res = await fetch(`${API_URL}/inventory/add`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({ items: skins })
-      });
-      const data = await res.json();
-      if (data.success) {
-        const mappedItems = data.items.map(item => ({ ...item, price: Number(item.price) }));
-        setUser(prev => ({
-          ...prev,
-          inventory: [...(prev.inventory || []), ...mappedItems]
-        }));
-        return mappedItems;
-      }
-    } catch (err) {
-      console.error("Error depositing skins:", err);
-    }
-    return false;
-  };
-
-  const updateProfile = async (link_intercambio) => {
-    const token = localStorage.getItem("skinmarket_token");
-    if (!token) return;
-
-    try {
-      const res = await fetch(`${API_URL}/update-profile`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({ link_intercambio })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setUser(prev => ({
-          ...prev,
-          link_intercambio: data.profile.link_intercambio,
-          steam_id: data.profile.steam_id
-        }));
-        return true;
-      }
-    } catch (err) {
-      console.error("Error updating profile:", err);
-    }
-    return false;
-  };
-
-  const addToBalance = async (amount) => {
-    const token = localStorage.getItem("skinmarket_token");
-    if (!token) return;
-
-    try {
-      console.log(`[AUTH] Solicitando actualización de saldo: +${amount}`);
-      const res = await fetch(`${API_URL}/update-balance`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({ amount })
-      });
-      const data = await res.json();
-      console.log("[AUTH] Respuesta servidor:", data);
-      if (data.success) {
-        const newBalance = parseFloat(data.newBalance);
-        setUser(prev => ({
-          ...prev,
-          balance: newBalance,
-          saldo: data.newBalance
-        }));
-        console.log("[AUTH] Balance actualizado en estado:", newBalance);
-        return true;
-      }
-    } catch (err) {
-      console.error("Error updating balance:", err);
-    }
-    return false;
-  };
-
-  const importSteamInventory = async () => {
-    setUser(prev => ({ ...prev, inventory: [...(prev?.inventory || []), { id: Date.now(), name: "AK-47 | Redline", price: 25.50, rarity: "Covert", image: "" }] }));
-  };
-
-  const recoverPassword = (email) => {
+  const recoverPassword = useCallback((email) => {
     return `Se ha enviado un correo de recuperación a ${email} (Simulado)`;
-  };
+  }, []);
 
-  const claimDaily = async () => {
-    const token = localStorage.getItem("skinmarket_token");
-    if (!token) return { success: false, error: "Inicia sesión primero" };
-
-    try {
-      const res = await fetch(`${API_URL}/claim-daily`, {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (data.success) {
-        setUser(prev => ({
-          ...prev,
-          balance: parseFloat((prev.balance + parseFloat(data.reward)).toFixed(2)),
-          exp: (prev.exp || 0) + data.expReward,
-          ultimo_reclamo_diario: new Date().toISOString()
-        }));
-      }
-      return data;
-    } catch (err) {
-      console.error("Error claiming daily:", err);
-      return { success: false, error: "Error de conexión" };
-    }
-  };
+// Normalize balance/saldo and merge inventory into user object
+  const userWithInventory = user ? { 
+    ...user, 
+    inventory,
+    balance: Number(user.balance ?? user.saldo ?? 0),
+    saldo: Number(user.saldo ?? user.balance ?? 0)
+  } : null;
 
   return (
-    <AuthContext.Provider value={{
-      user, login, register, logout, updateUser,
-      sellSkin, withdrawSkin, depositSkins, importSteamInventory,
-      recoverPassword, loading, checkAuth, addToBalance, updateProfile, fetchInventory,
-      claimDaily
-    }}>
+    <AuthContext.Provider
+      value={{
+        user: userWithInventory,
+        inventory,
+        loading,
+        login,
+        register,
+        logout,
+        updateUser,
+        sellSkin,
+        sellAllSkins,
+        withdrawSkin,
+        depositSkins,
+        updateProfile,
+        addToBalance,
+        fetchInventory,
+        claimDaily,
+        recoverPassword,
+        checkAuth: () => {}
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

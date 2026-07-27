@@ -1,19 +1,13 @@
-import { motion } from "framer-motion";
-
-const rarityColors = {
-  "Mil-Spec Grade": "#4b92db",
-  "Restricted": "#a32cc4",
-  "Classified": "#d32f2f",
-  "Covert": "#f39c12",
-  "Exceedingly Rare": "#ffd700"
-};
+import { motion as Motion } from "framer-motion";
+import { getRarityColor } from "../constants/colors";
+import { getPlaceholderImage, handleImageError } from "../services/ImageService";
 
 export default function SkinCard({ skin }) {
   const rarity = skin.rarity || "Mil-Spec Grade";
-  const color = rarityColors[rarity] || "#f5ac3b";
+  const color = getRarityColor(rarity) || "#f5ac3b";
 
   return (
-    <motion.div
+    <Motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       whileHover={{ y: -8 }}
@@ -24,8 +18,9 @@ export default function SkinCard({ skin }) {
         padding: "24px",
         color: "white",
         textAlign: "left",
-        border: `1px solid rgba(255,255,255,0.05)`,
-        borderBottom: `4px solid ${color}`,
+        borderWidth: "1px 1px 4px 1px",
+        borderStyle: "solid",
+        borderColor: `rgba(255,255,255,0.05) rgba(255,255,255,0.05) ${color} rgba(255,255,255,0.05)`,
         cursor: "pointer",
         position: 'relative',
         overflow: 'hidden',
@@ -68,20 +63,20 @@ export default function SkinCard({ skin }) {
         </div>
 
         {/* Image Container */}
-        {skin.image && (
-          <div style={{ position: 'relative', height: '160px', marginBottom: '20px', zIndex: 1 }}>
-            <img
-              src={skin.image}
-              alt={skin.name}
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "contain",
-                filter: "drop-shadow(0 15px 25px rgba(0,0,0,0.5))"
-              }}
-            />
-          </div>
-        )}
+        <div style={{ position: 'relative', height: '160px', marginBottom: '20px', zIndex: 1 }}>
+          <img
+            src={skin.image || getPlaceholderImage(skin.name)}
+            alt={skin.name}
+            onError={(e) => handleImageError(e, skin.name, skin.image)}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+              filter: "drop-shadow(0 15px 25px rgba(0,0,0,0.5))",
+              opacity: skin.image ? 1 : 0.3
+            }}
+          />
+        </div>
 
         {/* Name and Series */}
         <div style={{ position: 'relative', zIndex: 1 }}>
@@ -117,10 +112,10 @@ export default function SkinCard({ skin }) {
         zIndex: 1
       }}>
         <div style={{ fontWeight: "900", fontSize: "1.4rem", color: '#fff' }}>
-          {skin.price} <span style={{ fontSize: '0.9rem', color: '#f5ac3b' }}>€</span>
+          €{Number(skin.price || 0).toFixed(2)}
         </div>
 
       </div>
-    </motion.div>
+    </Motion.div>
   );
 }

@@ -11,23 +11,29 @@
   transition: color 0.2s ease, background 0.2s ease;
 }
 
-/* Scrollbar personalizado */
+/* Scrollbar personalizado - unificado */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.3);
+  background: #0f1115;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #00ff88;
-  border-radius: 4px;
+  background: #f5ac3b;
+  border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #00dd66;
+  background: #e0992a;
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #f5ac3b #0f1115;
 }
 
 /* Cards profesional */

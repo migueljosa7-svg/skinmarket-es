@@ -3,25 +3,12 @@ import { useAuth } from "../context/useAuth";
 import { useFetchSkins } from "../hooks/useFetchSkins";
 import { generateAllCases } from "../constants/cases.js";
 import { getRarityColor } from "../constants/colors.js";
-import { motion } from "framer-motion";
+import { motion as Motion } from "framer-motion";
+import { getPlaceholderImage, handleImageError } from "../services/ImageService";
+import { useToast } from "../components/Toast";
+import { sound } from "../utils/audio";
+import { getFloatBadgeProps } from "../utils/floatPreview";
 
-
-/* ─────────────────────────────────────────────
-   ARMAS representativas por categoría de caja
-   Se usan como imagen decorativa en el modal
-───────────────────────────────────────────── */
-const WEAPON_EMOJIS_BY_CATEGORY = {
-  económica: ["🔫", "🗡️", "🔪", "💣", "🎯"],
-  intermedia: ["⚔️", "🪃", "🛡️", "💥", "🎖️"],
-  premium: ["👑", "🔱", "⚡", "🌟", "🏆"],
-};
-
-// Mapa de emoji de arma determinístico por índice de caja
-const getWeaponEmoji = (c) => {
-  const pool = WEAPON_EMOJIS_BY_CATEGORY[c.category] || ["🔫"];
-  const idx = parseInt(c.id.replace(/\D/g, ""), 10) || 0;
-  return pool[idx % pool.length];
-};
 
 /* ─────────────────────────────────────────────
    MINI ROULETTE — igual que KeyDrop (slide)
@@ -108,12 +95,11 @@ const MiniBattleRoulette = ({ items, accentColor }) => {
           const rc = getRarityColor(skin.rarity);
           return (
             <div
-              key={idx}
+              key={skin.id || `minibattle-${idx}`}
               style={{
                 minWidth: "110px",
                 height: "110px",
                 background: `radial-gradient(circle at center, ${rc}15 0%, rgba(255,255,255,0.02) 80%)`,
-                borderBottom: `4px solid ${rc}`,
                 borderRadius: "16px",
                 display: "flex",
                 flexDirection: "column",
@@ -122,18 +108,22 @@ const MiniBattleRoulette = ({ items, accentColor }) => {
                 padding: "10px",
                 boxSizing: "border-box",
                 flexShrink: 0,
-                border: '1px solid rgba(255,255,255,0.03)'
+                borderWidth: "0 0 4px 0",
+                borderStyle: "solid",
+                borderColor: rc
               }}
             >
               <img
-                src={skin.image}
+                src={skin.image || getPlaceholderImage(skin.name)}
                 alt={skin.name}
+                onError={(e) => handleImageError(e, skin.name, skin.image)}
                 style={{
                   width: "80px",
                   height: "60px",
                   objectFit: "contain",
                   marginBottom: "8px",
                   filter: `drop-shadow(0 0 10px ${rc}40)`,
+                  opacity: skin.image ? 1 : 0.3
                 }}
               />
               <div
@@ -159,11 +149,8 @@ const MiniBattleRoulette = ({ items, accentColor }) => {
 };
 
 const BoxCard = ({ c, qty, onAdd, onRemove }) => {
-  const [hovered, setHovered] = useState(false);
-  const weapon = getWeaponEmoji(c);
-
   return (
-    <motion.div
+    <Motion.div
       whileHover={{ y: -5 }}
       style={{
         position: "relative",
@@ -325,7 +312,7 @@ const BoxCard = ({ c, qty, onAdd, onRemove }) => {
           </button>
         </div>
       </div>
-    </motion.div>
+    </Motion.div>
   );
 };
 
@@ -368,7 +355,8 @@ const BattleSelector = ({
   selectedBoxes, setSelectedBoxes,
   gameMode, setGameMode,
   playerCount, setPlayerCount,
-  botLevels, setBotLevels
+  botLevels, setBotLevels,
+  toast
 }) => {
   const [filter, setFilter] = useState("all");
   const [sortBy, setSortBy] = useState("price-asc");
@@ -413,7 +401,7 @@ const BattleSelector = ({
   };
 
   return (
-    <motion.div
+    <Motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       onClick={onClose}
@@ -422,7 +410,7 @@ const BattleSelector = ({
         display: "flex", alignItems: "center", justifyContent: "center", padding: "20px",
       }}
     >
-      <motion.div
+      <Motion.div
         initial={{ opacity: 0, scale: 0.9, y: 30 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         onClick={(e) => e.stopPropagation()}
@@ -553,7 +541,7 @@ const BattleSelector = ({
                 <div style={costLabelStyle}>Costo de Entrada</div>
                 <div style={{ fontSize: '2.5rem', fontWeight: '900', color: canAfford ? '#f5ac3b' : '#ef4444' }}>{totalCost.toFixed(2)}€</div>
               </div>
-              <motion.button
+              <Motion.button
                 whileHover={canAfford ? { scale: 1.05 } : {}}
                 whileTap={canAfford ? { scale: 0.95 } : {}}
                 disabled={!canAfford}
@@ -561,7 +549,7 @@ const BattleSelector = ({
                 style={{ ...primaryButtonStyle, background: canAfford ? "#f5ac3b" : "rgba(255,255,255,0.1)" }}
               >
                 CONTINUAR ➔
-              </motion.button>
+              </Motion.button>
             </div>
           </>
         ) : (
@@ -612,30 +600,30 @@ const BattleSelector = ({
                   }}
                   style={secondaryButtonStyle}
                 >🎲 AZAR</button>
-                <motion.button
+                <Motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => {
                     const levelsArray = [];
                     for (let i = 1; i < playerCount; i++) levelsArray.push(botLevels[i]);
                     const allBotsAssigned = levelsArray.every(level => level !== undefined);
-                    if (allBotsAssigned) {
+if (allBotsAssigned) {
                       onStart(selectedBoxes, totalCost, levelsArray, gameMode, playerCount);
                       setStep('config');
                     } else {
-                      alert('Por favor, asigna un nivel a todos los bots antes de iniciar la batalla.');
+                      toast.warning('Por favor, asigna un nivel a todos los bots antes de iniciar la batalla.');
                     }
                   }}
                   style={{ ...primaryButtonStyle, background: "#10b981" }}
                 >
                   ¡A LUCHAR! ⚔️
-                </motion.button>
+                </Motion.button>
               </div>
             </div>
           </>
         )}
-      </motion.div>
-    </motion.div>
+      </Motion.div>
+    </Motion.div>
   );
 };
 
@@ -708,6 +696,7 @@ const SectionHeader = ({ num, label, noMargin }) => (
 ───────────────────────────────────────────── */
 export default function Battles() {
   const { user, updateUser } = useAuth();
+  const toast = useToast();
   const { skins: allSkins, loading: skinsLoading } = useFetchSkins(1000, false);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalStep, setModalStep] = useState("config"); // 'config' or 'bots'
@@ -743,22 +732,47 @@ export default function Battles() {
     [allSkins]
   );
 
+  // Helper: map bot template ID to difficulty level
+  const getBotDifficulty = useCallback((botLevel) => {
+    // Elite/master/king/hacker bots → "hard"
+    const hardBots = ["elite1", "elite2", "master1", "master2", "skin_king", "hacker"];
+    // Standard/pro bots → "normal"
+    const normalBots = ["std1", "std2"];
+    // Newbie bots → "easy"
+    const easyBots = ["newbie1", "newbie2"];
+    
+    if (hardBots.includes(botLevel)) return "hard";
+    if (normalBots.includes(botLevel)) return "normal";
+    if (easyBots.includes(botLevel)) return "easy";
+    return "normal"; // default
+  }, []);
+
   // Simular apertura de caja con pesos específicos para bots
   const openBoxRandomly = useCallback(
-    (caseData, validSkins, forceGoodDrop = false, isBot = false, botLevel = "") => {
+    (caseData, validSkins, forceGoodDrop = false, forceBadDrop = false, botLevel = "") => {
       if (!validSkins.length) return null;
 
       // Sort skins by price to find the jackpot (last item)
       const sortedSkins = [...validSkins].sort((a, b) => parseFloat(a.price) - parseFloat(b.price));
       const jackpot = sortedSkins[sortedSkins.length - 1];
+      const cheapest = sortedSkins[0];
+
+      // Determine difficulty from bot level
+      const difficulty = getBotDifficulty(botLevel);
 
       // Logic for high-level bots (Pro, Elite, Master, etc.)
       const isHighLevelBot = ["std1", "std2", "elite1", "elite2", "master1", "master2", "skin_king", "hacker"].includes(botLevel);
 
-      if (isBot && isHighLevelBot) {
+      if (isHighLevelBot && forceGoodDrop) {
         const roll = Math.random();
-        // 42-45% probability of hitting the most expensive skin
-        const jackpotChance = 0.42 + (Math.random() * 0.03);
+        let jackpotChance;
+        if (difficulty === "hard") {
+          jackpotChance = 0.55 + (Math.random() * 0.10); // 55-65% jackpot chance
+        } else if (difficulty === "normal") {
+          jackpotChance = 0.35 + (Math.random() * 0.10); // 35-45%
+        } else {
+          jackpotChance = 0.05; // 5%
+        }
 
         if (roll < jackpotChance) {
           return {
@@ -773,13 +787,22 @@ export default function Battles() {
 
       // Default weighted probability for others
       const weighted = [];
+      let weightMultiplier = forceGoodDrop ? 2 : (forceBadDrop ? 0.2 : 1);
+      
+      // Adjust multiplier based on difficulty
+      if (forceGoodDrop) {
+        if (difficulty === "hard") weightMultiplier = 5;
+        else if (difficulty === "normal") weightMultiplier = 3;
+        else weightMultiplier = 1.5;
+      } else if (forceBadDrop) {
+        if (difficulty === "hard") weightMultiplier = 0.1; // Hard bots never get bad drops
+        else if (difficulty === "normal") weightMultiplier = 0.3;
+        else weightMultiplier = 0.6;
+      }
+
       validSkins.forEach((skin) => {
         const price = Math.max(0.5, skin.price || 0.5);
-        // If forceGoodDrop (level hard/king), weight favors expensive
-        let weight = forceGoodDrop
-          ? Math.max(1, Math.floor(price * 2))
-          : Math.max(1, Math.floor(800 / (price * 10)));
-
+        let weight = Math.max(1, Math.floor((800 / (price * 10)) * weightMultiplier));
         for (let i = 0; i < weight; i++) {
           weighted.push({ ...skin, price: parseFloat(parseFloat(skin.price).toFixed(2)) });
         }
@@ -794,7 +817,7 @@ export default function Battles() {
         rarity: skin.rarity,
       };
     },
-    []
+    [getBotDifficulty]
   );
 
   // Iniciar la batalla
@@ -871,22 +894,25 @@ export default function Battles() {
           let forceGoodDrop = false;
           let forceBadDrop = false;
 
-          if (!p.isUser) {
+if (!p.isUser) {
+            // Map bot template IDs to difficulty using the helper
+            const difficulty = getBotDifficulty(p.level);
+
             // Lógica de probabilidad basada en el modo
             if (gameMode === "classic") {
-              if (p.level === "hard" && Math.random() < 0.8) forceGoodDrop = true;
-              if (p.level === "normal" && Math.random() < 0.45) forceGoodDrop = true;
-              if (p.level === "easy" && Math.random() > 0.7) forceBadDrop = true;
+              if (difficulty === "hard" && Math.random() < 0.8) forceGoodDrop = true;
+              if (difficulty === "normal" && Math.random() < 0.45) forceGoodDrop = true;
+              if (difficulty === "easy" && Math.random() > 0.7) forceBadDrop = true;
             } else if (gameMode === "crazy") {
               // En modo loco, ganar es tener MENOS valor
-              if (p.level === "hard" && Math.random() < 0.8) forceBadDrop = true;
-              if (p.level === "normal" && Math.random() < 0.45) forceBadDrop = true;
-              if (p.level === "easy" && Math.random() > 0.7) forceGoodDrop = true;
+              if (difficulty === "hard" && Math.random() < 0.8) forceBadDrop = true;
+              if (difficulty === "normal" && Math.random() < 0.45) forceBadDrop = true;
+              if (difficulty === "easy" && Math.random() > 0.7) forceGoodDrop = true;
             }
           }
 
           // Modificar openBoxRandomly para manejar probabilidades específicas
-          const drop = openBoxRandomly(cData, vSkins, forceGoodDrop, !p.isUser, p.level);
+          const drop = openBoxRandomly(cData, vSkins, forceGoodDrop, forceBadDrop, p.level);
           if (drop) {
             p.results.push(drop);
             p.total = parseFloat((p.total + drop.price).toFixed(2));
@@ -955,7 +981,7 @@ export default function Battles() {
     [allCases, getSkinsForCase, openBoxRandomly, updateUser]
   );
 
-  // Otorgar loot al terminar
+// Otorgar loot al terminar + sound effects
   useEffect(() => {
     if (!battleState || !animState.hasCompleted) return;
 
@@ -963,7 +989,9 @@ export default function Battles() {
     const isUserWinner = winnerIds.includes("user");
     const isTie = winnerIds.length > 1;
 
+    // Play sound based on result
     if (isUserWinner) {
+      sound.playWin(true);
       if (!isTie) {
         // Usuario gana TODO
         const totalLoot = players.flatMap((p) => p.results);
@@ -981,6 +1009,8 @@ export default function Battles() {
           }));
         }
       }
+    } else {
+      sound.playFail();
     }
   }, [animState.hasCompleted]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1038,7 +1068,10 @@ export default function Battles() {
       newReels[p.id] = reel;
     });
 
-    setActiveReels(newReels);
+    const animationFrame = requestAnimationFrame(() => {
+      setActiveReels(newReels);
+    });
+    return () => cancelAnimationFrame(animationFrame);
   }, [battleState, animState.visibleRounds, animState.hasCompleted, getSkinsForCase]);
 
   /* ── Render ── */
@@ -1080,7 +1113,7 @@ export default function Battles() {
       <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
 
         {/* Hero Header */}
-        <motion.div
+        <Motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           style={{
@@ -1106,7 +1139,7 @@ export default function Battles() {
             pointerEvents: 'none'
           }} />
 
-          <motion.h1
+          <Motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             style={{
@@ -1120,7 +1153,7 @@ export default function Battles() {
             }}
           >
             BATALLAS ÉPICAS
-          </motion.h1>
+          </Motion.h1>
 
           <p style={{
             color: '#f5ac3b',
@@ -1133,7 +1166,7 @@ export default function Battles() {
             EL GANADOR SE LLEVA TODO EL BOTÍN
           </p>
 
-          <motion.button
+          <Motion.button
             whileHover={{ scale: 1.05, translateY: -5 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => setModalOpen(true)}
@@ -1152,8 +1185,8 @@ export default function Battles() {
             }}
           >
             {skinsLoading ? "PREPARANDO..." : "CREAR ARENA ⚔️"}
-          </motion.button>
-        </motion.div>
+          </Motion.button>
+        </Motion.div>
 
         {/* Battle Arena */}
         {battleState && (
@@ -1163,7 +1196,7 @@ export default function Battles() {
             <div style={{
               display: 'flex', justifyContent: 'flex-end', gap: '10px', marginBottom: '15px'
             }}>
-              <button
+<button
                 onClick={handleRepeatBattle}
                 style={{
                   background: "rgba(245, 172, 59, 0.1)",
@@ -1177,8 +1210,6 @@ export default function Battles() {
                   transition: 'all 0.2s',
                   boxShadow: '0 4px 15px rgba(245, 172, 59, 0.1)'
                 }}
-                onMouseEnter={e => e.target.style.background = 'rgba(245, 172, 59, 0.2)'}
-                onMouseLeave={e => e.target.style.background = 'rgba(245, 172, 59, 0.1)'}
               >
                 REPETIR / COPIAR 🔄
               </button>
@@ -1196,8 +1227,6 @@ export default function Battles() {
                   cursor: animState.hasCompleted ? "default" : "pointer",
                   transition: 'all 0.2s'
                 }}
-                onMouseEnter={e => !animState.hasCompleted && (e.target.style.background = 'rgba(255,255,255,0.1)')}
-                onMouseLeave={e => !animState.hasCompleted && (e.target.style.background = 'rgba(255,255,255,0.05)')}
               >
                 SALTAR ⏭️
               </button>
@@ -1269,7 +1298,7 @@ export default function Battles() {
                   )}
 
                   {!battleState.isStarted ? (
-                    <motion.button
+                    <Motion.button
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => setBattleState(prev => ({ ...prev, isStarted: true }))}
@@ -1285,7 +1314,7 @@ export default function Battles() {
                       }}
                     >
                       EMPEZAR BATALLA 🤜💥🤛
-                    </motion.button>
+                    </Motion.button>
                   ) : (
                     <button
                       onClick={handleSkipAnimation}
@@ -1386,7 +1415,7 @@ export default function Battles() {
 
             {/* Resultado final */}
             {animState.hasCompleted && (
-              <motion.div
+              <Motion.div
                 initial={{ opacity: 0, scale: 0.9, y: 50 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 style={{
@@ -1450,7 +1479,7 @@ export default function Battles() {
                     ))}
                 </div>
 
-                <motion.button
+                <Motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => {
@@ -1472,8 +1501,8 @@ export default function Battles() {
                   }}
                 >
                   NUEVA BATALLA ⚔️
-                </motion.button>
-              </motion.div>
+                </Motion.button>
+              </Motion.div>
             )}
 
             {/* Scoreboard en curso + historial de rondas */}
@@ -1639,10 +1668,15 @@ export default function Battles() {
                                   }}
                                 >
                                   <img
-                                    src={skin.image}
+                                    src={skin.image || getPlaceholderImage(skin.name)}
                                     alt={skin.name}
-                                    style={{ width: "100%", height: "100%", objectFit: "contain" }}
-                                    onError={(e) => { e.currentTarget.style.display = "none"; }}
+                                    onError={(e) => handleImageError(e, skin.name, skin.image)}
+                                    style={{
+                                      width: "100%",
+                                      height: "100%",
+                                      objectFit: "contain",
+                                      opacity: skin.image ? 1 : 0.3
+                                    }}
                                   />
                                 </div>
                                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -1696,6 +1730,7 @@ export default function Battles() {
         setPlayerCount={setPlayerCount}
         botLevels={botLevels}
         setBotLevels={setBotLevels}
+        toast={toast}
       />
     </div>
   );

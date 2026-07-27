@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+// src/pages/Login.jsx
+import { useState } from "react";
 import { useAuth } from "../context/useAuth";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
 
 export default function Login() {
   const [view, setView] = useState("login"); // 'login', 'register', 'recover'
@@ -18,16 +18,8 @@ export default function Login() {
   const { login, register, recoverPassword } = useAuth();
   const navigate = useNavigate();
 
-  const [emailValid, setEmailValid] = useState(false);
-  const [passwordValid, setPasswordValid] = useState(false);
-
-  const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  const validatePassword = (password) => password.length >= 6;
-
-  useEffect(() => {
-    setEmailValid(validateEmail(email));
-    setPasswordValid(validatePassword(password));
-  }, [email, password]);
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const passwordValid = password.length >= 6;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -38,9 +30,9 @@ export default function Login() {
       if (!email.trim() || !password.trim()) return setError("Todos los campos son obligatorios");
       setLoading(true);
       try {
-        await login(email, password);
+        await login(email);
         setSuccess(true);
-        setTimeout(() => navigate("/dashboard"), 800);
+        setTimeout(() => navigate("/dashboard"), 500);
       } catch (err) {
         setError(err.message || "Error al iniciar sesión");
       } finally {
@@ -54,9 +46,9 @@ export default function Login() {
 
       setLoading(true);
       try {
-        await register(nombreUsuario, email, password);
+        await register(nombreUsuario, email);
         setSuccess(true);
-        setTimeout(() => setView("login"), 1500);
+        setTimeout(() => navigate("/dashboard"), 500);
       } catch (err) {
         setError(err.message || "Error al registrar");
       } finally {
@@ -73,148 +65,171 @@ export default function Login() {
     }
   };
 
+  const handleGuestLogin = () => {
+    login("guest@skinmarket.es").then(() => navigate("/dashboard")).catch(() => navigate("/dashboard"));
+  };
+
   return (
-    <div style={{
-      minHeight: "100vh", background: "#0f1115", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", position: 'relative', overflow: 'hidden'
-    }}>
-      {/* Background decoration */}
-      <div style={{ position: 'absolute', top: '10%', left: '10%', width: '400px', height: '400px', background: 'radial-gradient(circle, #f5ac3b11 0%, transparent 70%)', filter: 'blur(100px)', zIndex: 0 }} />
-      <div style={{ position: 'absolute', bottom: '10%', right: '10%', width: '400px', height: '400px', background: 'radial-gradient(circle, #3b82f611 0%, transparent 70%)', filter: 'blur(100px)', zIndex: 0 }} />
-
-      {/* Loading Overlay */}
-      {loading && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          style={{
-            position: 'absolute', inset: 0, background: 'rgba(15, 17, 21, 0.8)',
-            backdropFilter: 'blur(10px)', zIndex: 10, display: 'flex',
-            flexDirection: 'column', alignItems: 'center', justifyContent: 'center'
-          }}
-        >
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-            style={{
-              width: '60px', height: '60px', borderRadius: '50%',
-              border: '4px solid rgba(245, 172, 59, 0.1)',
-              borderTopColor: '#f5ac3b',
-              marginBottom: '20px'
-            }}
-          />
-          <p style={{ color: '#f5ac3b', fontWeight: '900', letterSpacing: '2px', fontSize: '0.8rem' }}>PROCESANDO...</p>
-        </motion.div>
-      )}
-
-      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} style={{
-        background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "32px", padding: "60px", maxWidth: "480px", width: "100%", boxShadow: "0 40px 100px rgba(0,0,0,0.6)", zIndex: 1, backdropFilter: 'blur(20px)'
-      }}>
-        <div style={{ textAlign: "center", marginBottom: "40px" }}>
-          <div style={{ fontSize: "3rem", marginBottom: "15px" }}>
-            {view === 'login' ? '🔑' : view === 'register' ? '📝' : '🛡️'}
-          </div>
-          <h1 style={{ fontSize: "2rem", fontWeight: '900', color: "white", marginBottom: "5px", letterSpacing: '-1.5px', textTransform: 'uppercase' }}>
-            {view === 'login' ? 'Ingresar' : view === 'register' ? 'Registro' : 'Recuperar'}
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#0f1115",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "20px",
+        position: "relative",
+        overflow: "hidden",
+        color: "white",
+        fontFamily: "'Inter', sans-serif"
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "440px",
+          background: "#15181e",
+          border: "1px solid rgba(255,255,255,0.05)",
+          borderRadius: "28px",
+          padding: "40px",
+          boxShadow: "0 30px 80px rgba(0,0,0,0.6)",
+          zIndex: 1
+        }}
+      >
+        <div style={{ textAlign: "center", marginBottom: "30px" }}>
+          <h1 style={{ fontSize: "2rem", fontWeight: "900", margin: "0 0 8px 0" }}>
+            {view === "login" ? "INICIAR SESIÓN" : view === "register" ? "CREAR CUENTA" : "RECUPERAR CLAVE"}
           </h1>
-          <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.9rem", fontWeight: 'bold' }}>
-            {view === 'login' ? 'Accede a tu cuenta premium' : view === 'register' ? 'Únete a la élite de SkinMarket' : 'Restablece tu acceso'}
+          <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.85rem", margin: 0 }}>
+            Únete y consigue €500 de saldo inicial
           </p>
         </div>
 
-        <form onSubmit={handleSubmit}>
-          {view === 'register' && (
-            <div style={{ marginBottom: "20px" }}>
-              <label style={{ display: "block", color: "rgba(255,255,255,0.6)", marginBottom: "8px", fontSize: "0.75rem", fontWeight: "900" }}>NOMBRE DE USUARIO</label>
-              <input type="text" placeholder="Ej: SkinMaster77" value={nombreUsuario} onChange={(e) => setNombreUsuario(e.target.value)} style={inputStyle} />
+        {error && (
+          <div style={{ padding: "12px", background: "rgba(239, 68, 68, 0.15)", border: "1px solid #ef4444", color: "#ef4444", borderRadius: "10px", marginBottom: "20px", fontSize: "0.85rem", textAlign: "center", fontWeight: "bold" }}>
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div style={{ padding: "12px", background: "rgba(16, 185, 129, 0.15)", border: "1px solid #10b981", color: "#10b981", borderRadius: "10px", marginBottom: "20px", fontSize: "0.85rem", textAlign: "center", fontWeight: "bold" }}>
+            ¡Operación completada con éxito!
+          </div>
+        )}
+
+        {recoveryMessage && (
+          <div style={{ padding: "12px", background: "rgba(59, 130, 246, 0.15)", border: "1px solid #3b82f6", color: "#3b82f6", borderRadius: "10px", marginBottom: "20px", fontSize: "0.85rem", textAlign: "center", fontWeight: "bold" }}>
+            {recoveryMessage}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+          {view === "register" && (
+            <div>
+              <label style={{ fontSize: "0.7rem", fontWeight: "900", color: "rgba(255,255,255,0.4)", display: "block", marginBottom: "6px" }}>NOMBRE DE USUARIO</label>
+              <input
+                type="text"
+                placeholder="Tu apodo"
+                value={nombreUsuario}
+                onChange={(e) => setNombreUsuario(e.target.value)}
+                style={{ width: "100%", padding: "14px", borderRadius: "12px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", color: "white", outline: "none" }}
+              />
             </div>
           )}
 
-          <div style={{ marginBottom: "20px" }}>
-            <label style={{ display: "block", color: "rgba(255,255,255,0.6)", marginBottom: "8px", fontSize: "0.75rem", fontWeight: "900" }}>EMAIL</label>
-            <input type="email" placeholder="tu@email.com" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} />
+          <div>
+            <label style={{ fontSize: "0.7rem", fontWeight: "900", color: "rgba(255,255,255,0.4)", display: "block", marginBottom: "6px" }}>CORREO ELECTRÓNICO</label>
+            <input
+              type="email"
+              placeholder="tu@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              style={{ width: "100%", padding: "14px", borderRadius: "12px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", color: "white", outline: "none" }}
+            />
           </div>
 
-          {view !== 'recover' && (
-            <div style={{ marginBottom: "20px", position: "relative" }}>
-              <label style={{ display: "block", color: "rgba(255,255,255,0.6)", marginBottom: "8px", fontSize: "0.75rem", fontWeight: "900" }}>CONTRASEÑA</label>
-              <div style={{ position: 'relative' }}>
+          {view !== "recover" && (
+            <div>
+              <label style={{ fontSize: "0.7rem", fontWeight: "900", color: "rgba(255,255,255,0.4)", display: "block", marginBottom: "6px" }}>CONTRASEÑA</label>
+              <div style={{ position: "relative" }}>
                 <input
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  style={{ ...inputStyle, paddingRight: '50px' }}
+                  style={{ width: "100%", padding: "14px", borderRadius: "12px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", color: "white", outline: "none" }}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  style={{
-                    position: 'absolute',
-                    right: '15px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'none',
-                    border: 'none',
-                    color: 'rgba(255,255,255,0.2)',
-                    cursor: 'pointer',
-                    fontSize: '1.2rem',
-                    transition: 'color 0.2s'
-                  }}
+                  style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: "0.8rem" }}
                 >
-                  {showPassword ? "🔒" : "🔓"}
+                  {showPassword ? "Ocultar" : "Ver"}
                 </button>
               </div>
             </div>
           )}
 
-          {view === 'register' && (
-            <div style={{ marginBottom: "30px" }}>
-              <label style={{ display: "block", color: "rgba(255,255,255,0.6)", marginBottom: "8px", fontSize: "0.75rem", fontWeight: "900" }}>CONFIRMAR CONTRASEÑA</label>
-              <input type="password" placeholder="••••••••" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} style={inputStyle} />
+          {view === "register" && (
+            <div>
+              <label style={{ fontSize: "0.7rem", fontWeight: "900", color: "rgba(255,255,255,0.4)", display: "block", marginBottom: "6px" }}>CONFIRMAR CONTRASEÑA</label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                style={{ width: "100%", padding: "14px", borderRadius: "12px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", color: "white", outline: "none" }}
+              />
             </div>
           )}
 
-          {error && <div style={errorStyle}>{error}</div>}
-          {success && <div style={successStyle}>{view === 'register' ? '¡Registro exitoso! Redirigiendo...' : '¡Acceso concedido!'}</div>}
-          {recoveryMessage && <div style={successStyle}>{recoveryMessage}</div>}
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              padding: "16px",
+              background: "#f5ac3b",
+              color: "black",
+              border: "none",
+              borderRadius: "14px",
+              fontWeight: "900",
+              fontSize: "1rem",
+              cursor: "pointer",
+              marginTop: "10px"
+            }}
+          >
+            {loading ? "PROCESANDO..." : view === "login" ? "ENTRAR" : view === "register" ? "REGISTRARME" : "ENVIAR ENLACE"}
+          </button>
 
-          <button type="submit" disabled={loading} style={{ ...buttonStyle, background: loading ? 'rgba(255,255,255,0.1)' : 'linear-gradient(90deg, #f5ac3b 0%, #ffba52 100%)' }}>
-            {loading ? "PROCESANDO..." : view === 'login' ? "INGRESAR" : view === 'register' ? "CREAR CUENTA" : "ENVIAR EMAIL"}
+          <button
+            type="button"
+            onClick={handleGuestLogin}
+            style={{
+              padding: "14px",
+              background: "rgba(255,255,255,0.05)",
+              color: "white",
+              border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: "14px",
+              fontWeight: "bold",
+              fontSize: "0.9rem",
+              cursor: "pointer"
+            }}
+          >
+            🎮 Entrar como Invitado
           </button>
         </form>
 
-        <div style={{ marginTop: "30px", display: "flex", flexDirection: "column", gap: "10px", alignItems: "center" }}>
-          {view === 'login' ? (
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: "25px", fontSize: "0.8rem", color: "rgba(255,255,255,0.5)" }}>
+          {view === "login" ? (
             <>
-              <button onClick={() => setView("register")} style={linkStyle}>¿No tienes cuenta? Regístrate</button>
-              <button onClick={() => setView("recover")} style={linkStyle}>Olvidé mi contraseña</button>
+              <span onClick={() => setView("register")} style={{ cursor: "pointer", color: "#f5ac3b" }}>¿No tienes cuenta? Regístrate</span>
+              <span onClick={() => setView("recover")} style={{ cursor: "pointer" }}>¿Olvidaste clave?</span>
             </>
           ) : (
-            <button onClick={() => setView("login")} style={linkStyle}>Volver al login</button>
+            <span onClick={() => setView("login")} style={{ cursor: "pointer", color: "#f5ac3b" }}>Volver a Iniciar Sesión</span>
           )}
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 }
-
-
-const inputStyle = {
-  width: "100%", padding: "16px 20px", borderRadius: "14px", border: "1px solid rgba(255,255,255,0.05)", background: "rgba(255,255,255,0.03)", color: "white", fontSize: "0.95rem", boxSizing: "border-box", outline: 'none'
-};
-
-const buttonStyle = {
-  width: "100%", padding: "18px", borderRadius: "14px", border: "none", color: "black", fontWeight: "900", cursor: "pointer", fontSize: "1rem", letterSpacing: '1px'
-};
-
-const errorStyle = {
-  background: "rgba(239, 68, 68, 0.1)", color: "#ff8a8a", padding: "12px", borderRadius: "10px", marginBottom: "20px", fontSize: "0.85rem", textAlign: 'center'
-};
-
-const successStyle = {
-  background: "rgba(16, 185, 129, 0.1)", color: "#10b981", padding: "12px", borderRadius: "10px", marginBottom: "20px", fontSize: "0.85rem", textAlign: 'center'
-};
-
-const linkStyle = {
-  background: "none", border: "none", color: "rgba(255,255,255,0.3)", cursor: "pointer", fontSize: "0.85rem", fontWeight: 'bold'
-};
