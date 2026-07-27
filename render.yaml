@@ -58,7 +58,7 @@ services:
           property: url
       - key: FRONTEND_URL
         fromService:
-          type: static
+          type: web
           name: skinmarket-frontend
           property: url
 
@@ -77,23 +77,12 @@ services:
 # ─────────────────────────────────────────────────────────────
 # 3. Frontend Static Site (React / Vite)
 # ─────────────────────────────────────────────────────────────
-  - type: static
+  - type: web
     name: skinmarket-frontend
+    env: static
     buildCommand: npm install && npm run build
-    publishPath: dist
+    staticPublishPath: ./dist
     autoDeploy: true
-    headers:
-      - path: /*
-        name: X-Frame-Options
-        value: DENY
-      - path: /*
-        name: X-Content-Type-Options
-        value: nosniff
-      - path: /*
-        name: Referrer-Policy
-        value: strict-origin-when-cross-origin
-    # ── Rewrite Rules: SPA Routing ──
-    # All non-asset routes go to index.html so React Router works
     routes:
       - type: rewrite
         source: /*
