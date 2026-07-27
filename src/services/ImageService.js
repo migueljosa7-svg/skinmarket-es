@@ -319,10 +319,74 @@ export function getSkinImageUrlSilent(skinName, originalImage) {
 }
 
 // ---------------------------------------------------------------------------
-// Public API: handleImageError — silent multi-tier fallback handler (uses data-try-index)
+// Emergency Skin Replacement System
 // ---------------------------------------------------------------------------
 
-export function handleImageError(event, skin) {
+/**
+ * Try to load emergency skin from local database
+ * @param {string} skinId - The skin ID to look up
+ * @returns {Promise<string|null>} Emergency image URL or null
+ */
+async function loadEmergencySkinImage(skinId) {
+  try {
+    // Try to load from local emergency skins directory
+    const response = await fetch(`/images/emergency-skins/${skinId}.png`);
+    if (response.ok) {
+      return `/images/emergency-skins/${skinId}.png`;
+    }
+
+    // Try webp format
+    const responseWebp = await fetch(`/images/emergency-skins/${skinId}.webp`);
+    if (responseWebp.ok) {
+      return `/images/emergency-skins/${skinId}.webp`;
+    }
+
+    // Try jpg format
+    const responseJpg = await fetch(`/images/emergency-skins/${skinId}.jpg`);
+    if (responseJpg.ok) {
+      return `/images/emergency-skins/${skinId}.jpg`;
+    }
+  } catch (err) {
+    // Silent fail - emergency images are optional
+  }
+  return null;
+}
+
+/**
+ * Request backend to replace corrupted skin with valid one
+ * @param {string} skinId - The corrupted skin ID
+ * @param {number} userId - The user ID requesting replacement
+ * @returns {Promise<Object|null>} Replacement skin object or null
+ */
+async function replaceWithValidSkin(skinId, userId) {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) return null;
+
+    const response = await fetch('/api/skins/replace-corrupted', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ skinId, userId })
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      return data.replacementSkin;
+    }
+  } catch (err) {
+    // Silent fail
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Public API: handleImageError — ultra-aggressive multi-tier fallback handler
+// ---------------------------------------------------------------------------
+
+export async function handleImageError(event, skin) {
   var img = event && event.target;
   if (!img || !img.src) return;
 
@@ -361,7 +425,45 @@ export function handleImageError(event, skin) {
     return;
   }
 
-  // All CDNs exhausted: silent SVG placeholder fallback
+  // All CDNs exhausted: Try emergency skin database (Level 1)
+  if (skin && skin.id) {
+    var emergencyUrl = await loadEmergencySkinImage(skin.id);
+    if (emergencyUrl) {
+      img.onerror = null;
+      img.src = emergencyUrl;
+      img.style.opacity = '1';
+      img.style.objectFit = 'contain';
+      img.removeAttribute('data-try-index');
+      return;
+    }
+
+    // No emergency image: Request backend replacement (Level 2 - Critical)
+    var userId = skin.userId || getCurrentUserId();
+    if (userId) {
+      var replacementSkin = await replaceWithValidSkin(skin.id, userId);
+      if (replacementSkin && replacementSkin.image) {
+        // Update the skin object in place if possible
+        if (skin.image !== replacementSkin.image) {
+          skin.image = replacementSkin.image;
+          skin.name = replacementSkin.name;
+        }
+
+        img.onerror = null;
+        img.src = replacementSkin.image;
+        img.style.opacity = '1';
+        img.style.objectFit = 'contain';
+        img.removeAttribute('data-try-index');
+
+        // Dispatch custom event to notify UI of replacement
+        window.dispatchEvent(new CustomEvent('skinReplaced', {
+          detail: { originalSkin: skin, replacementSkin: replacementSkin }
+        }));
+        return;
+      }
+    }
+  }
+
+  // All fallbacks exhausted: silent SVG placeholder fallback
   // Disable further error handling to prevent infinite loops
   img.onerror = null;
 
@@ -373,6 +475,23 @@ export function handleImageError(event, skin) {
 
   // Remove data-try-index since we've exhausted all sources
   img.removeAttribute('data-try-index');
+}
+
+/**
+ * Get current user ID from localStorage
+ * @returns {string|null} User ID or null
+ */
+function getCurrentUserId() {
+  try {
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      const user = JSON.parse(userData);
+      return user.usuario_id || user.id || null;
+    }
+  } catch (err) {
+    // Silent fail
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -387,14 +506,22 @@ export function resetImageCache() {
   failedUrls.clear();
 }
 
-export function preloadSkinImage(skinName, originalImage) {
+export async function preloadSkinImage(skinName, originalImage) {
   return new Promise(function (resolve) {
     var url = getSkinImageUrl(skinName, originalImage);
     var img = new Image();
     img.onload = function () { resolve(url); };
-    img.onerror = function () {
+    img.onerror = async function () {
       failedUrls.add(url);
-      resolve(getSkinImageUrl(skinName, originalImage));
+
+      // Try emergency skin if original fails
+      var skin = { name: skinName, image: originalImage };
+      var emergencyUrl = await loadEmergencySkinImage(skinName);
+      if (emergencyUrl) {
+        resolve(emergencyUrl);
+      } else {
+        resolve(getSkinImageUrl(skinName, originalImage));
+      }
     };
     img.src = url;
   });
