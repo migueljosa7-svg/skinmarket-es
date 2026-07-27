@@ -42,9 +42,14 @@ const isProduction = process.env.NODE_ENV === 'production';
 // Sanitize DATABASE_URL before using it
 const sanitizedDatabaseUrl = sanitizeDatabaseUrl(process.env.DATABASE_URL);
 
+// Determine if we should use SSL: production OR Render host
+const databaseUrl = sanitizedDatabaseUrl || process.env.DATABASE_URL || '';
+const isRenderHost = databaseUrl.includes('.render.com') || databaseUrl.includes('@dpg-');
+const useSSL = isProduction || isRenderHost;
+
 const pool = new Pool({
     connectionString: sanitizedDatabaseUrl,
-    ssl: isProduction ? { rejectUnauthorized: false } : false,
+    ssl: useSSL ? { rejectUnauthorized: false } : false,
     connectionTimeoutMillis: 10000,
     idleTimeoutMillis: 30000,
     max: 10

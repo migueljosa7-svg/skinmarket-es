@@ -102,6 +102,28 @@ node init_db.js || {
 }
 echo "  ✓ Migraciones completadas"
 
+# ── 4b. Verify DATABASE_URL parsing (debug) ────────
+echo ""
+echo "[4b/5] Verificando parseo de DATABASE_URL..."
+# Use Node.js for safe, precise parsing to avoid regex corruption
+PARSED=$(node -e "
+const url = process.env.DATABASE_URL;
+const m = url.match(/^postgres:\/\/([^:]+):([^@]+)@([^:\/]+)(?::(\d+))?\/\s*([^?]+)/);
+if (!m) {
+  console.error('ERROR: Cannot parse DATABASE_URL');
+  process.exit(1);
+}
+const [, user, pass, host, port, dbname] = m;
+console.log(JSON.stringify({
+  user,
+  pass: pass.substring(0, 3) + '***',
+  host,
+  port: port || '5432',
+  dbname
+}));
+")
+echo "  ✓ DATABASE_URL parseada correctamente: $PARSED"
+
 # ── 5. Start the backend server ───────────────────
 echo ""
 echo "[5/5] Iniciando servidor Node.js..."
