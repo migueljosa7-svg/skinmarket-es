@@ -86,7 +86,16 @@ node init_db.js || {
   echo "  ⚠️  init_db.js falló, intentando con init-db.sql..."
   # Fallback: ejecutar script SQL directamente si psql está disponible
   if command -v psql &> /dev/null; then
-    psql "$DATABASE_URL" -f "$(dirname "$0")/init-db.sql" || true
+    # Parse DATABASE_URL to force TCP/IP connection
+    # Format: postgres://user:password@host:port/database
+    DB_USER=$(echo "$DATABASE_URL" | grep -oP '(?<=://)[^:]+')
+    DB_PASS=$(echo "$DATABASE_URL" | grep -oP '(?<=:)[^@]+' | head -1)
+    DB_HOST=$(echo "$DATABASE_URL" | grep -oP '(?<=@)[^:]+')
+    DB_PORT=$(echo "$DATABASE_URL" | grep -oP '(?<=:)[^/]+' | tail -1)
+    DB_NAME=$(echo "$DATABASE_URL" | grep -oP '(?<=/)[^?]+')
+    
+    # Use explicit flags to force TCP/IP connection
+    PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -f "$(dirname "$0")/init-db.sql" || true
   else
     echo "  ⚠️  psql no disponible. init_db.js ya habrá creado las tablas."
   fi
