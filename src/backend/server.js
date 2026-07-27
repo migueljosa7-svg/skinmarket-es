@@ -896,7 +896,11 @@ app.use((err, req, res, next) => {
 // ─────────────────────────────────────────────────
 // Socket.io - Live Drops en Tiempo Real
 // ─────────────────────────────────────────────────
-const server = app.listen(PORT, () => log(LOG_LEVELS.INFO, 'SYSTEM', `Servidor corriendo en puerto ${PORT}`));
+const server = app.listen(PORT, "0.0.0.0", () => log(LOG_LEVELS.INFO, 'SYSTEM', `Servidor corriendo en puerto ${PORT}`));
+server.on('error', (err) => {
+  log(LOG_LEVELS.ERROR, 'SYSTEM', `Error al abrir puerto ${PORT}:`, err.message);
+  process.exit(1);
+});
 
 const io = new SocketIOServer(server, {
   cors: {
