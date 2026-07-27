@@ -4,7 +4,7 @@ import { useAuth } from "../context/useAuth";
 import { getRarityColor } from "../constants/colors.js";
 import RechargeModal from "../components/RechargeModal";
 import { StorageService } from "../services/StorageService";
-import { getPlaceholderImage, handleImageError } from "../services/ImageService";
+import { getPlaceholderImage, getSkinImageUrl, handleImageError } from "../services/ImageService";
 import { useToast } from "../components/Toast";
 
 const SettingsModal = ({ open, onClose }) => {
