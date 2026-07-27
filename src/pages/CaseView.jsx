@@ -173,7 +173,7 @@ const SingleMultiRoulette = ({ items, quantity, isSpinning, onComplete }) => {
               <img
                 src={skin.image || getPlaceholderImage(skin.name)}
                 alt={skin.name}
-                onError={(e) => handleImageError(e, skin.name, skin.image)}
+                onError={(e) => handleImageError(e, skin)}
                 style={{
                   width: "100px",
                   height: "70px",
@@ -419,7 +419,7 @@ export default function CaseView() {
             <img
               src={validSkins[validSkins.length - 1]?.image || caseData.imageSrc || getPlaceholderImage(caseData.name)}
               alt={caseData.name}
-              onError={(e) => handleImageError(e, caseData.name, validSkins[validSkins.length - 1]?.image || caseData.imageSrc)}
+onError={(e) => handleImageError(e, { name: caseData.name, image: validSkins[validSkins.length - 1]?.image || caseData.imageSrc })}
               style={{
                 width: "380px",
                 height: "280px",
@@ -504,7 +504,7 @@ export default function CaseView() {
                         <img
                           src={skin.image || getPlaceholderImage(skin.name)}
                           alt={skin.name}
-                          onError={(e) => handleImageError(e, skin.name, skin.image)}
+              onError={(e) => handleImageError(e, skin)}
                           style={{
                             width: "100%",
                             height: "120px",
@@ -696,7 +696,7 @@ export default function CaseView() {
                   <img
                     src={skin.image || getPlaceholderImage(skin.name)}
                     alt={skin.name}
-                    onError={(e) => handleImageError(e, skin.name, skin.image)}
+            onError={(e) => handleImageError(e, skin)}
                     style={{
                       width: "100%",
                       height: "100px",

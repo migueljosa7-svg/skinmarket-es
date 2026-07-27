@@ -173,7 +173,7 @@ export default function LiveDrops() {
                 <img
                   src={drop.image || getPlaceholderImage(drop.name)}
                   alt={drop.name}
-                  onError={(e) => handleImageError(e, drop.name, drop.image)}
+onError={(e) => handleImageError(e, drop)}
                   style={{
                     width: "40px",
                     height: "40px",

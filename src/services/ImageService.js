@@ -1,11 +1,12 @@
 /**
  * ImageService - Unified image loading service with multi-CDN fallback
- * 
+ *
  * Architecture:
- * - Multiple CDN sources with automatic fallback chain
+ * - 4-tier CDN fallback chain (Steam CloudFlare → Steam Akamai → ByMykel GitHub API → CS2 Stash)
+ * - data-try-index attribute on <img> elements for tracking fallback progress
+ * - Silent SVG placeholder as last resort (no console 404 errors)
  * - Per-session failed URL cache (no infinite loops)
- * - SVG placeholder generation as last resort
- * 
+ *
  * No external dependencies. 100% offline compatible placeholder generation.
  */
 
@@ -24,7 +25,42 @@ const GRADIENT_COLORS = [
 ];
 
 // ---------------------------------------------------------------------------
-// Placeholder Generation (Inline SVG -> Data URL)
+// CDN Source Definitions (4-tier fallback chain)
+// ---------------------------------------------------------------------------
+
+const CDN_TIERS = [
+  {
+    name: 'Steam CloudFlare CDN',
+    buildUrl: function(hash) {
+      if (!hash) return null;
+      return 'https://community.cloudflare.steamstatic.com/economy/image/' + hash + '/512fx512f';
+    },
+  },
+  {
+    name: 'Steam Akamai CDN',
+    buildUrl: function(hash) {
+      if (!hash) return null;
+      return 'https://steamcommunity-a.akamaihd.net/economy/image/' + hash;
+    },
+  },
+  {
+    name: 'ByMykel CS2 GitHub API',
+    buildUrl: function(cleanName) {
+      if (!cleanName) return null;
+      return 'https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/images/items/' + encodeURIComponent(cleanName) + '.png';
+    },
+  },
+  {
+    name: 'CS2 Stash / SwapGG Mirror',
+    buildUrl: function(cleanName) {
+      if (!cleanName) return null;
+      return 'https://csgostash.com/img/skins/large/' + encodeURIComponent(cleanName) + '.png';
+    },
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Helpers
 // ---------------------------------------------------------------------------
 
 function escapeXml(str) {
@@ -38,8 +74,8 @@ function escapeXml(str) {
 
 function hashColor(name) {
   if (!name) return GRADIENT_COLORS[0];
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
+  var hash = 0;
+  for (var i = 0; i < name.length; i++) {
     hash = ((hash << 5) - hash) + name.charCodeAt(i);
     hash |= 0;
   }
@@ -47,17 +83,17 @@ function hashColor(name) {
 }
 
 function generatePlaceholderDataUrl(skinName) {
-  const name = skinName || 'SKIN';
-  const safeName = escapeXml(name);
-  const primaryColor = hashColor(name);
-  const secondaryColor = '#020617';
+  var name = skinName || 'SKIN';
+  var safeName = escapeXml(name);
+  var primaryColor = hashColor(name);
+  var secondaryColor = '#020617';
 
-  const hash = name.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
-  const cx = 30 + (hash % 40);
-  const cy = 28 + (hash % 20);
-  const r = 10 + (hash % 10);
+  var hash = name.split('').reduce(function(acc, c) { return acc + c.charCodeAt(0); }, 0);
+  var cx = 30 + (hash % 40);
+  var cy = 28 + (hash % 20);
+  var r = 10 + (hash % 10);
 
-  const svg = [
+  var svg = [
     '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="150" viewBox="0 0 200 150">',
     '<defs>',
     '<linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">',
@@ -78,90 +114,108 @@ function generatePlaceholderDataUrl(skinName) {
   return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
 }
 
-// ---------------------------------------------------------------------------
-// Steam CDN Base Domains (for hash-based URL fallback)
-// ---------------------------------------------------------------------------
-
-const STEAM_CDN_DOMAINS = [
-  'https://community.steamstatic.com/economy/image',
-  'https://steamcommunity-a.akamaihd.net/economy/image',
-  'https://community.cloudflare.steamstatic.com/economy/image',
-];
-
-// ---------------------------------------------------------------------------
-// CDN Sources (in priority order)
-// ---------------------------------------------------------------------------
-
-const CDN_SOURCES = [
-  {
-    name: 'CSGOFloat API',
-    buildUrl: function(skinName) {
-      if (!skinName) return null;
-      return 'https://api.csgofloat.com/api/item_image/' + encodeURIComponent(skinName);
-    },
-  },
-  {
-    name: 'CSGO CDN',
-    buildUrl: function(skinName) {
-      if (!skinName) return null;
-      return 'https://cdn.csgo.com/images/items/' + encodeURIComponent(skinName);
-    },
-  },
-];
-
 /**
  * Extract the image hash/path from a Steam economy image URL.
  * Steam economy image URLs look like:
- *   https://community.steamstatic.com/economy/image/-9a81dlWLwJ2U.../fx360f
+ *   https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2U.../fx360f
  * Returns just the hash portion, or null if not a Steam URL.
  */
 function extractSteamImageHash(url) {
   if (!url) return null;
-  // Match Steam economy image pattern: /economy/image/<hash>
-  const match = url.match(/\/economy\/image\/([^/?#]+)/);
+  var match = url.match(/\/economy\/image\/([^/?#]+)/);
   return match ? match[1] : null;
 }
 
 /**
- * Build a Steam economy image URL using a specific CDN domain and image hash.
+ * Clean a skin name for CDN URLs: remove wear/quality suffixes,
+ * replace special characters, format as expected by external APIs.
+ * Example: "AK-47 | Redline (Field-Tested)" → "ak-47_redline"
  */
-function buildSteamCdnUrl(domain, hash) {
-  if (!domain || !hash) return null;
-  // Append a quality suffix for better resolution
-  return domain + '/' + hash + '/fx360f';
+function cleanSkinName(name) {
+  if (!name) return '';
+  // Remove parenthesized wear/quality suffixes: " (Field-Tested)", " (Minimal Wear)", etc.
+  var cleaned = name.replace(/\s*\([^)]*\)\s*/g, '');
+  // Remove leading/trailing whitespace
+  cleaned = cleaned.trim();
+  // Lowercase
+  cleaned = cleaned.toLowerCase();
+  // Replace " | " with "_"
+  cleaned = cleaned.replace(/\s*\|\s*/g, '_');
+  // Replace remaining spaces with underscores
+  cleaned = cleaned.replace(/\s+/g, '_');
+  // Remove any non-alphanumeric characters except underscores and hyphens
+  cleaned = cleaned.replace(/[^a-z0-9_-]/g, '');
+  return cleaned;
 }
 
 // ---------------------------------------------------------------------------
-// Public API
+// Public API: getSkinImageSources(skin) — returns ordered array of fallback URLs
+// ---------------------------------------------------------------------------
+
+/**
+ * Generate the 4-tier fallback image URL array for a given skin object.
+ * @param {Object} skin - Skin object with at least { name, image }
+ * @returns {string[]} Ordered array of CDN URLs (may include nulls)
+ */
+export function getSkinImageSources(skin) {
+  var sources = [];
+  if (!skin) return sources;
+
+  var skinName = skin.name || '';
+  var originalImage = skin.image || '';
+  var hash = extractSteamImageHash(originalImage) || skin.icon_url || '';
+  var cleanName = cleanSkinName(skinName);
+
+  // Tier 1: Steam CloudFlare CDN (hash-based)
+  if (hash) {
+    sources.push(CDN_TIERS[0].buildUrl(hash));
+  } else {
+    sources.push(null);
+  }
+
+  // Tier 2: Steam Akamai CDN (hash-based)
+  if (hash) {
+    sources.push(CDN_TIERS[1].buildUrl(hash));
+  } else {
+    sources.push(null);
+  }
+
+  // Tier 3: ByMykel CS2 GitHub API CDN (name-based)
+  if (cleanName) {
+    sources.push(CDN_TIERS[2].buildUrl(cleanName));
+  } else {
+    sources.push(null);
+  }
+
+  // Tier 4: CS2 Stash / SwapGG Mirror (name-based)
+  if (cleanName) {
+    sources.push(CDN_TIERS[3].buildUrl(cleanName));
+  } else {
+    sources.push(null);
+  }
+
+  return sources;
+}
+
+// ---------------------------------------------------------------------------
+// Public API: getSkinImageUrl — backward-compatible synchronous URL resolver
 // ---------------------------------------------------------------------------
 
 export function getSkinImageUrl(skinName, originalImage) {
-  // If the original image URL hasn't failed yet, use it
+  // If original image hasn't failed yet, use it
   if (originalImage && !failedUrls.has(originalImage)) {
     return originalImage;
   }
 
-  // If originalImage is a Steam URL that failed, try alternative Steam CDN domains
-  // using the same image hash (much more reliable than constructing from skin name)
-  if (originalImage) {
-    var hash = extractSteamImageHash(originalImage);
-    if (hash) {
-      for (var s = 0; s < STEAM_CDN_DOMAINS.length; s++) {
-        var altUrl = buildSteamCdnUrl(STEAM_CDN_DOMAINS[s], hash);
-        if (altUrl && !failedUrls.has(altUrl) && altUrl !== originalImage) {
-          return altUrl;
-        }
-      }
-    }
-  }
+  // Build a minimal skin object to generate sources
+  var skin = { name: skinName, image: originalImage };
+  var sources = getSkinImageSources(skin);
 
-  // Fall back to name-based CDN sources (CSGOFloat, CSGO CDN)
-  if (skinName) {
-    for (var i = 0; i < CDN_SOURCES.length; i++) {
-      var url = CDN_SOURCES[i].buildUrl(skinName);
-      if (url && !failedUrls.has(url)) {
-        return url;
-      }
+  // Return the first source that hasn't failed yet
+  for (var i = 0; i < sources.length; i++) {
+    var url = sources[i];
+    if (url && !failedUrls.has(url)) {
+      return url;
     }
   }
 
@@ -169,30 +223,66 @@ export function getSkinImageUrl(skinName, originalImage) {
   return generatePlaceholderDataUrl(skinName);
 }
 
-export function handleImageError(event, skinName, originalImage) {
+// ---------------------------------------------------------------------------
+// Public API: handleImageError — silent multi-tier fallback handler (uses data-try-index)
+// ---------------------------------------------------------------------------
+
+export function handleImageError(event, skin) {
   var img = event && event.target;
   if (!img || !img.src) return;
 
   var currentSrc = img.src;
 
-  // Stop if we've already fallen back to the placeholder
+  // If we're already on the SVG placeholder, stop (prevent loops)
   if (currentSrc.indexOf('data:image/svg+xml') === 0) {
     return;
   }
 
-  // Mark the current URL as failed
+  // Mark current URL as failed for this session
   failedUrls.add(currentSrc);
 
-  // Get the next URL to try (will skip failed URLs automatically)
-  var nextUrl = getSkinImageUrl(skinName, originalImage);
+  // Get or initialize the try index
+  var tryIndex = parseInt(img.getAttribute('data-try-index'), 10) || 0;
 
-  if (nextUrl !== currentSrc) {
-    img.src = nextUrl;
-    var isPlaceholder = nextUrl.indexOf('data:image/svg+xml') === 0;
-    img.style.opacity = isPlaceholder ? '0.4' : '1';
-    img.style.objectFit = 'contain';
+  // Get the fallback sources for this skin
+  var sources = getSkinImageSources(skin);
+
+  // Try next CDN in chain
+  if (tryIndex < sources.length) {
+    var nextUrl = sources[tryIndex];
+
+    if (nextUrl && !failedUrls.has(nextUrl) && nextUrl !== currentSrc) {
+      img.setAttribute('data-try-index', tryIndex + 1);
+      img.src = nextUrl;
+      img.style.opacity = '1';
+      img.style.objectFit = 'contain';
+      return;
+    }
+
+    // This source is null or already failed, skip to next
+    img.setAttribute('data-try-index', tryIndex + 1);
+    // Retry with incremented index (will pick next non-null source)
+    handleImageError(event, skin);
+    return;
   }
+
+  // All CDNs exhausted: silent SVG placeholder fallback
+  // Disable further error handling to prevent infinite loops
+  img.onerror = null;
+
+  // Assign SVG data URL placeholder silently
+  var placeholderUrl = generatePlaceholderDataUrl(skin && skin.name);
+  img.src = placeholderUrl;
+  img.style.opacity = '0.4';
+  img.style.objectFit = 'contain';
+
+  // Remove data-try-index since we've exhausted all sources
+  img.removeAttribute('data-try-index');
 }
+
+// ---------------------------------------------------------------------------
+// Public API: Utility functions
+// ---------------------------------------------------------------------------
 
 export function getPlaceholderImage(skinName) {
   return generatePlaceholderDataUrl(skinName);
@@ -217,9 +307,9 @@ export function preloadSkinImage(skinName, originalImage) {
 
 export default {
   getSkinImageUrl: getSkinImageUrl,
+  getSkinImageSources: getSkinImageSources,
   handleImageError: handleImageError,
   getPlaceholderImage: getPlaceholderImage,
   resetImageCache: resetImageCache,
   preloadSkinImage: preloadSkinImage,
 };
-

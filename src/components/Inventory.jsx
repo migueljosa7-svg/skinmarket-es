@@ -288,7 +288,7 @@ export default function Inventory() {
                   <img
                     src={skin.image || getPlaceholderImage(skin.name)}
                     alt={skin.name}
-                    onError={(e) => handleImageError(e, skin.name, skin.image)}
+onError={(e) => handleImageError(e, skin)}
                     style={{
                       width: "100%",
                       height: "90px",

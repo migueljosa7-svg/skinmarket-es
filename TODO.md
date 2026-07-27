@@ -1,20 +1,23 @@
-# Deployment Fix TODO (Phase 1)
+# ✅ TODO: Image Fallback Pipeline Implementation - COMPLETE
 
-- [x] Create plan (approved)
-- [x] 1. Edit `src/backend/package.json` — add `bcrypt` dependency
-- [x] 2. Edit `src/backend/db.js` — add SSL config + connection timeout
-- [x] 3. Edit `src/backend/init_db.js` — add retry logic with backoff
-- [x] 4. Run `cd src/backend && npm install` to install bcrypt
-- [x] 5. Commit: `fix(deploy): add bcrypt dependency and fix postgres hostname resolution`
-- [x] 6. Push to `master`
+## Implementation Status
 
-# Dependency Audit & Fix (Phase 2)
+### ✅ ImageService.js
+- ✅ Added `getSkinImageSources(skin)` — returns array of 4 CDN URLs:
+  1. Steam CloudFlare CDN: `https://community.cloudflare.steamstatic.com/economy/image/${hash}/512fx512f`
+  2. Steam Akamai CDN: `https://steamcommunity-a.akamaihd.net/economy/image/${hash}`
+  3. ByMykel CS2 GitHub API: `https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/images/items/${cleanName}.png`
+  4. CS2 Stash Mirror: `https://csgostash.com/img/skins/large/${cleanName}.png`
+- ✅ Refactored `handleImageError(e, skin)` — uses `data-try-index` attribute, iterates through 4-tier chain, silent SVG fallback
+- ✅ Added `cleanSkinName()` helper for CDN URL formatting
+- ✅ Kept backward-compatible `getSkinImageUrl()` and `getPlaceholderImage()`
+- ✅ Silent error handling — no console 404 logs
 
-- [x] 1. Run dependency scanner across all files
-- [x] 2. Create DEPENDENCY_AUDIT.md with full report
-- [x] 3. Add 12 missing dependencies to `src/backend/package.json` (helmet, hpp, express-session, connect-redis, redis, express-rate-limit, passport, passport-steam, steam-user, steamcommunity, steam-tradeoffer-manager, steam-totp)
-- [x] 4. Remove unused deps from `src/backend/package.json` (`@supabase/supabase-js`, `bcryptjs`)
-- [x] 5. Run `npm install` in `src/backend/` to sync package-lock.json
-- [x] 6. Commit: `fix(deps): add missing backend dependencies and cleanup unused packages`
-- [x] 7. Push to `master`
+### ✅ Component Updates (all `handleImageError(e, skin.name, skin.image)` → `handleImageError(e, skin)`)
+- ✅ `src/pages/Upgrade.jsx` — 2 instances fixed
+- ✅ `src/pages/CaseView.jsx` — 1 special case fixed (`caseData` → `{ name: ... }`)
+- ✅ All other 6 files already had correct signatures
+
+### ✅ Build Verification
+- ✅ `npx vite build` — completed successfully with zero errors
 
