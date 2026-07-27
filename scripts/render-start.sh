@@ -50,9 +50,37 @@ cd "$(dirname "$0")/../src/backend" 2>/dev/null || cd "$(dirname "$0")/../../src
 npm install --omit=dev
 echo "  ✓ Dependencias instaladas"
 
-# ── 3. Run database initialization ────────────────
+# ── 3. Sanitize DATABASE_URL for Render ────────────
 echo ""
-echo "[3/4] Ejecutando migraciones de base de datos..."
+echo "[3/4] Sanitizando DATABASE_URL para Render..."
+
+# Fix Render's incomplete DATABASE_URL hostname
+# Render sometimes provides: postgres://user:pass@dpg-xxxx-a/dbname
+# Should be: postgres://user:pass@dpg-xxxx-a.oregon-postgres.render.com/dbname
+if [[ "$DATABASE_URL" =~ @dpg- ]] && [[ ! "$DATABASE_URL" =~ \.render\.com/ ]]; then
+  # Extract hostname and database name
+  HOSTNAME=$(echo "$DATABASE_URL" | grep -oP '@dpg-[^/]+')
+  DB_NAME=$(echo "$DATABASE_URL" | grep -oP '@dpg-[^/]+/\K[^?]+')
+  
+  # Determine region (default to oregon, check for frankfurt)
+  REGION="oregon"
+  if [[ "$HOSTNAME" =~ frankfurt ]]; then
+    REGION="frankfurt"
+  fi
+  
+  # Reconstruct DATABASE_URL with proper hostname
+  BEFORE_HOST=$(echo "$DATABASE_URL" | sed -E "s|@dpg-.*|\@|")
+  AFTER_DB=$(echo "$DATABASE_URL" | grep -oP '\?.*' || echo "")
+  
+  export DATABASE_URL="${BEFORE_HOST}${HOSTNAME}.${REGION}-postgres.render.com/${DB_NAME}${AFTER_DB}"
+  echo "  ✓ DATABASE_URL sanitizada: ${HOSTNAME}.${REGION}-postgres.render.com/${DB_NAME}"
+else
+  echo "  ✓ DATABASE_URL ya tiene formato correcto"
+fi
+
+# ── 4. Run database initialization ────────────────
+echo ""
+echo "[4/4] Ejecutando migraciones de base de datos..."
 echo "  → Ejecutando init_db.js..."
 node init_db.js || {
   echo "  ⚠️  init_db.js falló, intentando con init-db.sql..."
@@ -65,9 +93,9 @@ node init_db.js || {
 }
 echo "  ✓ Migraciones completadas"
 
-# ── 4. Start the backend server ───────────────────
+# ── 5. Start the backend server ───────────────────
 echo ""
-echo "[4/4] Iniciando servidor Node.js..."
+echo "[5/5] Iniciando servidor Node.js..."
 echo "  → Puerto: ${PORT:-3001}"
 echo "  → Modo: ${NODE_ENV:-production}"
 echo "  → WebSockets: activos"

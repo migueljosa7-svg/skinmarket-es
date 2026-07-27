@@ -9,10 +9,41 @@ const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
+/**
+ * Sanitizes DATABASE_URL for Render PostgreSQL deployments
+ * Render sometimes provides hostnames without the full domain (e.g., @dpg-xxxx-a/)
+ * This function adds the proper .render.com domain
+ */
+function sanitizeDatabaseUrl(databaseUrl) {
+    if (!databaseUrl) return databaseUrl;
+
+    // Check if URL contains @dpg- and doesn't already end with .render.com/
+    if (databaseUrl.includes('@dpg-') && !databaseUrl.includes('.render.com/')) {
+        // Replace the pattern @dpg-xxxx-a/ with @dpg-xxxx-a.oregon-postgres.render.com/
+        // or @dpg-xxxx-a.frankfurt-postgres.render.com/
+        const sanitized = databaseUrl.replace(
+            /(@dpg-[^/]+)\/(.+)$/,
+            (match, hostname, dbName) => {
+                // Determine region based on common Render instance ID patterns
+                // Oregon is the default, Frankfurt instances typically have different ID patterns
+                const region = hostname.includes('frankfurt') ? 'frankfurt' : 'oregon';
+                return `${hostname}.${region}-postgres.render.com/${dbName}`;
+            }
+        );
+        console.log('[DB] DATABASE_URL sanitized for Render deployment');
+        return sanitized;
+    }
+
+    return databaseUrl;
+}
+
 const isProduction = process.env.NODE_ENV === 'production';
 
+// Sanitize DATABASE_URL before using it
+const sanitizedDatabaseUrl = sanitizeDatabaseUrl(process.env.DATABASE_URL);
+
 const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: sanitizedDatabaseUrl,
     ssl: isProduction ? { rejectUnauthorized: false } : false,
     connectionTimeoutMillis: 10000,
     idleTimeoutMillis: 30000,
