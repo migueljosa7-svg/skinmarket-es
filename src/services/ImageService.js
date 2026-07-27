@@ -56,36 +56,15 @@ function isValidSteamHash(hash) {
 }
 
 // ---------------------------------------------------------------------------
-// CDN Source Definitions (7-tier fallback chain — name-based CDNs first)
+// CDN Source Definitions (4-tier fallback chain — official Valve CDNs)
 // ---------------------------------------------------------------------------
 
 const CDN_TIERS = [
   {
-    name: 'ByMykel CS2 GitHub API',
-    buildUrl: function (cleanName) {
-      if (!cleanName) return null;
-      return 'https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/images/items/' + encodeURIComponent(cleanName) + '.png';
-    },
-  },
-  {
-    name: 'CS2 Stash Mirror',
-    buildUrl: function (cleanName) {
-      if (!cleanName) return null;
-      return 'https://csgostash.com/img/skins/large/' + encodeURIComponent(cleanName) + '.png';
-    },
-  },
-  {
-    name: 'ByMykel Web Mirror JSON',
-    buildUrl: function (cleanName) {
-      if (!cleanName) return null;
-      return 'https://bymykel.github.io/CSGO-API/api/en/skins/' + encodeURIComponent(cleanName) + '.json';
-    },
-  },
-  {
-    name: 'Steam CloudFlare CDN',
+    name: 'Steam CloudFlare CDN (Primary)',
     buildUrl: function (hash) {
       if (!hash) return null;
-      return 'https://community.cloudflare.steamstatic.com/economy/image/' + hash + '/512fx512f';
+      return 'https://community.cloudflare.steamstatic.com/economy/image/' + hash;
     },
   },
   {
@@ -93,6 +72,20 @@ const CDN_TIERS = [
     buildUrl: function (hash) {
       if (!hash) return null;
       return 'https://steamcommunity-a.akamaihd.net/economy/image/' + hash;
+    },
+  },
+  {
+    name: 'Steam CDN CloudFlare (Alternate)',
+    buildUrl: function (hash) {
+      if (!hash) return null;
+      return 'https://cdn.cloudflare.steamstatic.com/economy/image/' + hash;
+    },
+  },
+  {
+    name: 'Steam Community CDN',
+    buildUrl: function (hash) {
+      if (!hash) return null;
+      return 'https://steamcommunity.com/economy/image/' + hash;
     },
   },
 ];
@@ -209,41 +202,32 @@ export function getSkinImageSources(skin) {
   // Skip Steam CDN tiers entirely if the hash is not genuinely valid.
   var steamHashValid = isValidSteamHash(hash);
 
-  // --- NAME-BASED CDNs (Priority 1-4) ---
+  // --- HASH-BASED CDNs (Priority 1-4, all official Valve CDNs) ---
 
-  // Tier 1: ByMykel CS2 GitHub API CDN (name-based)
-  if (cleanName) {
-    sources.push(CDN_TIERS[0].buildUrl(cleanName));
+  // Tier 1: Steam CloudFlare CDN (Primary)
+  if (hash && steamHashValid) {
+    sources.push(CDN_TIERS[0].buildUrl(hash));
   } else {
     sources.push(null);
   }
 
-  // Tier 2: CS2 Stash Mirror (name-based)
-  if (cleanName) {
-    sources.push(CDN_TIERS[1].buildUrl(cleanName));
+  // Tier 2: Steam Akamai CDN
+  if (hash && steamHashValid) {
+    sources.push(CDN_TIERS[1].buildUrl(hash));
   } else {
     sources.push(null);
   }
 
-  // Tier 3: ByMykel Web Mirror JSON (name-based)
-  if (cleanName) {
-    sources.push(CDN_TIERS[2].buildUrl(cleanName));
+  // Tier 3: Steam CDN CloudFlare (Alternate)
+  if (hash && steamHashValid) {
+    sources.push(CDN_TIERS[2].buildUrl(hash));
   } else {
     sources.push(null);
   }
 
-  // --- HASH-BASED CDNs (Priority 4-5, fallback) ---
-
-  // Tier 4: Steam CloudFlare CDN (hash-based)
+  // Tier 4: Steam Community CDN
   if (hash && steamHashValid) {
     sources.push(CDN_TIERS[3].buildUrl(hash));
-  } else {
-    sources.push(null);
-  }
-
-  // Tier 5: Steam Akamai CDN (hash-based)
-  if (hash && steamHashValid) {
-    sources.push(CDN_TIERS[4].buildUrl(hash));
   } else {
     sources.push(null);
   }
@@ -294,8 +278,8 @@ export function getSkinImageUrlSilent(skinName, originalImage) {
     var skin = { name: skinName, image: originalImage };
     var sources = getSkinImageSources(skin);
 
-    // Return first non-Steam, non-null source (ByMykel, CS2 Stash, etc.)
-    for (var i = 0; i < 3; i++) { // First 3 are name-based CDNs
+    // Return first non-Steam, non-null source (skip invalid Steam hashes)
+    for (var i = 0; i < sources.length; i++) {
       var url = sources[i];
       if (url && !failedUrls.has(url)) {
         return url;

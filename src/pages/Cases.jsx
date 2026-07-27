@@ -131,8 +131,8 @@ const DailyRouletteModal = ({ isOpen, onClose, rewardAmount, skinsPool }) => {
                   borderColor: getRarityColor(skin?.rarity || "Common")
                 }}
               >
-              <img
-                  src={skin?.image || getPlaceholderImage(skin?.name)}
+                <img
+                  src={getSkinImageUrl(skin?.name, skin?.image)}
                   alt={skin?.name}
                   onError={(e) => handleImageError(e, skin)}
                   style={{ width: "80px", height: "auto", marginBottom: "8px", opacity: skin?.image ? 1 : 0.3 }} />
@@ -218,17 +218,17 @@ const CaseCard = ({ c, skinsPool, onClick }) => {
 
       <div style={{ padding: "20px", background: "#121419", display: "flex", flexDirection: "column", gap: "15px", flex: 1, justifyContent: "space-between" }}>
         <div style={{ display: "flex", gap: "5px", justifyContent: "center" }}>
-{skins.map((skin, i) => (
+          {skins.map((skin, i) => (
             <img
-              key={skin?.id || `cskin-${i}`}
-              src={skin.image || getPlaceholderImage(skin.name)}
+              src={getSkinImageUrl(skin.name, skin.image)}
               alt={skin.name}
               onError={(e) => handleImageError(e, skin)}
               style={{
-                width: "35px",
-                height: "35px",
+                width: "100%",
+                height: "90px",
                 objectFit: "contain",
-                opacity: skin.image ? 0.8 : 0.3
+                marginBottom: "12px",
+                opacity: skin.image ? 1 : 0.3
               }}
             />
           ))}

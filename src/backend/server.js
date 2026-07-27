@@ -519,28 +519,52 @@ app.post("/api/inventory/withdraw", authenticateToken, async (req, res) => {
     // 3. Intentar envío real con el Bot si está disponible
     if (botEngine.isLoggedIn) {
       try {
-        const result = await botEngine.sendWithdrawOffer(user.steam_id, user.trade_token, item.name);
+        log(LOG_LEVELS.INFO, 'STEAM TRADE', `Generando oferta real -> User TradeURL: ${user.link_intercambio} -> Item: ${item.name}`);
+
+        const result = await botEngine.sendWithdrawOffer(user.steam_id, user.trade_token, item.name, item.market_hash_name || item.name);
+
         if (result.success) {
           await db.query("UPDATE inventario SET status = 'withdrawn' WHERE item_id = $1", [itemId]);
 
-          await recordTransaction(req.user.id, 'retiro', item.price, 'steam_trade', `Retiro real de ${item.name}`);
-          await logAction(req.user.id, 'RETIRAR_ITEM_REAL', { itemId, itemName: item.name });
+          await recordTransaction(req.user.id, 'retiro', item.price, 'steam_trade', `Retiro real de ${item.name} - Offer ID: ${result.offerId}`);
+          await logAction(req.user.id, 'RETIRAR_ITEM_REAL', { itemId, itemName: item.name, offerId: result.offerId });
 
-          return res.json({ success: true, message: `Oferta #${result.offerId} enviada a Steam.` });
+          log(LOG_LEVELS.INFO, 'STEAM TRADE', `Oferta enviada exitosamente -> Offer ID: ${result.offerId}`);
+
+          return res.json({
+            success: true,
+            offerId: result.offerId,
+            message: `Oferta #${result.offerId} enviada a Steam. Revisa tu inventario de ofertas.`
+          });
         } else {
-          throw new Error(result.error || 'Error del bot');
+          const errorMsg = result.error || 'Error del bot';
+          log(LOG_LEVELS.ERROR, 'WITHDRAW', 'Error en envío de oferta', { error: errorMsg, itemName: item.name });
+
+          // Devolver error descriptivo al frontend
+          return res.status(400).json({
+            success: false,
+            error: errorMsg,
+            code: 'TRADE_OFFER_FAILED'
+          });
         }
       } catch (botErr) {
-        log(LOG_LEVELS.ERROR, 'WITHDRAW', 'Bot error', { error: botErr.message });
+        log(LOG_LEVELS.ERROR, 'WITHDRAW', 'Error fatal del bot', { error: botErr.message, stack: botErr.stack });
+
         // Fallback a simulación si el bot falla (ej: no tiene el objeto)
         await db.query("UPDATE inventario SET status = 'withdrawing' WHERE item_id = $1", [itemId]);
 
-        await recordTransaction(req.user.id, 'retiro', item.price, 'simulado_pendiente', `Retiro simulado de ${item.name}`);
+        await recordTransaction(req.user.id, 'retiro', item.price, 'simulado_pendiente', `Retiro simulado de ${item.name} - Fallback por error de bot`);
 
-        return res.json({ success: true, message: "El bot no tiene el objeto físico. Retiro marcado como pendiente (simulado)." });
+        return res.json({
+          success: true,
+          message: "El bot no tiene el objeto físico en este momento. Retiro marcado como pendiente (simulado).",
+          simulated: true
+        });
       }
     } else {
-      // Fallback a simulación si el bot no está configurado
+      // Bot no configurado - modo simulación
+      log(LOG_LEVELS.WARN, 'WITHDRAW', 'Bot no disponible, usando modo simulación', { userId: req.user.id, itemName: item.name });
+
       await db.query("UPDATE inventario SET status = 'withdrawing' WHERE item_id = $1", [itemId]);
 
       // Simular que se retira después de 5 segundos (sincronizado con el frontend)
@@ -553,11 +577,15 @@ app.post("/api/inventory/withdraw", authenticateToken, async (req, res) => {
         }
       }, 5000);
 
-      res.json({ success: true, message: "Bot fuera de línea. Retiro simulado iniciado." });
+      res.json({
+        success: true,
+        message: "Bot fuera de línea. Retiro simulado iniciado.",
+        simulated: true
+      });
     }
   } catch (err) {
-    log(LOG_LEVELS.ERROR, 'WITHDRAW', 'Error al procesar el retiro', { error: err.message });
-    res.status(500).json({ error: "Error al procesar el retiro" });
+    log(LOG_LEVELS.ERROR, 'WITHDRAW', 'Error al procesar el retiro', { error: err.message, stack: err.stack });
+    res.status(500).json({ error: "Error al procesar el retiro", details: err.message });
   }
 });
 
