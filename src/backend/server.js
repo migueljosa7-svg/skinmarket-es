@@ -21,6 +21,7 @@ import { fileURLToPath } from "url";
 import cron from "node-cron";
 import { createCharge, handleWebhook, getPaymentStatus } from "./controllers/paymentController.js";
 import p2pMarketService from "./services/p2pMarketService.js";
+import fs from "fs";
 
 dotenv.config();
 
@@ -101,8 +102,11 @@ const sessionStore = (() => {
 // Middlewares de Seguridad
 app.use(helmet());
 app.use(hpp());
+
+// Configuración flexible de CORS (acepta '*' en desarrollo)
+const corsOrigin = process.env.FRONTEND_URL || "*";
 app.use(cors({
-  origin: process.env.FRONTEND_URL || "http://localhost:5173",
+  origin: corsOrigin,
   credentials: true
 }));
 app.use(express.json());
@@ -131,6 +135,10 @@ app.use(session({
 // Iniciar Bot de Steam (después de crear app)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Configuración flexible de BACKEND_URL
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3001';
+
 if (process.env.BOT_USERNAME && process.env.BOT_USERNAME !== 'tu_usuario_steam') {
   botEngine.logIn();
   // Endpoint para ver estado del bot
@@ -155,8 +163,8 @@ passport.deserializeUser((obj, done) => done(null, obj));
 
 // Estrategia de Steam
 passport.use(new SteamStrategy({
-  returnURL: `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/auth/steam/return`,
-  realm: process.env.BACKEND_URL || 'http://localhost:3001',
+  returnURL: `${BACKEND_URL}/api/auth/steam/return`,
+  realm: BACKEND_URL,
   apiKey: process.env.STEAM_API_KEY
 }, async (identifier, profile, done) => {
   try {
@@ -230,7 +238,8 @@ app.get('/api/auth/steam/return', passport.authenticate('steam', { failureRedire
   const token = jwt.sign({ id: user.usuario_id, email: user.email }, JWT_SECRET, { expiresIn: '24h' });
 
   // Redirigir al frontend con el token
-  res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?token=${token}`);
+  const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+  res.redirect(`${FRONTEND_URL}/login?token=${token}`);
 });
 
 app.post("/api/register", async (req, res) => {
@@ -849,11 +858,31 @@ process.on('uncaughtException', (err) => {
 // ─────────────────────────────────────────────────
 // SPA CATCH-ALL - Servir Frontend (React)
 // ─────────────────────────────────────────────────
-app.use(express.static(path.join(__dirname, '../../dist')));
-// Cualquier ruta GET que no sea /api, sirve index.html
-app.get(/^\/(?!api\/).*/, (req, res) => {
-  res.sendFile(path.join(__dirname, '../../dist/index.html'));
-});
+const distPath = path.join(__dirname, '../../dist');
+const indexPath = path.join(distPath, 'index.html');
+
+// Crear directorio public si no existe (para skin_prices.json)
+const publicPath = path.join(__dirname, '../../public');
+if (!fs.existsSync(publicPath)) {
+  fs.mkdirSync(publicPath, { recursive: true });
+  log(LOG_LEVELS.INFO, 'SYSTEM', 'Directorio public/ creado');
+}
+
+// Servir archivos estáticos solo si el directorio dist existe
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
+
+  // Cualquier ruta GET que no sea /api, sirve index.html (solo si existe)
+  app.get(/^\/(?!api\/).*/, (req, res) => {
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      res.status(404).json({ error: "Frontend no construido. Ejecuta npm run build." });
+    }
+  });
+} else {
+  log(LOG_LEVELS.WARN, 'SYSTEM', 'Directorio dist/ no encontrado. Sirviendo solo API.');
+}
 
 // Global error middleware (must be last)
 app.use((err, req, res, next) => {
@@ -871,7 +900,7 @@ const server = app.listen(PORT, () => log(LOG_LEVELS.INFO, 'SYSTEM', `Servidor c
 
 const io = new SocketIOServer(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    origin: corsOrigin,
     methods: ["GET", "POST"],
     credentials: true
   },
