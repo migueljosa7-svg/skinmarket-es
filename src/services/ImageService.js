@@ -280,10 +280,31 @@ export function getSkinImageUrl(skinName, originalImage) {
   }
 
   // Last resort: SVG placeholder (no console 404 errors)
-  // Ensure onerror is null to prevent infinite loops
   var placeholderUrl = generatePlaceholderDataUrl(skinName);
-  // Return placeholder with onerror safeguard
   return placeholderUrl;
+}
+
+export function getSkinImageUrlSilent(skinName, originalImage) {
+  // Same as getSkinImageUrl but with better 404 suppression
+  var hash = originalImage ? extractSteamImageHash(originalImage) : null;
+  var isSteamUrl = !!hash;
+
+  // If Steam hash is invalid, skip directly to name-based CDNs
+  if (isSteamUrl && !isValidSteamHash(hash)) {
+    var skin = { name: skinName, image: originalImage };
+    var sources = getSkinImageSources(skin);
+
+    // Return first non-Steam, non-null source (ByMykel, CS2 Stash, etc.)
+    for (var i = 0; i < 3; i++) { // First 3 are name-based CDNs
+      var url = sources[i];
+      if (url && !failedUrls.has(url)) {
+        return url;
+      }
+    }
+  }
+
+  // Fallback to normal logic
+  return getSkinImageUrl(skinName, originalImage);
 }
 
 // ---------------------------------------------------------------------------
