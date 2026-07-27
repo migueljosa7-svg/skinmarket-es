@@ -95,9 +95,10 @@ export default function RechargeModal({ open, onClose }) {
 
   useEffect(() => {
     if (open && user?.steam_id) {
-      setTimeout(() => {
+      const timerId = setTimeout(() => {
         setSteamSkins(MOCK_STEAM_SKINS);
       }, 500);
+      return () => clearTimeout(timerId);
     }
   }, [open, user?.steam_id]);
 

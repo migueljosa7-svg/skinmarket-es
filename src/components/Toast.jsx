@@ -15,7 +15,8 @@ export function ToastProvider({ children }) {
   const addToast = useCallback((message, type = "info", duration = 3500) => {
     const id = ++toastId;
     setToasts((prev) => [...prev, { id, message, type, duration }]);
-    setTimeout(() => removeToast(id), duration);
+    const timerId = setTimeout(() => removeToast(id), duration);
+    return () => clearTimeout(timerId);
   }, [removeToast]);
 
   const toast = useCallback(
@@ -74,15 +75,15 @@ function ToastItem({ toast, onClose }) {
     toast.type === "success"
       ? "rgba(16, 185, 129, 0.95)"
       : toast.type === "error"
-      ? "rgba(239, 68, 68, 0.95)"
-      : "rgba(59, 130, 246, 0.95)";
+        ? "rgba(239, 68, 68, 0.95)"
+        : "rgba(59, 130, 246, 0.95)";
 
   const borderColor =
     toast.type === "success"
       ? "#10b981"
       : toast.type === "error"
-      ? "#ef4444"
-      : "#3b82f6";
+        ? "#ef4444"
+        : "#3b82f6";
 
   const icon =
     toast.type === "success" ? "✓" : toast.type === "error" ? "✕" : "ℹ";

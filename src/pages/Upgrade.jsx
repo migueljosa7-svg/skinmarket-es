@@ -313,7 +313,7 @@ export default function Upgrade() {
                     }}
                   />
                   <div style={{ fontSize: "0.7rem", fontWeight: "bold", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: "5px" }}>{skin.name}</div>
-                  <div style={{ fontSize: "0.85rem", color: "#f5ac3b", fontWeight: "900" }}>€{skin.price.toFixed(2)}</div>
+                  <div style={{ fontSize: "0.85rem", color: "#f5ac3b", fontWeight: "900" }}>€{Number(skin.price || 0).toFixed(2)}</div>
                 </div>
               );
             })}
@@ -443,7 +443,7 @@ export default function Upgrade() {
                   <img
                     src={getSkinImageUrl(skin.name, skin.image)}
                     alt={skin.name}
-onError={(e) => handleImageError(e, skin)}
+                    onError={(e) => handleImageError(e, skin)}
                     style={{
                       width: "100%",
                       height: "60px",
@@ -452,7 +452,7 @@ onError={(e) => handleImageError(e, skin)}
                     }}
                   />
                   <div style={{ fontSize: "0.7rem", fontWeight: "bold", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: "5px" }}>{skin.name}</div>
-                  <div style={{ fontSize: "0.85rem", color: "#3b82f6", fontWeight: "900" }}>€{skin.price.toFixed(2)}</div>
+                  <div style={{ fontSize: "0.85rem", color: "#3b82f6", fontWeight: "900" }}>€{Number(skin.price || 0).toFixed(2)}</div>
                 </div>
               );
             })}
