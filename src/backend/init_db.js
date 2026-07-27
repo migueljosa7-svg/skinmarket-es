@@ -1,6 +1,28 @@
 import db from './db.js';
 
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 const initDb = async () => {
+  // Retry logic: intenta conectar hasta 3 veces con backoff
+  const maxRetries = 3;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      // Test connection first
+      await db.query('SELECT 1');
+      console.log(`[DB] Conexión exitosa en intento ${attempt}`);
+      break;
+    } catch (err) {
+      console.error(`[DB] Intento ${attempt}/${maxRetries} falló: ${err.message}`);
+      if (attempt === maxRetries) {
+        console.error('[DB] No se pudo conectar después de varios intentos.');
+        process.exit(1);
+      }
+      const delay = attempt * 2000;
+      console.log(`[DB] Reintentando en ${delay / 1000}s...`);
+      await sleep(delay);
+    }
+  }
+
   const checkTableQuery = `
     CREATE TABLE IF NOT EXISTS usuarios (
         usuario_id SERIAL PRIMARY KEY,
@@ -114,3 +136,4 @@ const pagosPendientesQuery = `
 };
 
 initDb();
+
