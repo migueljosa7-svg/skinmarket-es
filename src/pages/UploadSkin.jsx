@@ -3,6 +3,7 @@ import { useState, useCallback } from "react";
 import { useAuth } from "../context/useAuth";
 import { getRarityColor } from "../constants/colors.js";
 import { StorageService } from "../services/StorageService";
+import { getPlaceholderImage, handleImageError, getSkinImageUrl } from "../services/ImageService";
 import { useToast } from "../components/Toast";
 
 const MOCK_STEAM_INVENTORY = [
@@ -114,7 +115,7 @@ export default function UploadSkin() {
                     }}
                   >
                     <img
-                      src={skin.image || getPlaceholderImage(skin.name)}
+                      src={getSkinImageUrl(skin.name, skin.image)}
                       alt={skin.name}
                       onError={(e) => handleImageError(e, skin)}
                       style={{ width: "100%", height: "80px", objectFit: "contain", marginBottom: "10px", opacity: skin.image ? 1 : 0.3 }}

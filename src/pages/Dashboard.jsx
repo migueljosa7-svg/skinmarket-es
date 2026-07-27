@@ -380,7 +380,7 @@ export default function Dashboard() {
                   }}
                 >
                   <img
-                    src={item.image || getPlaceholderImage(item.name)}
+                    src={getSkinImageUrl(item.name, item.image)}
                     alt={item.name}
                     onError={(e) => handleImageError(e, item)}
                     style={{

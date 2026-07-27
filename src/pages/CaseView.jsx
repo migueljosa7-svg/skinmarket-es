@@ -142,13 +142,13 @@ const SingleMultiRoulette = ({ items, quantity, isSpinning, onComplete }) => {
             <div
               key={skin.id || `reel-${idx}`}
               style={{
-                    minWidth: "150px",
-                    height: "160px",
-                    background: "rgba(255,255,255,0.02)",
-                    borderWidth: "0 0 4px 0",
-                    borderStyle: "solid",
-                    borderColor: color,
-                    borderRadius: "16px",
+                minWidth: "150px",
+                height: "160px",
+                background: "rgba(255,255,255,0.02)",
+                borderWidth: "0 0 4px 0",
+                borderStyle: "solid",
+                borderColor: color,
+                borderRadius: "16px",
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
@@ -417,9 +417,9 @@ export default function CaseView() {
         >
           <div style={{ position: "relative" }}>
             <img
-              src={validSkins[validSkins.length - 1]?.image || caseData.imageSrc || getPlaceholderImage(caseData.name)}
+              src={getSkinImageUrl(caseData.name, validSkins[validSkins.length - 1]?.image || caseData.imageSrc)}
               alt={caseData.name}
-onError={(e) => handleImageError(e, { name: caseData.name, image: validSkins[validSkins.length - 1]?.image || caseData.imageSrc })}
+              onError={(e) => handleImageError(e, { name: caseData.name, image: validSkins[validSkins.length - 1]?.image || caseData.imageSrc })}
               style={{
                 width: "380px",
                 height: "280px",
@@ -502,9 +502,9 @@ onError={(e) => handleImageError(e, { name: caseData.name, image: validSkins[val
                         }}
                       >
                         <img
-                          src={skin.image || getPlaceholderImage(skin.name)}
+                          src={getSkinImageUrl(skin.name, skin.image)}
                           alt={skin.name}
-              onError={(e) => handleImageError(e, skin)}
+                          onError={(e) => handleImageError(e, skin)}
                           style={{
                             width: "100%",
                             height: "120px",
@@ -694,9 +694,9 @@ onError={(e) => handleImageError(e, { name: caseData.name, image: validSkins[val
                   }}
                 >
                   <img
-                    src={skin.image || getPlaceholderImage(skin.name)}
+                    src={getSkinImageUrl(skin.name, skin.image)}
                     alt={skin.name}
-            onError={(e) => handleImageError(e, skin)}
+                    onError={(e) => handleImageError(e, skin)}
                     style={{
                       width: "100%",
                       height: "100px",

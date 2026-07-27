@@ -110,26 +110,33 @@ class BotEngine {
      * @param {string} itemMarketHashName - The item's market hash name
      * @returns {Promise<{success: boolean, offerId?: string, error?: string}>}
      */
-    async sendWithdrawOffer(partnerSteamID64, tradeToken, itemMarketHashName) {
+    async sendWithdrawOffer(partnerSteamID64, tradeToken, itemName, marketHashName) {
         // Check if bot is ready
         if (!this.isLoggedIn || !this.isReady) {
             console.warn('[BOT ENGINE] ⚠️ Bot no conectado. Añadiendo a cola de retiros.');
-            return this._enqueueWithdrawal(partnerSteamID64, tradeToken, itemMarketHashName);
+            return this._enqueueWithdrawal(partnerSteamID64, tradeToken, itemName, marketHashName);
         }
 
         try {
-            // Verify bot has the item in inventory
-            const itemInBot = await this._findItemInBotInventory(itemMarketHashName);
+            // Verify bot has the item in inventory - try by market_hash_name first, then by name
+            let itemInBot = await this._findItemInBotInventory(marketHashName || itemName);
+
+            // If not found by market hash, try searching by partial name match
+            if (!itemInBot && itemName) {
+                console.log(`[BOT ENGINE] 🔍 Buscando por nombre alternativo: ${itemName}`);
+                itemInBot = await this._findItemByPartialName(itemName);
+            }
 
             if (!itemInBot) {
-                console.warn(`[BOT ENGINE] ⚠️ El bot NO tiene "${itemMarketHashName}" en su inventario.`);
+                console.warn(`[BOT ENGINE] ⚠️ El bot NO tiene "${itemName}" (${marketHashName}) en su inventario.`);
                 return {
                     success: false,
-                    error: `El bot no posee el objeto "${itemMarketHashName}". Se marcará como pendiente.`
+                    error: `El bot no posee el objeto "${itemName}". Inventario del bot insuficiente.`
                 };
             }
 
             // Create and send the offer
+            console.log(`[BOT ENGINE] 📤 Creando oferta para: ${itemInBot.market_hash_name || itemName}`);
             const offerId = await this._createAndSendOffer(partnerSteamID64, tradeToken, [itemInBot]);
 
             console.log(`[BOT ENGINE] ✅ Oferta #${offerId} enviada exitosamente a ${partnerSteamID64}`);
@@ -144,7 +151,7 @@ class BotEngine {
             // Enqueue for retry if it's not a permanent error
             if (this._isRetryableError(err)) {
                 console.log('[BOT ENGINE] ⏳ Error recuperable. Añadiendo a cola para reintentar.');
-                return this._enqueueWithdrawal(partnerSteamID64, tradeToken, itemMarketHashName);
+                return this._enqueueWithdrawal(partnerSteamID64, tradeToken, itemName, marketHashName);
             }
 
             return {
@@ -358,13 +365,14 @@ class BotEngine {
     /**
      * Enqueue a withdrawal for sequential processing
      */
-    _enqueueWithdrawal(partnerSteamID64, tradeToken, itemMarketHashName) {
+    _enqueueWithdrawal(partnerSteamID64, tradeToken, itemName, marketHashName) {
         return new Promise((resolve, reject) => {
             const withdrawal = {
                 id: `wd_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
                 partnerSteamID64,
                 tradeToken,
-                itemMarketHashName,
+                itemName,
+                marketHashName,
                 retries: 0,
                 maxRetries: 3,
                 status: 'queued',
@@ -407,7 +415,8 @@ class BotEngine {
                 const result = await this.sendWithdrawOffer(
                     withdrawal.partnerSteamID64,
                     withdrawal.tradeToken,
-                    withdrawal.itemMarketHashName
+                    withdrawal.itemName,
+                    withdrawal.marketHashName
                 );
 
                 if (result.success) {
@@ -447,7 +456,7 @@ class BotEngine {
     }
 
     /**
-     * Find an item in the bot's cached inventory
+     * Find an item in the bot's cached inventory by exact market_hash_name match
      */
     _findItemInBotInventory(marketHashName) {
         return new Promise((resolve, reject) => {
@@ -463,6 +472,35 @@ class BotEngine {
                     .catch(reject);
             } else {
                 const item = this.botInventory.find(i => i.market_hash_name === marketHashName);
+                resolve(item || null);
+            }
+        });
+    }
+
+    /**
+     * Find an item by partial name match (fallback when exact market_hash_name fails)
+     */
+    _findItemByPartialName(itemName) {
+        return new Promise((resolve, reject) => {
+            const cacheAge = Date.now() - this.lastInventoryFetch;
+            if (cacheAge > this.inventoryCacheTTL) {
+                this.refreshInventory()
+                    .then(() => {
+                        // Try case-insensitive partial match
+                        const searchTerm = itemName.toLowerCase();
+                        const item = this.botInventory.find(i =>
+                            i.market_hash_name?.toLowerCase().includes(searchTerm) ||
+                            i.name?.toLowerCase().includes(searchTerm)
+                        );
+                        resolve(item || null);
+                    })
+                    .catch(reject);
+            } else {
+                const searchTerm = itemName.toLowerCase();
+                const item = this.botInventory.find(i =>
+                    i.market_hash_name?.toLowerCase().includes(searchTerm) ||
+                    i.name?.toLowerCase().includes(searchTerm)
+                );
                 resolve(item || null);
             }
         });

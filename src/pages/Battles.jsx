@@ -4,7 +4,7 @@ import { useFetchSkins } from "../hooks/useFetchSkins";
 import { generateAllCases } from "../constants/cases.js";
 import { getRarityColor } from "../constants/colors.js";
 import { motion as Motion } from "framer-motion";
-import { getPlaceholderImage, handleImageError } from "../services/ImageService";
+import { getPlaceholderImage, handleImageError, getSkinImageUrl } from "../services/ImageService";
 import { useToast } from "../components/Toast";
 import { sound } from "../utils/audio";
 import { getFloatBadgeProps } from "../utils/floatPreview";
@@ -114,7 +114,7 @@ const MiniBattleRoulette = ({ items, accentColor }) => {
               }}
             >
               <img
-                src={skin.image || getPlaceholderImage(skin.name)}
+                src={getSkinImageUrl(skin.name, skin.image)}
                 alt={skin.name}
                 onError={(e) => handleImageError(e, skin)}
                 style={{
