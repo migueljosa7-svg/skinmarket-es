@@ -6,7 +6,7 @@ import { getRarityColor } from "../constants/colors.js";
 import { StorageService } from "../services/StorageService";
 import { sound } from "../utils/audio";
 import { getFloatBadgeProps } from "../utils/floatPreview";
-import { getPlaceholderImage, handleImageError } from "../services/ImageService";
+import { getSkinImageUrl, getPlaceholderImage, handleImageError } from "../services/ImageService";
 import { useToast } from "../components/Toast";
 
 /* ─────────────────────────────────────────────
@@ -54,6 +54,26 @@ function calculateContractResult(selectedSkins, allSkins) {
   // If still empty, use all skins
   const finalPool = weighted.length > 0 ? weighted : rewardPool;
   const chosen = finalPool[Math.floor(Math.random() * finalPool.length)];
+
+  // Guard clause: if chosen is undefined, return a default result
+  if (!chosen) {
+    const defaultPrice = parseFloat((totalValue * 0.8).toFixed(2));
+    return {
+      success: true,
+      totalValue: parseFloat(totalValue.toFixed(2)),
+      minReward: parseFloat(minReward.toFixed(2)),
+      maxReward: parseFloat(maxReward.toFixed(2)),
+      reward: {
+        id: `contract_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+        name: "Skin de Contrato",
+        price: defaultPrice,
+        rarity: "Mil-Spec Grade",
+        image: "",
+        wear: "Field-Tested",
+      },
+      profit: parseFloat((defaultPrice - totalValue).toFixed(2)),
+    };
+  }
 
   // Calculate actual reward value (slightly randomized within range)
   const actualReward = parseFloat(
@@ -257,7 +277,7 @@ export default function Contracts() {
 
     // Calculate result (delayed for animation)
     setTimeout(() => {
-      const result = calculateContractResult(selectedSkins, []);
+      const result = calculateContractResult(selectedSkins, inventory);
       setLastResult(result);
 
       // Remove selected skins from inventory
@@ -394,7 +414,7 @@ export default function Contracts() {
                     }}
                   >
                     <img
-                      src={skin.image || getPlaceholderImage(skin.name)}
+                      src={getSkinImageUrl(skin.name, skin.image)}
                       alt={skin.name}
                       onError={(e) => handleImageError(e, skin)}
                       style={{
@@ -402,7 +422,6 @@ export default function Contracts() {
                         height: "60px",
                         objectFit: "contain",
                         marginBottom: "8px",
-                        opacity: skin.image ? 1 : 0.3,
                       }}
                     />
                     <div style={{ fontSize: "0.65rem", fontWeight: "900", color: color, marginBottom: "2px" }}>
@@ -469,10 +488,10 @@ export default function Contracts() {
                         }}
                       >
                         <img
-                          src={skin.image || getPlaceholderImage(skin.name)}
+                          src={getSkinImageUrl(skin.name, skin.image)}
                           alt={skin.name}
                           onError={(e) => handleImageError(e, skin)}
-                          style={{ width: "100%", height: "35px", objectFit: "contain", opacity: skin.image ? 1 : 0.3 }}
+                          style={{ width: "100%", height: "35px", objectFit: "contain" }}
                         />
                         <div style={{ fontSize: "0.55rem", color: "rgba(255,255,255,0.5)", marginTop: "4px" }}>
                           €{skin.price?.toFixed(2) || "0.00"}
@@ -620,9 +639,9 @@ export default function Contracts() {
                     }}
                   >
                     <img
-                      src={lastResult.reward.image || getPlaceholderImage(lastResult.reward.name)}
-                      alt={lastResult.reward.name}
-                      onError={(e) => handleImageError(e, lastResult.reward)}
+                      src={getSkinImageUrl(lastResult?.reward?.name, lastResult?.reward?.image)}
+                      alt={lastResult?.reward?.name ?? ""}
+                      onError={(e) => handleImageError(e, lastResult?.reward)}
                       style={{
                         width: "100%",
                         maxWidth: "120px",
@@ -630,26 +649,25 @@ export default function Contracts() {
                         objectFit: "contain",
                         marginBottom: "10px",
                         filter: "drop-shadow(0 0 15px rgba(16, 185, 129, 0.3))",
-                        opacity: lastResult.reward.image ? 1 : 0.3,
                       }}
                     />
                     <div
                       style={{
-                        color: getRarityColor(lastResult.reward.rarity),
+                        color: getRarityColor(lastResult?.reward?.rarity),
                         fontSize: "0.7rem",
                         fontWeight: "900",
                         marginBottom: "4px",
                       }}
                     >
-                      {lastResult.reward.rarity?.toUpperCase()}
+                      {lastResult?.reward?.rarity?.toUpperCase() ?? ""}
                     </div>
                     <div style={{ fontWeight: "bold", fontSize: "0.9rem", color: "white" }}>
-                      {lastResult.reward.name}
+                      {lastResult?.reward?.name ?? ""}
                     </div>
                     {/* Float Preview */}
                     <div style={{ marginTop: "8px", display: "flex", justifyContent: "center", gap: "8px", alignItems: "center" }}>
                       {(() => {
-                        const fp = getFloatBadgeProps(lastResult.reward.name, lastResult.reward.price);
+                        const fp = getFloatBadgeProps(lastResult?.reward?.name ?? "", lastResult?.reward?.price ?? 0);
                         return (
                           <>
                             {fp.extra && <span style={{ fontSize: "0.8rem" }}>{fp.extra}</span>}
@@ -684,10 +702,10 @@ export default function Contracts() {
                       })()}
                     </div>
                     <div style={{ fontSize: "1.4rem", fontWeight: "900", color: "#f5ac3b", marginTop: "10px" }}>
-                      €{lastResult.reward.price.toFixed(2)}
+                      €{(lastResult?.reward?.price ?? 0).toFixed(2)}
                     </div>
-                    <div style={{ color: lastResult.profit >= 0 ? "#10b981" : "#ef4444", fontWeight: "bold", fontSize: "0.85rem", marginTop: "5px" }}>
-                      {lastResult.profit >= 0 ? "+" : ""}€{lastResult.profit.toFixed(2)}
+                    <div style={{ color: (lastResult?.profit ?? 0) >= 0 ? "#10b981" : "#ef4444", fontWeight: "bold", fontSize: "0.85rem", marginTop: "5px" }}>
+                      {(lastResult?.profit ?? 0) >= 0 ? "+" : ""}€{(lastResult?.profit ?? 0).toFixed(2)}
                     </div>
                   </div>
                   <button

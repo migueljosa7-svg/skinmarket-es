@@ -116,7 +116,7 @@ const MiniBattleRoulette = ({ items, accentColor }) => {
               <img
                 src={skin.image || getPlaceholderImage(skin.name)}
                 alt={skin.name}
-onError={(e) => handleImageError(e, skin)}
+                onError={(e) => handleImageError(e, skin)}
                 style={{
                   width: "80px",
                   height: "60px",
@@ -607,7 +607,7 @@ const BattleSelector = ({
                     const levelsArray = [];
                     for (let i = 1; i < playerCount; i++) levelsArray.push(botLevels[i]);
                     const allBotsAssigned = levelsArray.every(level => level !== undefined);
-if (allBotsAssigned) {
+                    if (allBotsAssigned) {
                       onStart(selectedBoxes, totalCost, levelsArray, gameMode, playerCount);
                       setStep('config');
                     } else {
@@ -740,7 +740,7 @@ export default function Battles() {
     const normalBots = ["std1", "std2"];
     // Newbie bots → "easy"
     const easyBots = ["newbie1", "newbie2"];
-    
+
     if (hardBots.includes(botLevel)) return "hard";
     if (normalBots.includes(botLevel)) return "normal";
     if (easyBots.includes(botLevel)) return "easy";
@@ -788,7 +788,7 @@ export default function Battles() {
       // Default weighted probability for others
       const weighted = [];
       let weightMultiplier = forceGoodDrop ? 2 : (forceBadDrop ? 0.2 : 1);
-      
+
       // Adjust multiplier based on difficulty
       if (forceGoodDrop) {
         if (difficulty === "hard") weightMultiplier = 5;
@@ -894,7 +894,7 @@ export default function Battles() {
           let forceGoodDrop = false;
           let forceBadDrop = false;
 
-if (!p.isUser) {
+          if (!p.isUser) {
             // Map bot template IDs to difficulty using the helper
             const difficulty = getBotDifficulty(p.level);
 
@@ -981,7 +981,7 @@ if (!p.isUser) {
     [allCases, getSkinsForCase, openBoxRandomly, updateUser]
   );
 
-// Otorgar loot al terminar + sound effects
+  // Otorgar loot al terminar + sound effects
   useEffect(() => {
     if (!battleState || !animState.hasCompleted) return;
 
@@ -1196,7 +1196,7 @@ if (!p.isUser) {
             <div style={{
               display: 'flex', justifyContent: 'flex-end', gap: '10px', marginBottom: '15px'
             }}>
-<button
+              <button
                 onClick={handleRepeatBattle}
                 style={{
                   background: "rgba(245, 172, 59, 0.1)",
@@ -1248,9 +1248,9 @@ if (!p.isUser) {
                 {/* Header de ronda + caja activa */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "30px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                    {currentBox && (
+                    {currentBox?.image && (
                       <img
-                        src={currentBox.imageSrc}
+                        src={currentBox.image}
                         alt={currentBox.name}
                         style={{ width: "48px", filter: "drop-shadow(0 0 8px rgba(245,172,59,0.5))" }}
                         onError={(e) => { e.currentTarget.style.display = "none"; }}
@@ -1606,12 +1606,14 @@ if (!p.isUser) {
                             position: "relative",
                           }}
                         >
-                          <img
-                            src={box.imageSrc}
-                            alt={box.name}
-                            style={{ width: "32px", filter: "drop-shadow(0 0 4px rgba(0,0,0,0.8))" }}
-                            onError={(e) => { e.currentTarget.style.display = "none"; }}
-                          />
+                          {box?.image && (
+                            <img
+                              src={box.image}
+                              alt={box.name}
+                              style={{ width: "32px", filter: "drop-shadow(0 0 4px rgba(0,0,0,0.8))" }}
+                              onError={(e) => { e.currentTarget.style.display = "none"; }}
+                            />
+                          )}
                           <div>
                             <div
                               style={{

@@ -47,6 +47,11 @@ const initDb = async () => {
     ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS experiencia INTEGER DEFAULT 0;
     ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'user';
     ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS ultimo_reclamo_diario TIMESTAMP WITH TIME ZONE;
+    ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS avatar TEXT DEFAULT 'https://images.unsplash.com/photo-1566492031773-4f4e44671857?w=150&auto=format&fit=crop&q=80';
+    ALTER TABLE inventario ADD COLUMN IF NOT EXISTS wear VARCHAR(50) DEFAULT 'Field-Tested';
+    ALTER TABLE inventario ADD COLUMN IF NOT EXISTS skin_name VARCHAR(255);
+    ALTER TABLE inventario ADD COLUMN IF NOT EXISTS weapon VARCHAR(255);
+    ALTER TABLE transacciones ALTER COLUMN monto SET DEFAULT 0.00;
   `;
 
   const checkInventoryTableQuery = `
@@ -96,7 +101,7 @@ const initDb = async () => {
     );
   `;
 
-const pagosPendientesQuery = `
+  const pagosPendientesQuery = `
     CREATE TABLE IF NOT EXISTS pagos_pendientes (
         id SERIAL PRIMARY KEY,
         usuario_id INTEGER REFERENCES usuarios(usuario_id),

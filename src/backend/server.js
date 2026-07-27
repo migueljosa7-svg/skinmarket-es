@@ -24,7 +24,40 @@ import p2pMarketService from "./services/p2pMarketService.js";
 
 dotenv.config();
 
-console.log("Iniciando servidor...");
+// ─────────────────────────────────────────────────
+// LOGGING SYSTEM - Logs estructurados con niveles
+// ─────────────────────────────────────────────────
+
+const LOG_LEVELS = {
+  INFO: 'INFO',
+  WARN: 'WARN',
+  ERROR: 'ERROR',
+  DEBUG: 'DEBUG'
+};
+
+function log(level, module, message, data = null) {
+  const timestamp = new Date().toISOString();
+  const prefix = `[${timestamp}] [${level}] [${module}]`;
+
+  switch (level) {
+    case LOG_LEVELS.INFO:
+      console.log(`${prefix} ${message}`, data || '');
+      break;
+    case LOG_LEVELS.WARN:
+      console.warn(`${prefix} ${message}`, data || '');
+      break;
+    case LOG_LEVELS.ERROR:
+      console.error(`${prefix} ${message}`, data || '');
+      break;
+    case LOG_LEVELS.DEBUG:
+      console.debug(`${prefix} ${message}`, data || '');
+      break;
+    default:
+      console.log(`${prefix} ${message}`, data || '');
+  }
+}
+
+log(LOG_LEVELS.INFO, 'SYSTEM', 'Iniciando servidor...');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -38,16 +71,16 @@ const sessionStore = (() => {
     try {
       const redisClient = createClient({ url: process.env.REDIS_URL });
       redisClient.connect().catch(err => {
-        console.warn("[SESSION] Redis no disponible, usando MemoryStore:", err.message);
+        log(LOG_LEVELS.WARN, 'SESSION', 'Redis no disponible, usando MemoryStore', err.message);
       });
       store = new RedisStore({ client: redisClient });
-      console.log("[SESSION] Usando RedisStore");
+      log(LOG_LEVELS.INFO, 'SESSION', 'Usando RedisStore');
       return store;
     } catch (e) {
-      console.warn("[SESSION] Fallback a MemoryStore (Redis no disponible)");
+      log(LOG_LEVELS.WARN, 'SESSION', 'Fallback a MemoryStore (Redis no disponible)');
     }
   } else {
-    console.warn("[SESSION] REDIS_URL no definida, usando MemoryStore (sesiones no persistirán entre reinicios)");
+    log(LOG_LEVELS.WARN, 'SESSION', 'REDIS_URL no definida, usando MemoryStore (sesiones no persistirán entre reinicios)');
   }
   // Fallback: MemoryStore
   const MemoryStore = session.MemoryStore || (session.Store && session.Store);
@@ -105,7 +138,7 @@ if (process.env.BOT_USERNAME && process.env.BOT_USERNAME !== 'tu_usuario_steam')
     res.json(botEngine.getStatus());
   });
 } else {
-  console.log("[BOT] Bot no configurado. Iniciando en modo simulación.");
+  log(LOG_LEVELS.INFO, 'BOT', 'Bot no configurado. Iniciando en modo simulación.');
   // Endpoint de health check genérico aunque el bot no esté configurado
   app.get("/api/bot/status", (req, res) => {
     res.json({ status: "ok", bot: "simulated", message: "Bot no configurado - modo simulación" });
@@ -202,10 +235,10 @@ app.get('/api/auth/steam/return', passport.authenticate('steam', { failureRedire
 
 app.post("/api/register", async (req, res) => {
   const { nombre_usuario, email, password } = req.body;
-  console.log(`[AUTH] Intento de registro: ${nombre_usuario} (${email})`);
+  log(LOG_LEVELS.INFO, 'AUTH', `Intento de registro: ${nombre_usuario} (${email})`);
 
   if (!nombre_usuario || !email || !password) {
-    console.log("[AUTH] Registro fallido: faltan campos");
+    log(LOG_LEVELS.WARN, 'AUTH', 'Registro fallido: faltan campos');
     return res.status(400).json({ error: "Todos los campos son obligatorios" });
   }
 
@@ -219,10 +252,10 @@ app.post("/api/register", async (req, res) => {
     const user = result.rows[0];
     const token = jwt.sign({ id: user.usuario_id, email: user.email }, JWT_SECRET, { expiresIn: '24h' });
 
-    console.log(`[AUTH] Usuario registrado con éxito: ${user.usuario_id}`);
+    log(LOG_LEVELS.INFO, 'AUTH', `Usuario registrado con éxito: ${user.usuario_id}`);
     res.status(201).json({ user, token });
   } catch (err) {
-    console.error("[AUTH] Error en registro:", err);
+    log(LOG_LEVELS.ERROR, 'AUTH', 'Error en registro', { code: err.code, message: err.message });
     if (err.code === '23505') {
       return res.status(400).json({ error: "El usuario o email ya existe" });
     }
@@ -270,7 +303,10 @@ app.get("/api/me", authenticateToken, async (req, res) => {
       [req.user.id]
     );
     const user = userResult.rows[0];
-    user.inventory = inventoryResult.rows;
+    user.inventory = inventoryResult.rows.map(item => ({
+      ...item,
+      price: item.price ?? 0.00
+    }));
     res.json(user);
   } catch (err) {
     console.error(err);
@@ -406,7 +442,11 @@ app.get("/api/inventory", authenticateToken, async (req, res) => {
       "SELECT item_id as id, name, price, image, rarity, marketable, status FROM inventario WHERE usuario_id = $1 AND status != 'sold' AND status != 'withdrawn'",
       [req.user.id]
     );
-    res.json(result.rows);
+    const sanitized = result.rows.map(item => ({
+      ...item,
+      price: item.price ?? 0.00
+    }));
+    res.json(sanitized);
   } catch (err) {
     res.status(500).json({ error: "Error al obtener inventario" });
   }
@@ -482,7 +522,7 @@ app.post("/api/inventory/withdraw", authenticateToken, async (req, res) => {
           throw new Error(result.error || 'Error del bot');
         }
       } catch (botErr) {
-        console.error("[WITHDRAW] Bot error:", botErr.message);
+        log(LOG_LEVELS.ERROR, 'WITHDRAW', 'Bot error', { error: botErr.message });
         // Fallback a simulación si el bot falla (ej: no tiene el objeto)
         await db.query("UPDATE inventario SET status = 'withdrawing' WHERE item_id = $1", [itemId]);
 
@@ -498,16 +538,16 @@ app.post("/api/inventory/withdraw", authenticateToken, async (req, res) => {
       setTimeout(async () => {
         try {
           await db.query("UPDATE inventario SET status = 'withdrawn' WHERE item_id = $1", [itemId]);
-          console.log(`[WITHDRAW] Item ${itemId} marcado como retirado (simulado)`);
+          log(LOG_LEVELS.INFO, 'WITHDRAW', `Item ${itemId} marcado como retirado (simulado)`);
         } catch (e) {
-          console.error("Error en simulación de retiro:", e);
+          log(LOG_LEVELS.ERROR, 'WITHDRAW', 'Error en simulación de retiro', { error: e.message });
         }
       }, 5000);
 
       res.json({ success: true, message: "Bot fuera de línea. Retiro simulado iniciado." });
     }
   } catch (err) {
-    console.error(err);
+    log(LOG_LEVELS.ERROR, 'WITHDRAW', 'Error al procesar el retiro', { error: err.message });
     res.status(500).json({ error: "Error al procesar el retiro" });
   }
 });
@@ -543,7 +583,7 @@ app.post("/api/update-profile", authenticateToken, async (req, res) => {
 
 app.post("/api/update-balance", authenticateToken, async (req, res) => {
   const { amount } = req.body;
-  console.log(`[BALANCE] Intento de actualización: +${amount} para usuario_id: ${req.user.id}`);
+  log(LOG_LEVELS.INFO, 'BALANCE', `Intento de actualización: +${amount}`, { usuario_id: req.user.id });
 
   if (amount === undefined) return res.status(400).json({ error: "Monto no especificado" });
 
@@ -552,46 +592,72 @@ app.post("/api/update-balance", authenticateToken, async (req, res) => {
       "UPDATE usuarios SET saldo = saldo + $1 WHERE usuario_id = $2 RETURNING saldo",
       [parseFloat(amount), req.user.id]
     );
-    console.log(`[BALANCE] Éxito. Nuevo saldo en DB: ${result.rows[0].saldo}`);
+    log(LOG_LEVELS.INFO, 'BALANCE', `Éxito. Nuevo saldo: ${result.rows[0].saldo}`, { usuario_id: req.user.id });
 
     await recordTransaction(req.user.id, 'deposito', parseFloat(amount), 'steam_deposit', 'Depósito de skins o saldo');
     await logAction(req.user.id, 'ACTUALIZAR_SALDO', { amount });
 
     res.json({ success: true, newBalance: result.rows[0].saldo });
   } catch (err) {
-    console.error("[BALANCE] Error:", err);
+    log(LOG_LEVELS.ERROR, 'BALANCE', 'Error al actualizar saldo', { error: err.message });
     res.status(500).json({ error: "Error al actualizar saldo" });
   }
 });
 
 // --- STEAM ROUTES ---
 
+// Cache en memoria para inventarios de Steam (TTL: 5 minutos)
+const steamInventoryCache = new Map();
+const STEAM_CACHE_TTL = 5 * 60 * 1000; // 5 minutos en ms
+
 app.get("/api/steam-inventory/:steamId", authenticateToken, async (req, res) => {
   const steamId = req.params.steamId;
-  console.log(`[STEAM] Solicitando inventario para: ${steamId}`);
+  const cacheKey = `inventory_${steamId}`;
+
+  // Verificar cache
+  const cached = steamInventoryCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < STEAM_CACHE_TTL) {
+    console.log(`[STEAM] Cache hit para: ${steamId}`);
+    return res.json(cached.data);
+  }
+
+  // Si el cache expiró, limpiarlo
+  if (cached) {
+    steamInventoryCache.delete(cacheKey);
+  }
+
+  log(LOG_LEVELS.INFO, 'STEAM', `Solicitando inventario para: ${steamId}`);
 
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
     const response = await fetch(
       `https://steamcommunity.com/inventory/${steamId}/730/2?l=english`,
       {
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
           "Referer": "https://steamcommunity.com/"
-        }
+        },
+        signal: controller.signal
       }
     );
 
+    clearTimeout(timeoutId);
+
     if (response.status !== 200) {
-      console.error(`[STEAM] Error from Steam API: ${response.status} ${response.statusText}`);
       const errorText = await response.text();
-      console.error(`[STEAM] Body: ${errorText}`);
-      return res.status(response.status).json({ error: `Steam respondió con error ${response.status}` });
+      log(LOG_LEVELS.ERROR, 'STEAM', `Error from Steam API: ${response.status} ${response.statusText}`, { body: errorText });
+      return res.status(response.status).json({
+        error: `Steam respondió con error ${response.status}`,
+        details: "La API de Steam no está disponible en este momento. Por favor, intenta de nuevo más tarde."
+      });
     }
 
     const data = await response.json();
 
     if (!data || data.success === false) {
-      console.warn("[STEAM] Respuesta fallida o perfil privado");
+      log(LOG_LEVELS.WARN, 'STEAM', 'Respuesta fallida o perfil privado');
       return res.status(403).json({ error: "El inventario es privado o no se pudo acceder. Por favor, cámbialo a Público en los ajustes de Steam." });
     }
 
@@ -614,17 +680,33 @@ app.get("/api/steam-inventory/:steamId", authenticateToken, async (req, res) => 
         id: asset.assetid,
         name: description.market_hash_name,
         image: `https://steamcommunity-a.akamaihd.net/economy/image/${description.icon_url}`,
-        price: parseFloat(basePrice.toFixed(2)),
+        price: parseFloat(basePrice.toFixed(2)) ?? 0.00,
         rarity: rarity,
         marketable: description.marketable === 1
       };
     }).filter(skin => skin !== null);
 
-    console.log(`[STEAM] Éxito: ${inventory.length} items cargados`);
+    // Guardar en cache
+    steamInventoryCache.set(cacheKey, {
+      data: inventory,
+      timestamp: Date.now()
+    });
+
+    log(LOG_LEVELS.INFO, 'STEAM', `Éxito: ${inventory.length} items cargados (cacheado por 5min)`);
     res.json(inventory);
   } catch (err) {
-    console.error("[STEAM] fatal error detail:", err);
-    res.status(500).json({ error: "Error interno al conectar con Steam", details: err.message });
+    log(LOG_LEVELS.ERROR, 'STEAM', 'Error fatal al obtener inventario', { error: err.message, stack: err.stack });
+    if (err.name === 'AbortError') {
+      res.status(408).json({
+        error: "Steam API no responde",
+        details: "La API de Steam no respondió a tiempo. Por favor, intenta de nuevo en unos momentos."
+      });
+    } else {
+      res.status(500).json({
+        error: "Error interno al conectar con Steam",
+        details: err.message
+      });
+    }
   }
 });
 
@@ -632,19 +714,35 @@ app.get("/api/steam-price", async (req, res) => {
   const hashName = req.query.market_hash_name;
   if (!hashName) return res.status(400).json({ error: "Missing market_hash_name" });
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
     const response = await fetch(
       `https://steamcommunity.com/market/priceoverview/?appid=730&currency=3&market_hash_name=${encodeURIComponent(hashName)}`,
-      { headers: { "User-Agent": "Mozilla/5.0" } }
+      {
+        headers: { "User-Agent": "Mozilla/5.0" },
+        signal: controller.signal
+      }
     );
+
+    clearTimeout(timeoutId);
     const data = await response.json();
     res.json(data);
   } catch (err) {
-    res.status(500).json({ error: "Error fetching price" });
+    if (err.name === 'AbortError') {
+      res.status(408).json({ error: "Steam API timeout" });
+    } else {
+      res.status(500).json({ error: "Error fetching price" });
+    }
   }
 });
 
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", timestamp: new Date(), version: "1.0.0" });
+  res.status(200).json({ status: "ok" });
+});
+
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok" });
 });
 
 // --- ADMIN ROUTES ---
@@ -655,11 +753,11 @@ const isAdmin = async (req, res, next) => {
     if (result.rows[0]?.role === 'admin') {
       next();
     } else {
-      console.warn(`[ADMIN] Intento de acceso no autorizado: Usuario ID ${req.user.id}`);
+      log(LOG_LEVELS.WARN, 'ADMIN', `Intento de acceso no autorizado`, { usuario_id: req.user.id });
       res.status(403).json({ error: "Acceso denegado: Se requiere rol de administrador" });
     }
   } catch (err) {
-    console.error("[ADMIN] Error en middleware isAdmin:", err);
+    log(LOG_LEVELS.ERROR, 'ADMIN', 'Error en middleware isAdmin', { error: err.message });
     res.status(500).json({ error: "Error al verificar permisos" });
   }
 };
@@ -678,8 +776,7 @@ app.get("/api/admin/stats", authenticateToken, isAdmin, async (req, res) => {
       withdrawn: totalWithdrawn.rows[0].sum || 0
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error al obtener estadísticas" });
+    log(LOG_LEVELS.ERROR, 'ADMIN', 'Error al obtener estadísticas', { error: err.message });
   }
 });
 
@@ -700,8 +797,7 @@ app.post("/api/admin/settings/probabilities", authenticateToken, isAdmin, async 
     await logAction(req.user.id, "UPDATE_SETTINGS", { key: 'probabilidades', value: probabilities });
     res.json({ success: true });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error al actualizar probabilidades" });
+    log(LOG_LEVELS.ERROR, 'ADMIN', 'Error al actualizar probabilidades', { error: err.message });
   }
 });
 
@@ -733,6 +829,24 @@ app.post("/api/p2p/search", authenticateToken, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────
+// GLOBAL ERROR HANDLER - Catch all unhandled errors
+// ─────────────────────────────────────────────────
+process.on('unhandledRejection', (reason, promise) => {
+  log(LOG_LEVELS.ERROR, 'GLOBAL', 'Unhandled Rejection', { reason: reason?.toString() });
+});
+
+process.on('uncaughtException', (err) => {
+  log(LOG_LEVELS.ERROR, 'GLOBAL', 'Uncaught Exception', {
+    error: err.message,
+    stack: err.stack
+  });
+  // Don't exit in production, let the process restart via PM2/Docker
+  if (process.env.NODE_ENV !== 'production') {
+    process.exit(1);
+  }
+});
+
+// ─────────────────────────────────────────────────
 // SPA CATCH-ALL - Servir Frontend (React)
 // ─────────────────────────────────────────────────
 app.use(express.static(path.join(__dirname, '../../dist')));
@@ -741,24 +855,36 @@ app.get(/^\/(?!api\/).*/, (req, res) => {
   res.sendFile(path.join(__dirname, '../../dist/index.html'));
 });
 
+// Global error middleware (must be last)
+app.use((err, req, res, next) => {
+  log(LOG_LEVELS.ERROR, 'GLOBAL', 'Error en middleware global', {
+    error: err.message,
+    stack: err.stack
+  });
+  res.status(500).json({ error: "Error interno del servidor" });
+});
+
 // ─────────────────────────────────────────────────
 // Socket.io - Live Drops en Tiempo Real
 // ─────────────────────────────────────────────────
-const server = app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
+const server = app.listen(PORT, () => log(LOG_LEVELS.INFO, 'SYSTEM', `Servidor corriendo en puerto ${PORT}`));
 
 const io = new SocketIOServer(server, {
   cors: {
     origin: process.env.FRONTEND_URL || "http://localhost:5173",
     methods: ["GET", "POST"],
     credentials: true
-  }
+  },
+  transports: ['websocket', 'polling'],
+  pingTimeout: 60000,
+  pingInterval: 25000
 });
 
 io.on("connection", (socket) => {
-  console.log(`[SOCKET] Cliente conectado: ${socket.id}`);
+  log(LOG_LEVELS.INFO, 'SOCKET', `Cliente conectado: ${socket.id}`);
 
   socket.on("disconnect", () => {
-    console.log(`[SOCKET] Cliente desconectado: ${socket.id}`);
+    log(LOG_LEVELS.INFO, 'SOCKET', `Cliente desconectado: ${socket.id}`);
   });
 });
 
@@ -786,12 +912,12 @@ async function refreshPriceCache() {
   try {
     const { execSync } = await import("child_process");
     const scriptPath = path.join(__dirname, "../../generate_prices_cache.js");
-    console.log("[PRICES] Iniciando actualización de caché de precios...");
+    log(LOG_LEVELS.INFO, 'PRICES', 'Iniciando actualización de caché de precios...');
     const result = execSync(`node "${scriptPath}"`, { timeout: 30000 });
-    console.log(`[PRICES] Caché actualizada: ${result.toString().trim()}`);
+    log(LOG_LEVELS.INFO, 'PRICES', `Caché actualizada: ${result.toString().trim()}`);
   } catch (err) {
-    console.error("[PRICES] Error al actualizar caché de precios:", err.message);
-    console.log("[PRICES] Los precios existentes se mantienen (respaldo preservado).");
+    log(LOG_LEVELS.ERROR, 'PRICES', 'Error al actualizar caché de precios', { error: err.message });
+    log(LOG_LEVELS.WARN, 'PRICES', 'Los precios existentes se mantienen (respaldo preservado)');
   }
 }
 

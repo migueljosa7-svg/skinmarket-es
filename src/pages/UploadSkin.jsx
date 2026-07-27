@@ -104,18 +104,23 @@ export default function UploadSkin() {
                     onClick={() => toggleSelectSkin(skin)}
                     style={{
                       background: isSelected ? "rgba(245, 172, 59, 0.2)" : "rgba(255,255,255,0.02)",
-                    borderWidth: isSelected ? "2px 2px 4px 2px" : "1px 1px 4px 1px",
-                    borderStyle: "solid",
-                    borderColor: isSelected ? `#f5ac3b #f5ac3b ${color} #f5ac3b` : `rgba(255,255,255,0.05) rgba(255,255,255,0.05) ${color} rgba(255,255,255,0.05)`,
+                      borderWidth: isSelected ? "2px 2px 4px 2px" : "1px 1px 4px 1px",
+                      borderStyle: "solid",
+                      borderColor: isSelected ? `#f5ac3b #f5ac3b ${color} #f5ac3b` : `rgba(255,255,255,0.05) rgba(255,255,255,0.05) ${color} rgba(255,255,255,0.05)`,
                       borderRadius: "18px",
                       padding: "18px",
                       cursor: "pointer",
                       textAlign: "center"
                     }}
                   >
-                    <img src={skin.image} alt={skin.name} style={{ width: "100%", height: "80px", objectFit: "contain", marginBottom: "10px" }} />
+                    <img
+                      src={skin.image || getPlaceholderImage(skin.name)}
+                      alt={skin.name}
+                      onError={(e) => handleImageError(e, skin)}
+                      style={{ width: "100%", height: "80px", objectFit: "contain", marginBottom: "10px", opacity: skin.image ? 1 : 0.3 }}
+                    />
                     <div style={{ fontSize: "0.8rem", fontWeight: "bold", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{skin.name}</div>
-                    <div style={{ fontSize: "1rem", color: "#f5ac3b", fontWeight: "900", marginTop: "5px" }}>€{skin.price.toFixed(2)}</div>
+                    <div style={{ fontSize: "1rem", color: "#f5ac3b", fontWeight: "900", marginTop: "5px" }}>€{Number(skin.price || 0).toFixed(2)}</div>
                   </div>
                 );
               })}

@@ -62,42 +62,35 @@ function isValidSteamHash(hash) {
 const CDN_TIERS = [
   {
     name: 'ByMykel CS2 GitHub API',
-    buildUrl: function(cleanName) {
+    buildUrl: function (cleanName) {
       if (!cleanName) return null;
       return 'https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/images/items/' + encodeURIComponent(cleanName) + '.png';
     },
   },
   {
     name: 'CS2 Stash Mirror',
-    buildUrl: function(cleanName) {
+    buildUrl: function (cleanName) {
       if (!cleanName) return null;
       return 'https://csgostash.com/img/skins/large/' + encodeURIComponent(cleanName) + '.png';
     },
   },
   {
-    name: 'Swap.gg Public CDN',
-    buildUrl: function(cleanName) {
-      if (!cleanName) return null;
-      return 'https://market-cdn.swap.gg/v1/images/p/' + encodeURIComponent(cleanName) + '.png';
-    },
-  },
-  {
     name: 'ByMykel Web Mirror JSON',
-    buildUrl: function(cleanName) {
+    buildUrl: function (cleanName) {
       if (!cleanName) return null;
       return 'https://bymykel.github.io/CSGO-API/api/en/skins/' + encodeURIComponent(cleanName) + '.json';
     },
   },
   {
     name: 'Steam CloudFlare CDN',
-    buildUrl: function(hash) {
+    buildUrl: function (hash) {
       if (!hash) return null;
       return 'https://community.cloudflare.steamstatic.com/economy/image/' + hash + '/512fx512f';
     },
   },
   {
     name: 'Steam Akamai CDN',
-    buildUrl: function(hash) {
+    buildUrl: function (hash) {
       if (!hash) return null;
       return 'https://steamcommunity-a.akamaihd.net/economy/image/' + hash;
     },
@@ -133,7 +126,7 @@ function generatePlaceholderDataUrl(skinName) {
   var primaryColor = hashColor(name);
   var secondaryColor = '#020617';
 
-  var hash = name.split('').reduce(function(acc, c) { return acc + c.charCodeAt(0); }, 0);
+  var hash = name.split('').reduce(function (acc, c) { return acc + c.charCodeAt(0); }, 0);
   var cx = 30 + (hash % 40);
   var cy = 28 + (hash % 20);
   var r = 10 + (hash % 10);
@@ -232,32 +225,25 @@ export function getSkinImageSources(skin) {
     sources.push(null);
   }
 
-  // Tier 3: Swap.gg Public CDN (name-based)
+  // Tier 3: ByMykel Web Mirror JSON (name-based)
   if (cleanName) {
     sources.push(CDN_TIERS[2].buildUrl(cleanName));
   } else {
     sources.push(null);
   }
 
-  // Tier 4: ByMykel Web Mirror JSON (name-based)
-  if (cleanName) {
-    sources.push(CDN_TIERS[3].buildUrl(cleanName));
+  // --- HASH-BASED CDNs (Priority 4-5, fallback) ---
+
+  // Tier 4: Steam CloudFlare CDN (hash-based)
+  if (hash && steamHashValid) {
+    sources.push(CDN_TIERS[3].buildUrl(hash));
   } else {
     sources.push(null);
   }
 
-  // --- HASH-BASED CDNs (Priority 5-6, fallback) ---
-
-  // Tier 5: Steam CloudFlare CDN (hash-based)
+  // Tier 5: Steam Akamai CDN (hash-based)
   if (hash && steamHashValid) {
     sources.push(CDN_TIERS[4].buildUrl(hash));
-  } else {
-    sources.push(null);
-  }
-
-  // Tier 6: Steam Akamai CDN (hash-based)
-  if (hash && steamHashValid) {
-    sources.push(CDN_TIERS[5].buildUrl(hash));
   } else {
     sources.push(null);
   }
@@ -294,7 +280,10 @@ export function getSkinImageUrl(skinName, originalImage) {
   }
 
   // Last resort: SVG placeholder (no console 404 errors)
-  return generatePlaceholderDataUrl(skinName);
+  // Ensure onerror is null to prevent infinite loops
+  var placeholderUrl = generatePlaceholderDataUrl(skinName);
+  // Return placeholder with onerror safeguard
+  return placeholderUrl;
 }
 
 // ---------------------------------------------------------------------------
@@ -367,11 +356,11 @@ export function resetImageCache() {
 }
 
 export function preloadSkinImage(skinName, originalImage) {
-  return new Promise(function(resolve) {
+  return new Promise(function (resolve) {
     var url = getSkinImageUrl(skinName, originalImage);
     var img = new Image();
-    img.onload = function() { resolve(url); };
-    img.onerror = function() {
+    img.onload = function () { resolve(url); };
+    img.onerror = function () {
       failedUrls.add(url);
       resolve(getSkinImageUrl(skinName, originalImage));
     };

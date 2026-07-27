@@ -1,4 +1,4 @@
-# TODO: Unify Inventory Image Resolution + Multi-CDN Pipeline
+# TODO: Unify Inventory Image Resolution + Multi-CDN Pipeline ✅ COMPLETED
 
 ## Step 1: `src/services/ImageService.js` ✅
 - [x] Reorder CDN tiers to 7-tier pipeline (name-based CDNs first)
@@ -17,7 +17,7 @@
 - [x] Import `getSkinImageUrl` from ImageService
 - [x] Fix inventory skin cards: use `getSkinImageUrl(skin.name, skin.image)`
 
-## Step 4: Build & Deploy 🔄
-- [ ] Run `npx vite build` to verify compilation
-- [ ] Git commit & push to master
+## Step 4: Build & Deploy ✅
+- [x] `npx vite build` → 511 modules, 0 errors
+- [x] Commit: `7be7c02` pushed to `origin/master`
 
