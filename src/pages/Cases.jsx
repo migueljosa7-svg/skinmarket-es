@@ -131,7 +131,11 @@ const DailyRouletteModal = ({ isOpen, onClose, rewardAmount, skinsPool }) => {
                   borderColor: getRarityColor(skin?.rarity || "Common")
                 }}
               >
-                <img src={skin?.image} alt={skin?.name} style={{ width: "80px", height: "auto", marginBottom: "8px" }} />
+              <img
+                  src={skin?.image || getPlaceholderImage(skin?.name)}
+                  alt={skin?.name}
+                  onError={(e) => handleImageError(e, skin?.name, skin?.image)}
+                  style={{ width: "80px", height: "auto", marginBottom: "8px", opacity: skin?.image ? 1 : 0.3 }} />
                 <div style={{ fontSize: "0.65rem", color: "rgba(255,255,255,0.5)", fontWeight: "bold", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {skin?.name}
                 </div>
