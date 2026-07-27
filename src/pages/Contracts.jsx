@@ -396,7 +396,7 @@ export default function Contracts() {
                     <img
                       src={skin.image || getPlaceholderImage(skin.name)}
                       alt={skin.name}
-                      onError={(e) => handleImageError(e, skin.name, skin.image)}
+                      onError={(e) => handleImageError(e, skin)}
                       style={{
                         width: "100%",
                         height: "60px",
@@ -471,7 +471,7 @@ export default function Contracts() {
                         <img
                           src={skin.image || getPlaceholderImage(skin.name)}
                           alt={skin.name}
-                          onError={(e) => handleImageError(e, skin.name, skin.image)}
+                          onError={(e) => handleImageError(e, skin)}
                           style={{ width: "100%", height: "35px", objectFit: "contain", opacity: skin.image ? 1 : 0.3 }}
                         />
                         <div style={{ fontSize: "0.55rem", color: "rgba(255,255,255,0.5)", marginTop: "4px" }}>
@@ -622,7 +622,7 @@ export default function Contracts() {
                     <img
                       src={lastResult.reward.image || getPlaceholderImage(lastResult.reward.name)}
                       alt={lastResult.reward.name}
-                      onError={(e) => handleImageError(e, lastResult.reward.name, lastResult.reward.image)}
+                      onError={(e) => handleImageError(e, lastResult.reward)}
                       style={{
                         width: "100%",
                         maxWidth: "120px",

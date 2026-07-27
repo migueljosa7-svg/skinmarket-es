@@ -116,7 +116,7 @@ const MiniBattleRoulette = ({ items, accentColor }) => {
               <img
                 src={skin.image || getPlaceholderImage(skin.name)}
                 alt={skin.name}
-                onError={(e) => handleImageError(e, skin.name, skin.image)}
+onError={(e) => handleImageError(e, skin)}
                 style={{
                   width: "80px",
                   height: "60px",
@@ -1670,7 +1670,7 @@ if (!p.isUser) {
                                   <img
                                     src={skin.image || getPlaceholderImage(skin.name)}
                                     alt={skin.name}
-                                    onError={(e) => handleImageError(e, skin.name, skin.image)}
+                                    onError={(e) => handleImageError(e, skin)}
                                     style={{
                                       width: "100%",
                                       height: "100%",
