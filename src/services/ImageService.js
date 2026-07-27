@@ -30,6 +30,29 @@ const GRADIENT_COLORS = [
 // ---------------------------------------------------------------------------
 
 /**
+ * Cleans a Steam economy image hash by removing truncated/corrupted suffixes.
+ * Steam hashes should be complete base64-ish strings. This function removes
+ * common truncation patterns like trailing "..." or incomplete base64 padding.
+ *
+ * @param {string} hash - The raw Steam image hash
+ * @returns {string} Cleaned hash, or empty string if invalid
+ */
+function cleanSteamHash(hash) {
+  if (!hash || typeof hash !== 'string') return '';
+
+  // Remove trailing ellipsis or truncation indicators
+  var cleaned = hash.replace(/\.{2,}$/, '').trim();
+
+  // Remove any non-base64 characters that might have been introduced
+  cleaned = cleaned.replace(/[^a-zA-Z0-9_\-/=]/, '');
+
+  // Ensure minimum length (genuine Steam hashes are 150+ chars)
+  if (cleaned.length < 150) return '';
+
+  return cleaned;
+}
+
+/**
  * Validates whether a Steam economy image hash appears to be genuine and not
  * truncated/corrupted. Real Steam hashes are long base64-ish strings (150+ chars)
  * that start with a dash or alphanumeric character and contain no spaces.
@@ -40,17 +63,21 @@ const GRADIENT_COLORS = [
 function isValidSteamHash(hash) {
   if (!hash || typeof hash !== 'string') return false;
 
+  // Clean the hash first to remove truncation artifacts
+  var cleanedHash = cleanSteamHash(hash);
+  if (!cleanedHash) return false;
+
   // A real Steam hash must be sufficiently long (genuine hashes are >150 chars)
-  if (hash.length < 150) return false;
+  if (cleanedHash.length < 150) return false;
 
   // Must not contain whitespace
-  if (/\s/.test(hash)) return false;
+  if (/\s/.test(cleanedHash)) return false;
 
   // Must contain only valid URL-safe base64 characters plus hyphens and underscores
-  if (!/^[a-zA-Z0-9_\-/=]+$/.test(hash)) return false;
+  if (!/^[a-zA-Z0-9_\-/=]+$/.test(cleanedHash)) return false;
 
   // Genuine hashes typically start with a dash or alphanumeric character
-  if (!/^[a-zA-Z0-9\-_]/.test(hash.charAt(0))) return false;
+  if (!/^[a-zA-Z0-9\-_]/.test(cleanedHash.charAt(0))) return false;
 
   return true;
 }

@@ -28,13 +28,15 @@ export function getSocket() {
     }
 
     socket = io(SOCKET_URL, {
-        transports: ["websocket", "polling"],
+        transports: ["polling", "websocket"], // polling first for better compatibility
         reconnectionAttempts: 10,
         reconnectionDelay: 2000,
         reconnectionDelayMax: 10000,
         timeout: 20000,
         autoConnect: true,
         forceNew: false,
+        // Prevent overwhelming the server with failed requests
+        rejectUnauthorized: false, // Allow self-signed certs in development
     });
 
     socket.on("connect", () => {

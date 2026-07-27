@@ -39,6 +39,11 @@ export function ToastProvider({ children }) {
     [addToast]
   );
 
+  toast.warning = useCallback(
+    (message) => addToast(message, "warning"),
+    [addToast]
+  );
+
   return (
     <ToastContext.Provider value={toast}>
       {children}
@@ -76,17 +81,21 @@ function ToastItem({ toast, onClose }) {
       ? "rgba(16, 185, 129, 0.95)"
       : toast.type === "error"
         ? "rgba(239, 68, 68, 0.95)"
-        : "rgba(59, 130, 246, 0.95)";
+        : toast.type === "warning"
+          ? "rgba(245, 158, 11, 0.95)"
+          : "rgba(59, 130, 246, 0.95)";
 
   const borderColor =
     toast.type === "success"
       ? "#10b981"
       : toast.type === "error"
         ? "#ef4444"
-        : "#3b82f6";
+        : toast.type === "warning"
+          ? "#f59e0b"
+          : "#3b82f6";
 
   const icon =
-    toast.type === "success" ? "✓" : toast.type === "error" ? "✕" : "ℹ";
+    toast.type === "success" ? "✓" : toast.type === "error" ? "✕" : toast.type === "warning" ? "⚠" : "ℹ";
 
   return (
     <div
@@ -140,6 +149,7 @@ export function useToast() {
       success: (m) => console.log("[toast]", m),
       error: (m) => console.warn("[toast]", m),
       info: (m) => console.info("[toast]", m),
+      warning: (m) => console.warn("[toast]", m),
     };
   }
   return ctx;
