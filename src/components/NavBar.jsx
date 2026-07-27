@@ -1,13 +1,15 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
-import { useState } from "react";
-import { FaTrophy, FaShoppingBag, FaUser, FaSignOutAlt, FaPlus, FaFire } from "react-icons/fa";
+import { useState, useEffect } from "react";
+import { FaTrophy, FaShoppingBag, FaUser, FaSignOutAlt, FaPlus, FaFire, FaVolumeUp, FaVolumeMute } from "react-icons/fa";
 import { GiTwoCoins } from "react-icons/gi";
 import RechargeModal from "./RechargeModal";
+import { sound } from "../utils/audio";
 
 const NAV_ITEMS = [
   { to: "/cases", label: "CAJAS" },
   { to: "/upgrade", label: "UPGRADE" },
+  { to: "/contracts", label: "CONTRATOS" },
   { to: "/battles", label: "BATALLAS" },
   { to: "/ranking", label: "RANKING" },
 ];
@@ -24,10 +26,32 @@ export default function Navbar() {
   const location = useLocation();
   const [rechargeOpen, setRechargeOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isMuted, setIsMuted] = useState(() => sound.muted);
+
+  // Activate audio context on first user interaction (click/touch anywhere)
+  useEffect(() => {
+    const handler = () => {
+      sound.init();
+      document.removeEventListener("click", handler);
+      document.removeEventListener("touchstart", handler);
+    };
+    document.addEventListener("click", handler);
+    document.addEventListener("touchstart", handler);
+    return () => {
+      document.removeEventListener("click", handler);
+      document.removeEventListener("touchstart", handler);
+    };
+  }, []);
 
   const handleLogout = () => {
     logout();
     navigate("/");
+  };
+
+  const handleToggleMute = () => {
+    sound.init();
+    const newState = sound.toggleMute();
+    setIsMuted(!newState);
   };
 
   return (
@@ -180,6 +204,23 @@ export default function Navbar() {
                   </Link>
                 ))}
               </div>
+
+              {/* Sound Toggle */}
+              <button
+                onClick={handleToggleMute}
+                className="icon-btn"
+                title={isMuted ? "Activar sonido" : "Silenciar sonido"}
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  background: isMuted ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)',
+                  border: `1px solid ${isMuted ? 'rgba(239,68,68,0.2)' : 'rgba(16,185,129,0.2)'}`,
+                  color: isMuted ? '#ef4444' : '#10b981',
+                  cursor: 'pointer'
+                }}
+              >
+                {isMuted ? <FaVolumeMute /> : <FaVolumeUp />}
+              </button>
 
               {/* Logout */}
               <button onClick={handleLogout} className="logout-btn" title="Cerrar sesión">

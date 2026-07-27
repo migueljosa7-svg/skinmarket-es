@@ -115,7 +115,7 @@ const DailyRouletteModal = ({ isOpen, onClose, rewardAmount, skinsPool }) => {
           <div ref={containerRef} style={{ display: "flex", gap: "10px", paddingLeft: "50%", transition: "none" }}>
             {reel.map((skin, i) => (
               <div
-                key={i}
+                key={skin?.id || `daily-${i}`}
                 style={{
                   minWidth: "150px",
                   height: "150px",
@@ -214,9 +214,9 @@ const CaseCard = ({ c, skinsPool, onClick }) => {
 
       <div style={{ padding: "20px", background: "#121419", display: "flex", flexDirection: "column", gap: "15px", flex: 1, justifyContent: "space-between" }}>
         <div style={{ display: "flex", gap: "5px", justifyContent: "center" }}>
-          {skins.map((skin, i) => (
+{skins.map((skin, i) => (
             <img
-              key={i}
+              key={skin?.id || `cskin-${i}`}
               src={skin.image || getPlaceholderImage(skin.name)}
               alt={skin.name}
               onError={(e) => handleImageError(e, skin.name, skin.image)}

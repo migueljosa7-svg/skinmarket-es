@@ -6,6 +6,8 @@ import { getRarityColor } from "../constants/colors.js";
 import { motion as Motion } from "framer-motion";
 import { getPlaceholderImage, handleImageError } from "../services/ImageService";
 import { useToast } from "../components/Toast";
+import { sound } from "../utils/audio";
+import { getFloatBadgeProps } from "../utils/floatPreview";
 
 
 /* ─────────────────────────────────────────────
@@ -93,7 +95,7 @@ const MiniBattleRoulette = ({ items, accentColor }) => {
           const rc = getRarityColor(skin.rarity);
           return (
             <div
-              key={idx}
+              key={skin.id || `minibattle-${idx}`}
               style={{
                 minWidth: "110px",
                 height: "110px",
@@ -730,6 +732,21 @@ export default function Battles() {
     [allSkins]
   );
 
+  // Helper: map bot template ID to difficulty level
+  const getBotDifficulty = useCallback((botLevel) => {
+    // Elite/master/king/hacker bots → "hard"
+    const hardBots = ["elite1", "elite2", "master1", "master2", "skin_king", "hacker"];
+    // Standard/pro bots → "normal"
+    const normalBots = ["std1", "std2"];
+    // Newbie bots → "easy"
+    const easyBots = ["newbie1", "newbie2"];
+    
+    if (hardBots.includes(botLevel)) return "hard";
+    if (normalBots.includes(botLevel)) return "normal";
+    if (easyBots.includes(botLevel)) return "easy";
+    return "normal"; // default
+  }, []);
+
   // Simular apertura de caja con pesos específicos para bots
   const openBoxRandomly = useCallback(
     (caseData, validSkins, forceGoodDrop = false, forceBadDrop = false, botLevel = "") => {
@@ -740,14 +757,24 @@ export default function Battles() {
       const jackpot = sortedSkins[sortedSkins.length - 1];
       const cheapest = sortedSkins[0];
 
+      // Determine difficulty from bot level
+      const difficulty = getBotDifficulty(botLevel);
+
       // Logic for high-level bots (Pro, Elite, Master, etc.)
       const isHighLevelBot = ["std1", "std2", "elite1", "elite2", "master1", "master2", "skin_king", "hacker"].includes(botLevel);
 
-      if (isHighLevelBot) {
+      if (isHighLevelBot && forceGoodDrop) {
         const roll = Math.random();
-        const jackpotChance = 0.42 + (Math.random() * 0.03);
+        let jackpotChance;
+        if (difficulty === "hard") {
+          jackpotChance = 0.55 + (Math.random() * 0.10); // 55-65% jackpot chance
+        } else if (difficulty === "normal") {
+          jackpotChance = 0.35 + (Math.random() * 0.10); // 35-45%
+        } else {
+          jackpotChance = 0.05; // 5%
+        }
 
-        if (roll < jackpotChance && forceGoodDrop) {
+        if (roll < jackpotChance) {
           return {
             id: `${jackpot.id}-${Date.now()}-${Math.random()}`,
             name: jackpot.name,
@@ -760,14 +787,22 @@ export default function Battles() {
 
       // Default weighted probability for others
       const weighted = [];
+      let weightMultiplier = forceGoodDrop ? 2 : (forceBadDrop ? 0.2 : 1);
+      
+      // Adjust multiplier based on difficulty
+      if (forceGoodDrop) {
+        if (difficulty === "hard") weightMultiplier = 5;
+        else if (difficulty === "normal") weightMultiplier = 3;
+        else weightMultiplier = 1.5;
+      } else if (forceBadDrop) {
+        if (difficulty === "hard") weightMultiplier = 0.1; // Hard bots never get bad drops
+        else if (difficulty === "normal") weightMultiplier = 0.3;
+        else weightMultiplier = 0.6;
+      }
+
       validSkins.forEach((skin) => {
         const price = Math.max(0.5, skin.price || 0.5);
-        let weight = forceGoodDrop
-          ? Math.max(1, Math.floor(price * 2))
-          : forceBadDrop
-            ? Math.max(1, Math.floor(5 / (price * 10)))
-            : Math.max(1, Math.floor(800 / (price * 10)));
-
+        let weight = Math.max(1, Math.floor((800 / (price * 10)) * weightMultiplier));
         for (let i = 0; i < weight; i++) {
           weighted.push({ ...skin, price: parseFloat(parseFloat(skin.price).toFixed(2)) });
         }
@@ -782,7 +817,7 @@ export default function Battles() {
         rarity: skin.rarity,
       };
     },
-    []
+    [getBotDifficulty]
   );
 
   // Iniciar la batalla
@@ -859,17 +894,20 @@ export default function Battles() {
           let forceGoodDrop = false;
           let forceBadDrop = false;
 
-          if (!p.isUser) {
+if (!p.isUser) {
+            // Map bot template IDs to difficulty using the helper
+            const difficulty = getBotDifficulty(p.level);
+
             // Lógica de probabilidad basada en el modo
             if (gameMode === "classic") {
-              if (p.level === "hard" && Math.random() < 0.8) forceGoodDrop = true;
-              if (p.level === "normal" && Math.random() < 0.45) forceGoodDrop = true;
-              if (p.level === "easy" && Math.random() > 0.7) forceBadDrop = true;
+              if (difficulty === "hard" && Math.random() < 0.8) forceGoodDrop = true;
+              if (difficulty === "normal" && Math.random() < 0.45) forceGoodDrop = true;
+              if (difficulty === "easy" && Math.random() > 0.7) forceBadDrop = true;
             } else if (gameMode === "crazy") {
               // En modo loco, ganar es tener MENOS valor
-              if (p.level === "hard" && Math.random() < 0.8) forceBadDrop = true;
-              if (p.level === "normal" && Math.random() < 0.45) forceBadDrop = true;
-              if (p.level === "easy" && Math.random() > 0.7) forceGoodDrop = true;
+              if (difficulty === "hard" && Math.random() < 0.8) forceBadDrop = true;
+              if (difficulty === "normal" && Math.random() < 0.45) forceBadDrop = true;
+              if (difficulty === "easy" && Math.random() > 0.7) forceGoodDrop = true;
             }
           }
 
@@ -943,7 +981,7 @@ export default function Battles() {
     [allCases, getSkinsForCase, openBoxRandomly, updateUser]
   );
 
-  // Otorgar loot al terminar
+// Otorgar loot al terminar + sound effects
   useEffect(() => {
     if (!battleState || !animState.hasCompleted) return;
 
@@ -951,7 +989,9 @@ export default function Battles() {
     const isUserWinner = winnerIds.includes("user");
     const isTie = winnerIds.length > 1;
 
+    // Play sound based on result
     if (isUserWinner) {
+      sound.playWin(true);
       if (!isTie) {
         // Usuario gana TODO
         const totalLoot = players.flatMap((p) => p.results);
@@ -969,6 +1009,8 @@ export default function Battles() {
           }));
         }
       }
+    } else {
+      sound.playFail();
     }
   }, [animState.hasCompleted]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1154,7 +1196,7 @@ export default function Battles() {
             <div style={{
               display: 'flex', justifyContent: 'flex-end', gap: '10px', marginBottom: '15px'
             }}>
-              <button
+<button
                 onClick={handleRepeatBattle}
                 style={{
                   background: "rgba(245, 172, 59, 0.1)",
@@ -1168,8 +1210,6 @@ export default function Battles() {
                   transition: 'all 0.2s',
                   boxShadow: '0 4px 15px rgba(245, 172, 59, 0.1)'
                 }}
-                onMouseEnter={e => e.target.style.background = 'rgba(245, 172, 59, 0.2)'}
-                onMouseLeave={e => e.target.style.background = 'rgba(245, 172, 59, 0.1)'}
               >
                 REPETIR / COPIAR 🔄
               </button>
@@ -1187,8 +1227,6 @@ export default function Battles() {
                   cursor: animState.hasCompleted ? "default" : "pointer",
                   transition: 'all 0.2s'
                 }}
-                onMouseEnter={e => !animState.hasCompleted && (e.target.style.background = 'rgba(255,255,255,0.1)')}
-                onMouseLeave={e => !animState.hasCompleted && (e.target.style.background = 'rgba(255,255,255,0.05)')}
               >
                 SALTAR ⏭️
               </button>

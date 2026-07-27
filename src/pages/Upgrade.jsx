@@ -145,6 +145,7 @@ export default function Upgrade() {
   const [lastResult, setLastResult] = useState(null);
   const [searchRight, setSearchRight] = useState("");
   const [page, setPage] = useState(0);
+  const [reverseMode, setReverseMode] = useState(false);
   const itemsPerPage = 16;
 
   const validTargets = useMemo(() => {
@@ -174,13 +175,28 @@ export default function Upgrade() {
 
   const handleSkinClick = (id) => {
     if (isSpinning) return;
-    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
+    setSelectedIds((prev) => {
+      if (prev.includes(id)) return prev.filter((i) => i !== id);
+      // Max 3 skins allowed
+      if (prev.length >= 3) return prev;
+      return [...prev, id];
+    });
   };
 
   const calculateChance = () => {
     if (selectedIds.length === 0 || targetSkins.length === 0) return 0;
     const totalBetValue = (user?.inventory || []).filter((s) => selectedIds.includes(s.id)).reduce((sum, s) => sum + (s.price || 0), 0);
     const totalTargetValue = targetSkins.reduce((sum, s) => sum + (s.price || 0), 0);
+    if (totalTargetValue <= 0 || totalBetValue <= 0) return 0;
+
+    if (reverseMode) {
+      // Reverse: 1 high-value skin vs multiple low-value targets
+      // You're betting your 1 skin to win multiple lower-value skins
+      const ratio = totalTargetValue / totalBetValue;
+      return Math.max(Math.min(ratio * 90, 90), 0.01);
+    }
+
+    // Normal: multiple low-value vs 1 high-value target
     const ratio = totalBetValue / totalTargetValue;
     return Math.max(Math.min(ratio * 95, 95), 0.01);
   };
@@ -306,6 +322,47 @@ export default function Upgrade() {
 
         {/* CENTER COLUMN */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "30px" }}>
+          {/* Mode Toggle */}
+          <div style={{ display: "flex", gap: "10px", alignItems: "center", background: "rgba(255,255,255,0.03)", padding: "5px", borderRadius: "14px", border: "1px solid rgba(255,255,255,0.05)" }}>
+            <button
+              onClick={() => setReverseMode(false)}
+              style={{
+                padding: "10px 20px",
+                borderRadius: "10px",
+                border: "none",
+                background: reverseMode ? "transparent" : "#f5ac3b",
+                color: reverseMode ? "rgba(255,255,255,0.4)" : "black",
+                fontWeight: "900",
+                fontSize: "0.8rem",
+                cursor: "pointer",
+                transition: "all 0.2s",
+              }}
+            >
+              ↑ UPGRADE
+            </button>
+            <button
+              onClick={() => setReverseMode(true)}
+              style={{
+                padding: "10px 20px",
+                borderRadius: "10px",
+                border: "none",
+                background: reverseMode ? "#a855f7" : "transparent",
+                color: reverseMode ? "white" : "rgba(255,255,255,0.4)",
+                fontWeight: "900",
+                fontSize: "0.8rem",
+                cursor: "pointer",
+                transition: "all 0.2s",
+              }}
+            >
+              ↓ DOWNGRADE
+            </button>
+          </div>
+          <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.3)", fontWeight: "bold", textAlign: "center" }}>
+            {reverseMode
+              ? "Apuesta 1 skin de alto valor para ganar VARIAS skins de menor valor"
+              : "Apuesta hasta 3 skins para ganar 1 skin de mayor valor"}
+          </div>
+
           <UpgradeSpinner chance={chance} isSpinning={isSpinning} resultDegree={resultDegree} onComplete={handleAnimationComplete} />
 
           <button

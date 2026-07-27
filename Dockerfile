@@ -1,29 +1,51 @@
-# ETAPA 1: Construcción del Frontend (React + Vite)
-FROM node:20 AS build-stage
+# ============================================================
+# STAGE 1: Build Frontend (React + Vite)
+# ============================================================
+FROM node:20-alpine AS build-stage
 WORKDIR /app
 
-# Instalar TODAS las dependencias (necesarias para build de React)
+# Copy package files first for layer caching
 COPY package*.json ./
-RUN npm install
+RUN npm ci --frozen-lockfile
 
-# Copiar el código y construir el frontend (crea la carpeta 'dist')
+# Copy source code and build
 COPY . .
 RUN npm run build
 
-# ETAPA 2: Servidor Final de Producción (Node.js)
-FROM node:20-alpine
+# ============================================================
+# STAGE 2: Production Backend (Node.js + PM2)
+# ============================================================
+FROM node:20-alpine AS production
 WORKDIR /app
 
-# Copiar dependencias de producción
+# Install PM2 globally for process management
+RUN npm install -g pm2
+
+# Copy production dependencies only (root: for vite build output serving)
 COPY package*.json ./
-RUN npm install --omit=dev
+RUN npm ci --omit=dev --frozen-lockfile
 
-# Copiar el backend y el build del frontend de la etapa anterior
-COPY --from=build-stage /app/src /app/src
-COPY --from=build-stage /app/dist /app/dist
+# Copy backend source
+COPY src/backend ./src/backend
 
-# Exponer el puerto del Backend (Render asignará PORT por defecto si no, pero 3001 internamente)
+# Copy only the built frontend from stage 1
+COPY --from=build-stage /app/dist ./dist
+
+# Copy generate_prices_cache.js (needed by cron job)
+COPY generate_prices_cache.js ./
+
+# Copy ecosystem config for PM2
+COPY ecosystem.config.cjs ./
+
+# Create .env symlink or ensure it's mounted from docker-compose
+# The .env file will be provided via docker-compose environment variables
+
 EXPOSE 3001
 
-# Iniciar tu servidor Node.js que alojará la API, Bot de Steam y base de datos
-CMD ["node", "src/backend/server.js"]
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3001/api/health || exit 1
+
+# Use PM2 in production mode with no-daemon (foreground)
+CMD ["pm2-runtime", "ecosystem.config.cjs", "--env", "production"]
+

@@ -140,7 +140,7 @@ const SingleMultiRoulette = ({ items, quantity, isSpinning, onComplete }) => {
           const color = getRarityColor(skin.rarity);
           return (
             <div
-              key={idx}
+              key={skin.id || `reel-${idx}`}
               style={{
                     minWidth: "150px",
                     height: "160px",
@@ -487,7 +487,7 @@ export default function CaseView() {
                     const color = getRarityColor(skin.rarity);
                     return (
                       <div
-                        key={idx}
+                        key={skin.id || `result-${idx}`}
                         style={{
                           width: "220px",
                           background: "rgba(255,255,255,0.03)",
@@ -682,7 +682,7 @@ export default function CaseView() {
               const color = getRarityColor(skin.rarity);
               return (
                 <div
-                  key={idx}
+                  key={skin.id || `skin-${idx}`}
                   style={{
                     background: "rgba(255,255,255,0.02)",
                     borderRadius: "20px",

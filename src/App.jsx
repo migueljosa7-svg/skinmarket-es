@@ -18,12 +18,14 @@ const Cases = lazy(() => import("./pages/Cases"));
 const CaseView = lazy(() => import("./pages/CaseView"));
 const Battles = lazy(() => import("./pages/Battles"));
 const Upgrade = lazy(() => import("./pages/Upgrade"));
+const Contracts = lazy(() => import("./pages/Contracts"));
 const Ranking = lazy(() => import("./pages/Ranking"));
 const Admin = lazy(() => import("./pages/Admin"));
 const Inventory = lazy(() => import("./components/Inventory"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const Terms = lazy(() => import("./pages/Terms"));
 const About = lazy(() => import("./pages/About"));
+const FAQ = lazy(() => import("./pages/FAQ"));
 
 export default function App() {
   return (
@@ -41,6 +43,7 @@ export default function App() {
                   <Route path="/privacy" element={<Privacy />} />
                   <Route path="/terms" element={<Terms />} />
                   <Route path="/about" element={<About />} />
+                  <Route path="/faq" element={<FAQ />} />
                   <Route path="/login" element={<Login />} />
                   <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                   <Route path="/upload" element={<ProtectedRoute><UploadSkin /></ProtectedRoute>} />
@@ -49,6 +52,7 @@ export default function App() {
                   <Route path="/battles" element={<ProtectedRoute><Battles /></ProtectedRoute>} />
                   <Route path="/ranking" element={<Ranking />} />
                   <Route path="/upgrade" element={<ProtectedRoute><Upgrade /></ProtectedRoute>} />
+                  <Route path="/contracts" element={<ProtectedRoute><Contracts /></ProtectedRoute>} />
                   <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
                   <Route path="/admin" element={<ProtectedRoute adminOnly={true}><Admin /></ProtectedRoute>} />
                 </Routes>

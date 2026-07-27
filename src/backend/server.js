@@ -4,7 +4,7 @@ import cors from "cors";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import db from "./db.js";
-import steamBot from "./steamBot.js";
+import botEngine from "./steam/botEngine.js";
 import dotenv from "dotenv";
 import session from "express-session";
 import { createClient } from "redis";
@@ -14,13 +14,17 @@ import hpp from "hpp";
 import rateLimit from "express-rate-limit";
 import passport from "passport";
 import { Strategy as SteamStrategy } from "passport-steam";
+import { Server as SocketIOServer } from "socket.io";
 
 dotenv.config();
 
-// Iniciar Bot de Steam
-// Iniciar Bot de Steam (Solo si hay credenciales configuradas)
+// Iniciar Bot de Steam (nuevo botEngine con reconexión y cola)
 if (process.env.BOT_USERNAME && process.env.BOT_USERNAME !== 'tu_usuario_steam') {
-  steamBot.logIn();
+  botEngine.logIn();
+  // Endpoint para ver estado del bot
+  app.get("/api/bot/status", (req, res) => {
+    res.json(botEngine.getStatus());
+  });
 } else {
   console.log("[BOT] Bot no configurado. Iniciando en modo simulación.");
 }
@@ -426,15 +430,19 @@ app.post("/api/inventory/withdraw", authenticateToken, async (req, res) => {
     }
 
     // 3. Intentar envío real con el Bot si está disponible
-    if (steamBot.isLoggedIn) {
+    if (botEngine.isLoggedIn) {
       try {
-        await steamBot.sendWithdrawOffer(user.steam_id, user.trade_token, item.name);
-        await db.query("UPDATE inventario SET status = 'withdrawn' WHERE item_id = $1", [itemId]);
+        const result = await botEngine.sendWithdrawOffer(user.steam_id, user.trade_token, item.name);
+        if (result.success) {
+          await db.query("UPDATE inventario SET status = 'withdrawn' WHERE item_id = $1", [itemId]);
 
-        await recordTransaction(req.user.id, 'retiro', item.price, 'steam_trade', `Retiro real de ${item.name}`);
-        await logAction(req.user.id, 'RETIRAR_ITEM_REAL', { itemId, itemName: item.name });
+          await recordTransaction(req.user.id, 'retiro', item.price, 'steam_trade', `Retiro real de ${item.name}`);
+          await logAction(req.user.id, 'RETIRAR_ITEM_REAL', { itemId, itemName: item.name });
 
-        return res.json({ success: true, message: "Oferta real enviada a Steam." });
+          return res.json({ success: true, message: `Oferta #${result.offerId} enviada a Steam.` });
+        } else {
+          throw new Error(result.error || 'Error del bot');
+        }
       } catch (botErr) {
         console.error("[WITHDRAW] Bot error:", botErr.message);
         // Fallback a simulación si el bot falla (ej: no tiene el objeto)
@@ -663,6 +671,9 @@ app.post("/api/admin/settings/probabilities", authenticateToken, isAdmin, async 
 
 import path from "path";
 import { fileURLToPath } from "url";
+import cron from "node-cron";
+import { createCharge, handleWebhook, getPaymentStatus } from "./controllers/paymentController.js";
+import p2pMarketService from "./services/p2pMarketService.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -675,4 +686,107 @@ app.get(/(.*)/, (req, res) => {
   res.sendFile(path.join(__dirname, '../../dist/index.html'));
 });
 
-app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
+// ─────────────────────────────────────────────────
+// PAYMENT ROUTES - Pasarela de Pago
+// ─────────────────────────────────────────────────
+
+app.post("/api/payments/create-charge", authenticateToken, createCharge);
+app.post("/api/payments/webhook", handleWebhook);
+app.get("/api/payments/status/:chargeId", authenticateToken, getPaymentStatus);
+
+// ─────────────────────────────────────────────────
+// P2P MARKET ROUTES - Mercado Externo
+// ─────────────────────────────────────────────────
+
+app.get("/api/p2p/status", authenticateToken, (req, res) => {
+  res.json(p2pMarketService.getStatus());
+});
+
+app.post("/api/p2p/search", authenticateToken, async (req, res) => {
+  const { marketHashName, minPrice, maxPrice } = req.body;
+  if (!marketHashName) return res.status(400).json({ error: "marketHashName requerido" });
+  try {
+    const results = await p2pMarketService.searchSkin(marketHashName, { minPrice, maxPrice });
+    res.json({ success: true, results });
+  } catch (err) {
+    res.status(500).json({ error: "Error al buscar en mercado P2P", details: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────
+// Socket.io - Live Drops en Tiempo Real
+// ─────────────────────────────────────────────────
+const server = app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
+
+const io = new SocketIOServer(server, {
+  cors: {
+    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    methods: ["GET", "POST"],
+    credentials: true
+  }
+});
+
+io.on("connection", (socket) => {
+  console.log(`[SOCKET] Cliente conectado: ${socket.id}`);
+
+  socket.on("disconnect", () => {
+    console.log(`[SOCKET] Cliente desconectado: ${socket.id}`);
+  });
+});
+
+// Función helper para emitir live drops a todos los clientes
+function emitLiveDrop(dropData) {
+  io.emit("live-drop", {
+    id: `drop_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+    user: dropData.user || "Jugador",
+    item: {
+      name: dropData.item?.name || "Skin",
+      price: Number(parseFloat(dropData.item?.price || 10).toFixed(2)),
+      rarity: dropData.item?.rarity || "Mil-Spec",
+      image: dropData.item?.image || ""
+    },
+    caseName: dropData.caseName || "Caja",
+    timestamp: new Date().toISOString()
+  });
+}
+
+// ─────────────────────────────────────────────────
+// Price Cache - Actualización Automática (Cron)
+// ─────────────────────────────────────────────────
+
+async function refreshPriceCache() {
+  try {
+    const { execSync } = await import("child_process");
+    const scriptPath = path.join(__dirname, "../../generate_prices_cache.js");
+    console.log("[PRICES] Iniciando actualización de caché de precios...");
+    const result = execSync(`node "${scriptPath}"`, { timeout: 30000 });
+    console.log(`[PRICES] Caché actualizada: ${result.toString().trim()}`);
+  } catch (err) {
+    console.error("[PRICES] Error al actualizar caché de precios:", err.message);
+    console.log("[PRICES] Los precios existentes se mantienen (respaldo preservado).");
+  }
+}
+
+// Programar actualización cada 6 horas (a las 0:00, 6:00, 12:00, 18:00)
+cron.schedule("0 */6 * * *", () => {
+  refreshPriceCache();
+});
+
+// También ejecutar la primera vez 10 segundos después del inicio
+setTimeout(() => {
+  refreshPriceCache();
+}, 10000);
+
+// ─────────────────────────────────────────────────
+// ADMIN: Refrescar caché de precios manualmente
+// ─────────────────────────────────────────────────
+
+app.post("/api/admin/refresh-prices", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    await refreshPriceCache();
+    await logAction(req.user.id, "REFRESH_PRICES", {});
+    res.json({ success: true, message: "Caché de precios actualizada correctamente." });
+  } catch (err) {
+    res.status(500).json({ error: "Error al refrescar precios" });
+  }
+});

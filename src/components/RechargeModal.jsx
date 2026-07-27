@@ -3,6 +3,8 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../context/useAuth";
 import { useToast } from "./Toast";
 
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
+
 const TabButton = ({ active, onClick, label, icon }) => (
   <button
     onClick={onClick}
@@ -36,6 +38,47 @@ const MOCK_STEAM_SKINS = [
   { id: "st_4", name: "Glock-18 | Water Elemental", price: 8.50, rarity: "Restricted", wear: "Factory New", image: "https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw" }
 ];
 
+/**
+ * Get auth token from localStorage for API calls
+ */
+function getAuthToken() {
+  try {
+    const raw = localStorage.getItem("skinmarket_db_v1");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return parsed?.user?.token || null;
+    }
+  } catch (e) {
+    // ignore
+  }
+  return null;
+}
+
+/**
+ * Call the backend payment API
+ */
+async function callPaymentAPI(endpoint, body) {
+  const token = getAuthToken();
+  const headers = {
+    "Content-Type": "application/json",
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_BASE}${endpoint}`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || `Error ${response.status}`);
+  }
+  return data;
+}
+
 export default function RechargeModal({ open, onClose }) {
   const toast = useToast();
   const [activeTab, setActiveTab] = useState("card");
@@ -50,7 +93,6 @@ export default function RechargeModal({ open, onClose }) {
 
   useEffect(() => {
     if (open && user?.steam_id) {
-      // Direct mock response since we're in pure local mode
       setTimeout(() => {
         setSteamSkins(MOCK_STEAM_SKINS);
       }, 500);
@@ -81,15 +123,38 @@ export default function RechargeModal({ open, onClose }) {
     const amountNum = parseFloat(cardData.amount);
     if (isNaN(amountNum) || amountNum <= 0) return toast.error("Monto inválido");
     setLoading(true);
-    const saved = addToBalance(amountNum);
-    if (saved) {
-      setSuccess(`¡Pago procesado! Se han añadido €${amountNum.toFixed(2)} a tu saldo.`);
-      setTimeout(() => {
-        setSuccess(null);
-        onClose();
-      }, 2000);
-    } else {
-      toast.error("Error al procesar el pago.");
+
+    try {
+      // Call backend API for card payment
+      const result = await callPaymentAPI("/api/payments/create-charge", {
+        amount: amountNum,
+        method: "card",
+      });
+
+      if (result.success) {
+        // Update local balance to reflect the deposit
+        addToBalance(amountNum);
+        setSuccess(`✅ ${result.message}`);
+        setTimeout(() => {
+          setSuccess(null);
+          onClose();
+        }, 2000);
+      } else {
+        toast.error(result.error || "Error al procesar el pago.");
+      }
+    } catch (err) {
+      console.error("[RECHARGE] Card deposit error:", err);
+      // Fallback to local storage if API is unavailable
+      const saved = addToBalance(amountNum);
+      if (saved) {
+        setSuccess(`💳 Pago simulado: €${amountNum.toFixed(2)} añadidos a tu saldo.`);
+        setTimeout(() => {
+          setSuccess(null);
+          onClose();
+        }, 2000);
+      } else {
+        toast.error("Error al procesar el pago.");
+      }
     }
     setLoading(false);
   };
@@ -98,29 +163,86 @@ export default function RechargeModal({ open, onClose }) {
     const codeClean = giftCode.trim().toUpperCase();
     if (!codeClean) return;
 
-    let amount = 15.00;
-    if (codeClean === "SKINMARKET") amount = 100.00;
-    else if (codeClean === "ESPAÑA") amount = 50.00;
-    else if (codeClean === "START") amount = 25.00;
-
     setLoading(true);
-    const saved = addToBalance(amount);
-    if (saved) {
-      setSuccess(`¡Código ${codeClean} canjeado con éxito! +€${amount.toFixed(2)} añadidos.`);
-      setGiftCode("");
-      setTimeout(() => {
-        setSuccess(null);
-        onClose();
-      }, 2000);
-    } else {
-      toast.error("Código no válido.");
+
+    try {
+      // Call backend API for gift code redemption
+      const result = await callPaymentAPI("/api/payments/create-charge", {
+        amount: 0,
+        method: "gift_code",
+        code: codeClean,
+      });
+
+      if (result.success) {
+        addToBalance(result.amount);
+        setSuccess(`🎁 ${result.message}`);
+        setGiftCode("");
+        setTimeout(() => {
+          setSuccess(null);
+          onClose();
+        }, 2000);
+      } else {
+        toast.error(result.error || "Código no válido.");
+      }
+    } catch (err) {
+      console.error("[RECHARGE] Gift code error:", err);
+      // Fallback to local codes if API is unavailable
+      let amount = 0;
+      if (codeClean === "SKINMARKET") amount = 100.00;
+      else if (codeClean === "ESPAÑA") amount = 50.00;
+      else if (codeClean === "START") amount = 25.00;
+      else if (codeClean === "BIENVENIDO") amount = 10.00;
+
+      if (amount > 0) {
+        const saved = addToBalance(amount);
+        if (saved) {
+          setSuccess(`🎁 Código ${codeClean} canjeado (simulado): +€${amount.toFixed(2)}`);
+          setGiftCode("");
+          setTimeout(() => {
+            setSuccess(null);
+            onClose();
+          }, 2000);
+        } else {
+          toast.error("Error al canjear el código.");
+        }
+      } else {
+        toast.error("Código no válido.");
+      }
     }
     setLoading(false);
   };
 
-  const generateCryptoAddress = (coin) => {
+  const generateCryptoAddress = async (coin) => {
     setLoading(true);
-    setTimeout(() => {
+
+    try {
+      const methodMap = {
+        BTC: "crypto_btc",
+        ETH: "crypto_eth",
+        LTC: "crypto_lte",
+        USDT: "crypto_usdt",
+        SOL: "crypto_sol",
+      };
+
+      const result = await callPaymentAPI("/api/payments/create-charge", {
+        amount: parseFloat(cardData.amount || "50"),
+        method: methodMap[coin] || "crypto_btc",
+      });
+
+      if (result.success) {
+        setCryptoData({
+          coin: result.coin.toUpperCase(),
+          label: result.coinLabel,
+          address: result.address,
+          network: result.network,
+          chargeId: result.chargeId,
+        });
+      } else {
+        toast.error(result.error || "Error al generar dirección.");
+      }
+    } catch (err) {
+      console.error("[RECHARGE] Crypto address error:", err);
+      // Fallback to simulated addresses
       const addresses = {
         BTC: "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
         ETH: "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
@@ -128,9 +250,14 @@ export default function RechargeModal({ open, onClose }) {
         USDT: "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
         SOL: "7Y4p742d35Cc6634C0532925a3b844Bc454e4438f44e"
       };
-      setCryptoData({ coin, address: addresses[coin] || "ADDRESS_GEN" });
-      setLoading(false);
-    }, 400);
+      setCryptoData({
+        coin,
+        label: coin,
+        address: addresses[coin] || "ADDRESS_GEN",
+        network: coin === "USDT" ? "ERC-20" : coin,
+      });
+    }
+    setLoading(false);
   };
 
   const toggleSelect = (skin) => {
@@ -233,7 +360,7 @@ export default function RechargeModal({ open, onClose }) {
           {activeTab === "card" && (
             <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
               <div>
-                    <label style={{ fontSize: "0.8rem", color: "#9ca3af" }}>Selecciona o introduce importe (€)</label>
+                <label style={{ fontSize: "0.8rem", color: "#9ca3af" }}>Selecciona o introduce importe (€)</label>
                 <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
                   {["10", "25", "50", "100", "250"].map((val) => (
                     <button
@@ -394,9 +521,12 @@ export default function RechargeModal({ open, onClose }) {
                   }}
                 >
                   <p style={{ color: "#9ca3af", margin: "0 0 8px 0", fontSize: "0.8rem" }}>
-                    Dirección de depósito {cryptoData.coin}:
+                    Dirección de depósito {cryptoData.label || cryptoData.coin} ({cryptoData.network}):
                   </p>
                   <code style={{ color: "#f5ac3b", fontSize: "0.9rem" }}>{cryptoData.address}</code>
+                  <p style={{ color: "rgba(255,255,255,0.3)", fontSize: "0.7rem", marginTop: "10px" }}>
+                    Envía los fondos a esta dirección. El saldo se acreditará automáticamente tras las confirmaciones de red.
+                  </p>
                 </div>
               )}
             </div>
@@ -444,6 +574,8 @@ export default function RechargeModal({ open, onClose }) {
                 <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>Códigos de prueba:</span>
                 <span onClick={() => setGiftCode("SKINMARKET")} style={{ fontSize: "0.75rem", color: "#f5ac3b", cursor: "pointer", textDecoration: "underline" }}>SKINMARKET (+€100)</span>
                 <span onClick={() => setGiftCode("ESPAÑA")} style={{ fontSize: "0.75rem", color: "#f5ac3b", cursor: "pointer", textDecoration: "underline" }}>ESPAÑA (+€50)</span>
+                <span onClick={() => setGiftCode("START")} style={{ fontSize: "0.75rem", color: "#f5ac3b", cursor: "pointer", textDecoration: "underline" }}>START (+€25)</span>
+                <span onClick={() => setGiftCode("BIENVENIDO")} style={{ fontSize: "0.75rem", color: "#f5ac3b", cursor: "pointer", textDecoration: "underline" }}>BIENVENIDO (+€10)</span>
               </div>
             </div>
           )}
@@ -452,3 +584,4 @@ export default function RechargeModal({ open, onClose }) {
     </div>
   );
 }
+

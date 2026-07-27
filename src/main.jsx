@@ -4,6 +4,17 @@ import App from "./App";
 import "./index.css";
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
+import { sound } from "./utils/audio";
+
+// Activate audio context on first user gesture (click/touch anywhere)
+// to avoid "AudioContext was not allowed to start" browser warning
+const activateAudio = () => {
+  sound.activateFromUserGesture();
+  document.removeEventListener("click", activateAudio);
+  document.removeEventListener("touchstart", activateAudio);
+};
+document.addEventListener("click", activateAudio, { once: true });
+document.addEventListener("touchstart", activateAudio, { once: true });
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

@@ -1,9 +1,12 @@
 // src/components/LiveDrops.jsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion as Motion, AnimatePresence } from "framer-motion";
 import { getRarityColor } from "../constants/colors";
 import { StorageService } from "../services/StorageService";
 import { getPlaceholderImage, handleImageError } from "../services/ImageService";
+import { io as SocketIOClient } from "socket.io-client";
+
+const MAX_DROPS = 15;
 
 const BOT_NAMES = [
   "CSGO_Pro", "CryptoKing", "SkinHunter", "Viper", "Zeus",
@@ -19,9 +22,31 @@ const MOCK_FALLBACK_DROPS = [
 
 export default function LiveDrops() {
   const [drops, setDrops] = useState([]);
+  const socketRef = useRef(null);
 
   useEffect(() => {
-    // Subscribe to StorageService live drops
+    // Conectar a Socket.io para drops en tiempo real
+    const serverUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
+    socketRef.current = SocketIOClient(serverUrl, {
+      transports: ["websocket", "polling"]
+    });
+
+    socketRef.current.on("live-drop", (dropData) => {
+      const formatted = {
+        id: dropData.id,
+        name: dropData.item?.name || "Skin",
+        price: dropData.item?.price || 10,
+        rarity: dropData.item?.rarity || "Mil-Spec",
+        user: dropData.user || "Jugador",
+        image: dropData.item?.image || ""
+      };
+      setDrops((prev) => {
+        const next = [formatted, ...prev].slice(0, MAX_DROPS);
+        return next;
+      });
+    });
+
+    // Subscribe to StorageService live drops (respaldo local)
     const unsubscribe = StorageService.subscribe((data) => {
       const formatted = (data.liveDrops || []).map((d) => ({
         id: d.id,
@@ -31,10 +56,16 @@ export default function LiveDrops() {
         user: d.user || "Jugador",
         image: d.item?.image || ""
       }));
-      setDrops(formatted.length > 0 ? formatted : MOCK_FALLBACK_DROPS);
+      if (formatted.length > 0) {
+        setDrops((prev) => {
+          const merged = [...formatted, ...prev];
+          const unique = merged.filter((v, i, a) => a.findIndex((t) => t.id === v.id) === i);
+          return unique.slice(0, MAX_DROPS);
+        });
+      }
     });
 
-    // Background community drop generator interval
+    // Background community drop generator interval (respaldo simulado)
     const interval = setInterval(() => {
       const randomUser = BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)];
       const sampleSkins = [
@@ -51,9 +82,14 @@ export default function LiveDrops() {
         item: { ...picked, image: "" },
         caseName: "Live Feed"
       });
-    }, 6000);
+    }, 8000);
 
     return () => {
+      // Limpiar: desconectar socket y eliminar listeners
+      if (socketRef.current) {
+        socketRef.current.off("live-drop");
+        socketRef.current.disconnect();
+      }
       unsubscribe();
       clearInterval(interval);
     };
