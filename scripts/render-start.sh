@@ -46,7 +46,7 @@ fi
 # ── 2. Install backend dependencies ───────────────
 echo ""
 echo "[2/4] Instalando dependencias del backend..."
-cd "$(dirname "$0")/../src/backend"
+cd "$(dirname "$0")/../src/backend" 2>/dev/null || cd "$(dirname "$0")/../../src/backend" 2>/dev/null || cd /opt/render/project/src/src/backend 2>/dev/null
 npm install --omit=dev
 echo "  ✓ Dependencias instaladas"
 

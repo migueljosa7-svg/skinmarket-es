@@ -3,7 +3,9 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../context/useAuth";
 import { useToast } from "./Toast";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
+// En producción (backend sirve frontend), usamos cadena vacía para rutas relativas.
+// En desarrollo standalone, usamos VITE_API_URL, de lo contrario localhost.
+const API_BASE = import.meta.env.VITE_API_URL || "";
 
 const TabButton = ({ active, onClick, label, icon }) => (
   <button

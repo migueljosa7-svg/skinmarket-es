@@ -15,19 +15,14 @@ import rateLimit from "express-rate-limit";
 import passport from "passport";
 import { Strategy as SteamStrategy } from "passport-steam";
 import { Server as SocketIOServer } from "socket.io";
+import fetch from "node-fetch";
+import path from "path";
+import { fileURLToPath } from "url";
+import cron from "node-cron";
+import { createCharge, handleWebhook, getPaymentStatus } from "./controllers/paymentController.js";
+import p2pMarketService from "./services/p2pMarketService.js";
 
 dotenv.config();
-
-// Iniciar Bot de Steam (nuevo botEngine con reconexión y cola)
-if (process.env.BOT_USERNAME && process.env.BOT_USERNAME !== 'tu_usuario_steam') {
-  botEngine.logIn();
-  // Endpoint para ver estado del bot
-  app.get("/api/bot/status", (req, res) => {
-    res.json(botEngine.getStatus());
-  });
-} else {
-  console.log("[BOT] Bot no configurado. Iniciando en modo simulación.");
-}
 
 console.log("Iniciando servidor...");
 
@@ -35,14 +30,40 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET;
 
-// Configurar Redis
-console.log("Conectando a Redis...");
-const redisClient = createClient({
-  url: process.env.REDIS_URL || "redis://localhost:6379"
-});
-redisClient.connect()
-  .then(() => console.log("Redis conectado"))
-  .catch(err => console.error("Error conectando a Redis:", err));
+// ─── Session Store: Redis con fallback a MemoryStore ──────
+const sessionStore = (() => {
+  let store;
+  // Intenta con Redis
+  if (process.env.REDIS_URL) {
+    try {
+      const redisClient = createClient({ url: process.env.REDIS_URL });
+      redisClient.connect().catch(err => {
+        console.warn("[SESSION] Redis no disponible, usando MemoryStore:", err.message);
+      });
+      store = new RedisStore({ client: redisClient });
+      console.log("[SESSION] Usando RedisStore");
+      return store;
+    } catch (e) {
+      console.warn("[SESSION] Fallback a MemoryStore (Redis no disponible)");
+    }
+  } else {
+    console.warn("[SESSION] REDIS_URL no definida, usando MemoryStore (sesiones no persistirán entre reinicios)");
+  }
+  // Fallback: MemoryStore
+  const MemoryStore = session.MemoryStore || (session.Store && session.Store);
+  if (MemoryStore) {
+    store = new session.MemoryStore();
+  } else {
+    // Fallback manual simple
+    const simpleStore = new Map();
+    store = {
+      get: (sid, cb) => { cb(null, simpleStore.get(sid) || null); },
+      set: (sid, session, cb) => { simpleStore.set(sid, session); cb(null); },
+      destroy: (sid, cb) => { simpleStore.delete(sid); cb(null); },
+    };
+  }
+  return store;
+})();
 
 // Middlewares de Seguridad
 app.use(helmet());
@@ -61,9 +82,9 @@ const limiter = rateLimit({
 });
 app.use("/api/", limiter);
 
-// Configurar Sesiones con Redis
+// Configurar Sesiones (con fallback a MemoryStore si Redis no está disponible)
 app.use(session({
-  store: new RedisStore({ client: redisClient }),
+  store: sessionStore,
   secret: JWT_SECRET,
   resave: false,
   saveUninitialized: false,
@@ -73,6 +94,23 @@ app.use(session({
     maxAge: 24 * 60 * 60 * 1000 // 24 horas
   }
 }));
+
+// Iniciar Bot de Steam (después de crear app)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+if (process.env.BOT_USERNAME && process.env.BOT_USERNAME !== 'tu_usuario_steam') {
+  botEngine.logIn();
+  // Endpoint para ver estado del bot
+  app.get("/api/bot/status", (req, res) => {
+    res.json(botEngine.getStatus());
+  });
+} else {
+  console.log("[BOT] Bot no configurado. Iniciando en modo simulación.");
+  // Endpoint de health check genérico aunque el bot no esté configurado
+  app.get("/api/bot/status", (req, res) => {
+    res.json({ status: "ok", bot: "simulated", message: "Bot no configurado - modo simulación" });
+  });
+}
 
 // Inicializar Passport
 app.use(passport.initialize());
@@ -528,8 +566,6 @@ app.post("/api/update-balance", authenticateToken, async (req, res) => {
 
 // --- STEAM ROUTES ---
 
-import fetch from 'node-fetch';
-
 app.get("/api/steam-inventory/:steamId", authenticateToken, async (req, res) => {
   const steamId = req.params.steamId;
   console.log(`[STEAM] Solicitando inventario para: ${steamId}`);
@@ -669,23 +705,6 @@ app.post("/api/admin/settings/probabilities", authenticateToken, isAdmin, async 
   }
 });
 
-import path from "path";
-import { fileURLToPath } from "url";
-import cron from "node-cron";
-import { createCharge, handleWebhook, getPaymentStatus } from "./controllers/paymentController.js";
-import p2pMarketService from "./services/p2pMarketService.js";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Servir la carpeta generada por React (Vite)
-app.use(express.static(path.join(__dirname, '../../dist')));
-
-// Cualquier ruta que NO sea /api, que la maneje React
-app.get(/(.*)/, (req, res) => {
-  res.sendFile(path.join(__dirname, '../../dist/index.html'));
-});
-
 // ─────────────────────────────────────────────────
 // PAYMENT ROUTES - Pasarela de Pago
 // ─────────────────────────────────────────────────
@@ -711,6 +730,15 @@ app.post("/api/p2p/search", authenticateToken, async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: "Error al buscar en mercado P2P", details: err.message });
   }
+});
+
+// ─────────────────────────────────────────────────
+// SPA CATCH-ALL - Servir Frontend (React)
+// ─────────────────────────────────────────────────
+app.use(express.static(path.join(__dirname, '../../dist')));
+// Cualquier ruta GET que no sea /api, sirve index.html
+app.get(/^\/(?!api\/).*/, (req, res) => {
+  res.sendFile(path.join(__dirname, '../../dist/index.html'));
 });
 
 // ─────────────────────────────────────────────────
