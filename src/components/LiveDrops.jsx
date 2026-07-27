@@ -25,8 +25,11 @@ export default function LiveDrops() {
   const socketRef = useRef(null);
 
   useEffect(() => {
-    // Conectar a Socket.io para drops en tiempo real
-    const serverUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
+// Conectar a Socket.io para drops en tiempo real
+    // En producción (backend sirve frontend), usamos ruta relativa.
+    // En desarrollo con Vite proxy, usamos ruta relativa también.
+    // En standalone (frontend separado), usamos VITE_WS_URL.
+    const serverUrl = import.meta.env.VITE_WS_URL || window.location.origin;
     socketRef.current = SocketIOClient(serverUrl, {
       transports: ["websocket", "polling"]
     });
