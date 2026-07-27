@@ -688,7 +688,7 @@ app.get("/api/steam-inventory/:steamId", authenticateToken, async (req, res) => 
       return {
         id: asset.assetid,
         name: description.market_hash_name,
-        image: `https://steamcommunity-a.akamaihd.net/economy/image/${description.icon_url}`,
+        image: `https://community.cloudflare.steamstatic.com/economy/image/${description.icon_url}`,
         price: parseFloat(basePrice.toFixed(2)) ?? 0.00,
         rarity: rarity,
         marketable: description.marketable === 1
