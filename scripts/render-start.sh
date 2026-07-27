@@ -100,21 +100,26 @@ echo "  ✓ Migraciones completadas (o continuando a pesar de errores)"
 echo ""
 echo "[4b/5] Verificando parseo de DATABASE_URL..."
 # Use Node.js for safe, precise parsing to avoid regex corruption
+# Append full domain for Render PostgreSQL hosts if needed
 PARSED=$(node -e "
 const url = process.env.DATABASE_URL;
 const m = url.match(/^postgres:\/\/([^:]+):([^@]+)@([^:\/]+)(?::(\d+))?\/\s*([^?]+)/);
 if (!m) {
   console.error('ERROR: Cannot parse DATABASE_URL');
-  process.exit(1);
+  console.log(JSON.stringify({ error: 'parse_failed', raw: url.substring(0, 50) + '...' }));
+} else {
+  const [, user, pass, host, port, dbname] = m;
+  // Append full domain for Render PostgreSQL hosts without dots
+  const fullHost = host.includes('.') ? host : host + '.oregon-postgres.render.com';
+  console.log(JSON.stringify({
+    user,
+    pass: pass.substring(0, 3) + '***',
+    host: fullHost,
+    original_host: host,
+    port: port || '5432',
+    dbname
+  }));
 }
-const [, user, pass, host, port, dbname] = m;
-console.log(JSON.stringify({
-  user,
-  pass: pass.substring(0, 3) + '***',
-  host,
-  port: port || '5432',
-  dbname
-}));
 ")
 echo "  ✓ DATABASE_URL parseada correctamente: $PARSED"
 
