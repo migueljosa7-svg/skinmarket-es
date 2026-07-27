@@ -79,24 +79,20 @@ function generatePlaceholderDataUrl(skinName) {
 }
 
 // ---------------------------------------------------------------------------
+// Steam CDN Base Domains (for hash-based URL fallback)
+// ---------------------------------------------------------------------------
+
+const STEAM_CDN_DOMAINS = [
+  'https://community.steamstatic.com/economy/image',
+  'https://steamcommunity-a.akamaihd.net/economy/image',
+  'https://community.cloudflare.steamstatic.com/economy/image',
+];
+
+// ---------------------------------------------------------------------------
 // CDN Sources (in priority order)
 // ---------------------------------------------------------------------------
 
 const CDN_SOURCES = [
-  {
-    name: 'Steam CDN',
-    buildUrl: function(skinName) {
-      if (!skinName) return null;
-      return 'https://steamcommunity-a.akamaihd.net/economy/image/' + encodeURIComponent(skinName);
-    },
-  },
-  {
-    name: 'Steam CloudFlare CDN',
-    buildUrl: function(skinName) {
-      if (!skinName) return null;
-      return 'https://community.cloudflare.steamstatic.com/economy/image/' + encodeURIComponent(skinName);
-    },
-  },
   {
     name: 'CSGOFloat API',
     buildUrl: function(skinName) {
@@ -113,14 +109,53 @@ const CDN_SOURCES = [
   },
 ];
 
+/**
+ * Extract the image hash/path from a Steam economy image URL.
+ * Steam economy image URLs look like:
+ *   https://community.steamstatic.com/economy/image/-9a81dlWLwJ2U.../fx360f
+ * Returns just the hash portion, or null if not a Steam URL.
+ */
+function extractSteamImageHash(url) {
+  if (!url) return null;
+  // Match Steam economy image pattern: /economy/image/<hash>
+  const match = url.match(/\/economy\/image\/([^/?#]+)/);
+  return match ? match[1] : null;
+}
+
+/**
+ * Build a Steam economy image URL using a specific CDN domain and image hash.
+ */
+function buildSteamCdnUrl(domain, hash) {
+  if (!domain || !hash) return null;
+  // Append a quality suffix for better resolution
+  return domain + '/' + hash + '/fx360f';
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
 export function getSkinImageUrl(skinName, originalImage) {
+  // If the original image URL hasn't failed yet, use it
   if (originalImage && !failedUrls.has(originalImage)) {
     return originalImage;
   }
+
+  // If originalImage is a Steam URL that failed, try alternative Steam CDN domains
+  // using the same image hash (much more reliable than constructing from skin name)
+  if (originalImage) {
+    var hash = extractSteamImageHash(originalImage);
+    if (hash) {
+      for (var s = 0; s < STEAM_CDN_DOMAINS.length; s++) {
+        var altUrl = buildSteamCdnUrl(STEAM_CDN_DOMAINS[s], hash);
+        if (altUrl && !failedUrls.has(altUrl) && altUrl !== originalImage) {
+          return altUrl;
+        }
+      }
+    }
+  }
+
+  // Fall back to name-based CDN sources (CSGOFloat, CSGO CDN)
   if (skinName) {
     for (var i = 0; i < CDN_SOURCES.length; i++) {
       var url = CDN_SOURCES[i].buildUrl(skinName);
@@ -129,6 +164,8 @@ export function getSkinImageUrl(skinName, originalImage) {
       }
     }
   }
+
+  // Last resort: SVG placeholder
   return generatePlaceholderDataUrl(skinName);
 }
 
@@ -138,17 +175,21 @@ export function handleImageError(event, skinName, originalImage) {
 
   var currentSrc = img.src;
 
+  // Stop if we've already fallen back to the placeholder
   if (currentSrc.indexOf('data:image/svg+xml') === 0) {
     return;
   }
 
+  // Mark the current URL as failed
   failedUrls.add(currentSrc);
 
+  // Get the next URL to try (will skip failed URLs automatically)
   var nextUrl = getSkinImageUrl(skinName, originalImage);
 
   if (nextUrl !== currentSrc) {
     img.src = nextUrl;
-    img.style.opacity = nextUrl.indexOf('data:image/svg+xml') === 0 ? '0.4' : '1';
+    var isPlaceholder = nextUrl.indexOf('data:image/svg+xml') === 0;
+    img.style.opacity = isPlaceholder ? '0.4' : '1';
     img.style.objectFit = 'contain';
   }
 }

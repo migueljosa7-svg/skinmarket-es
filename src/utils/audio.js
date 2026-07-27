@@ -53,6 +53,28 @@ class SoundEngine {
   }
 
   /**
+   * Explicitly creates or resumes the AudioContext from a user gesture.
+   * Called by the global click/touch listener in main.jsx.
+   * This is the method that main.jsx references as activateFromUserGesture.
+   */
+  activateFromUserGesture() {
+    if (typeof window === "undefined") return;
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) {
+        if (!this.ctx) {
+          this.ctx = new AudioCtx();
+        }
+        if (this.ctx.state === "suspended") {
+          this.ctx.resume().catch(() => {});
+        }
+      }
+    } catch (e) {
+      // Audio not supported — silently ignore
+    }
+  }
+
+  /**
    * Creates or resumes AudioContext. Safe to call multiple times.
    * Attaches a one-time global listener on the document to create the
    * context on the very first user gesture, avoiding autoplay policy warnings.
