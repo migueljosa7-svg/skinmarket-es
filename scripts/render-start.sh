@@ -50,32 +50,15 @@ cd "$(dirname "$0")/../src/backend" 2>/dev/null || cd "$(dirname "$0")/../../src
 npm install --omit=dev
 echo "  ✓ Dependencias instaladas"
 
-# ── 3. Sanitize DATABASE_URL for Render ────────────
+# ── 3. Verify DATABASE_URL ─────────────────────────
 echo ""
-echo "[3/4] Sanitizando DATABASE_URL para Render..."
+echo "[3/4] Verificando DATABASE_URL..."
 
-# Fix Render's incomplete DATABASE_URL hostname
-# Render sometimes provides: postgres://user:pass@dpg-xxxx-a/dbname
-# Should be: postgres://user:pass@dpg-xxxx-a.oregon-postgres.render.com/dbname
-if [[ "$DATABASE_URL" =~ @dpg- ]] && [[ ! "$DATABASE_URL" =~ \.render\.com/ ]]; then
-  # Extract hostname and database name
-  HOSTNAME=$(echo "$DATABASE_URL" | grep -oP '@dpg-[^/]+')
-  DB_NAME=$(echo "$DATABASE_URL" | grep -oP '@dpg-[^/]+/\K[^?]+')
-  
-  # Determine region (default to oregon, check for frankfurt)
-  REGION="oregon"
-  if [[ "$HOSTNAME" =~ frankfurt ]]; then
-    REGION="frankfurt"
-  fi
-  
-  # Reconstruct DATABASE_URL with proper hostname
-  BEFORE_HOST=$(echo "$DATABASE_URL" | sed -E "s|@dpg-.*|\@|")
-  AFTER_DB=$(echo "$DATABASE_URL" | grep -oP '\?.*' || echo "")
-  
-  export DATABASE_URL="${BEFORE_HOST}${HOSTNAME}.${REGION}-postgres.render.com/${DB_NAME}${AFTER_DB}"
-  echo "  ✓ DATABASE_URL sanitizada: ${HOSTNAME}.${REGION}-postgres.render.com/${DB_NAME}"
+if [ -z "$DATABASE_URL" ]; then
+  echo "  ✗ DATABASE_URL no está configurada"
+  echo "  ⚠️  El servidor no podrá conectarse a la base de datos"
 else
-  echo "  ✓ DATABASE_URL ya tiene formato correcto"
+  echo "  ✓ DATABASE_URL configurada (se usará tal cual viene de Render)"
 fi
 
 # ── 4. Run database initialization ────────────────
@@ -110,8 +93,8 @@ node init_db.js || {
   else
     echo "  ⚠️  psql no disponible. init_db.js ya habrá creado las tablas."
   fi
-}
-echo "  ✓ Migraciones completadas"
+} || true
+echo "  ✓ Migraciones completadas (o continuando a pesar de errores)"
 
 # ── 4b. Verify DATABASE_URL parsing (debug) ────────
 echo ""
