@@ -6,6 +6,7 @@
  * - data-try-index attribute on <img> elements for tracking fallback progress
  * - Silent SVG placeholder as last resort (no console 404 errors)
  * - Per-session failed URL cache (no infinite loops)
+ * - Proactive Steam hash validation to prevent browser 404 errors on first render
  *
  * No external dependencies. 100% offline compatible placeholder generation.
  */
@@ -23,6 +24,36 @@ const GRADIENT_COLORS = [
   '#10b981', '#f59e0b', '#ec4899', '#a855f7',
   '#8b5cf6', '#f43f5e', '#14b8a6', '#eab308',
 ];
+
+// ---------------------------------------------------------------------------
+// Steam Hash Validation
+// ---------------------------------------------------------------------------
+
+/**
+ * Validates whether a Steam economy image hash appears to be genuine and not
+ * truncated/corrupted. Real Steam hashes are long base64-ish strings (150+ chars)
+ * that start with a dash or alphanumeric character and contain no spaces.
+ *
+ * @param {string} hash - The extracted Steam image hash
+ * @returns {boolean} true if the hash is likely valid
+ */
+function isValidSteamHash(hash) {
+  if (!hash || typeof hash !== 'string') return false;
+
+  // A real Steam hash must be sufficiently long (genuine hashes are >150 chars)
+  if (hash.length < 150) return false;
+
+  // Must not contain whitespace
+  if (/\s/.test(hash)) return false;
+
+  // Must contain only valid URL-safe base64 characters plus hyphens and underscores
+  if (!/^[a-zA-Z0-9_\-/=]+$/.test(hash)) return false;
+
+  // Genuine hashes typically start with a dash or alphanumeric character
+  if (!/^[a-zA-Z0-9\-_]/.test(hash.charAt(0))) return false;
+
+  return true;
+}
 
 // ---------------------------------------------------------------------------
 // CDN Source Definitions (4-tier fallback chain)
@@ -166,15 +197,20 @@ export function getSkinImageSources(skin) {
   var hash = extractSteamImageHash(originalImage) || skin.icon_url || '';
   var cleanName = cleanSkinName(skinName);
 
+  // Validate the Steam hash before using it. Corrupted/truncated hashes that fail
+  // validation will cause the browser to emit 404 console errors on first render.
+  // Skip Steam CDN tiers entirely if the hash is not genuinely valid.
+  var steamHashValid = isValidSteamHash(hash);
+
   // Tier 1: Steam CloudFlare CDN (hash-based)
-  if (hash) {
+  if (hash && steamHashValid) {
     sources.push(CDN_TIERS[0].buildUrl(hash));
   } else {
     sources.push(null);
   }
 
   // Tier 2: Steam Akamai CDN (hash-based)
-  if (hash) {
+  if (hash && steamHashValid) {
     sources.push(CDN_TIERS[1].buildUrl(hash));
   } else {
     sources.push(null);
@@ -202,8 +238,14 @@ export function getSkinImageSources(skin) {
 // ---------------------------------------------------------------------------
 
 export function getSkinImageUrl(skinName, originalImage) {
-  // If original image hasn't failed yet, use it
-  if (originalImage && !failedUrls.has(originalImage)) {
+  // Validate the hash in the original image URL before returning it directly.
+  // If the Steam hash is corrupted or truncated, skip the original URL to
+  // prevent the browser from firing a 404 error on first render.
+  var hash = originalImage ? extractSteamImageHash(originalImage) : null;
+  var isSteamUrl = !!hash;
+  var canUseOriginal = originalImage && !failedUrls.has(originalImage) && (!isSteamUrl || isValidSteamHash(hash));
+
+  if (canUseOriginal) {
     return originalImage;
   }
 
@@ -219,7 +261,7 @@ export function getSkinImageUrl(skinName, originalImage) {
     }
   }
 
-  // Last resort: SVG placeholder
+  // Last resort: SVG placeholder (no console 404 errors)
   return generatePlaceholderDataUrl(skinName);
 }
 

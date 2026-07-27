@@ -1,23 +1,13 @@
-# ✅ TODO: Image Fallback Pipeline Implementation - COMPLETE
+# TODO: Steam Hash Validation & Console Cleanup
 
-## Implementation Status
+## Complete
+- [x] Analyzed ImageService.js and all consuming components
+- [x] Plan approved by user
 
-### ✅ ImageService.js
-- ✅ Added `getSkinImageSources(skin)` — returns array of 4 CDN URLs:
-  1. Steam CloudFlare CDN: `https://community.cloudflare.steamstatic.com/economy/image/${hash}/512fx512f`
-  2. Steam Akamai CDN: `https://steamcommunity-a.akamaihd.net/economy/image/${hash}`
-  3. ByMykel CS2 GitHub API: `https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/images/items/${cleanName}.png`
-  4. CS2 Stash Mirror: `https://csgostash.com/img/skins/large/${cleanName}.png`
-- ✅ Refactored `handleImageError(e, skin)` — uses `data-try-index` attribute, iterates through 4-tier chain, silent SVG fallback
-- ✅ Added `cleanSkinName()` helper for CDN URL formatting
-- ✅ Kept backward-compatible `getSkinImageUrl()` and `getPlaceholderImage()`
-- ✅ Silent error handling — no console 404 logs
-
-### ✅ Component Updates (all `handleImageError(e, skin.name, skin.image)` → `handleImageError(e, skin)`)
-- ✅ `src/pages/Upgrade.jsx` — 2 instances fixed
-- ✅ `src/pages/CaseView.jsx` — 1 special case fixed (`caseData` → `{ name: ... }`)
-- ✅ All other 6 files already had correct signatures
-
-### ✅ Build Verification
-- ✅ `npx vite build` — completed successfully with zero errors
+## Pending Steps
+- [ ] 1. Add `isValidSteamHash(hash)` helper in ImageService.js
+- [ ] 2. Modify `getSkinImageSources(skin)` to skip Steam CDN tiers when hash is invalid
+- [ ] 3. Modify `getSkinImageUrl(skinName, originalImage)` to validate hash before using originalImage
+- [ ] 4. Update SkinCard.jsx to use safe initial src
+- [ ] 5. Commit & push to master
 
