@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useAuth } from "../context/useAuth";
 import { getRarityColor } from "../constants/colors.js";
-import { getPlaceholderImage, handleImageError } from "../services/ImageService";
+import { getPlaceholderImage, handleImageError, getSkinImageUrl } from "../services/ImageService";
 import { useToast } from "./Toast";
 import { motion as Motion, AnimatePresence } from "framer-motion";
 
@@ -286,7 +286,7 @@ export default function Inventory() {
                   )}
 
                   <img
-                    src={skin.image || getPlaceholderImage(skin.name)}
+                    src={getSkinImageUrl(skin.name, skin.image)}
                     alt={skin.name}
 onError={(e) => handleImageError(e, skin)}
                     style={{
