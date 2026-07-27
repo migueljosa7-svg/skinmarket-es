@@ -6,7 +6,7 @@ import { useFetchSkins } from "../hooks/useFetchSkins";
 import { getRarityColor } from "../constants/colors.js";
 import { StorageService } from "../services/StorageService";
 import { sound } from "../utils/audio";
-import { getPlaceholderImage, handleImageError } from "../services/ImageService";
+import { getPlaceholderImage, handleImageError, getSkinImageUrl } from "../services/ImageService";
 
 const UpgradeSpinner = ({ chance, isSpinning, resultDegree, onComplete }) => {
   const tickRef = useRef(null);
@@ -302,7 +302,7 @@ export default function Upgrade() {
                   }}
                 >
                   <img
-                    src={skin.image || getPlaceholderImage(skin.name)}
+                    src={getSkinImageUrl(skin.name, skin.image)}
                     alt={skin.name}
                     onError={(e) => handleImageError(e, skin)}
                     style={{
@@ -441,7 +441,7 @@ export default function Upgrade() {
                   }}
                 >
                   <img
-                    src={skin.image || getPlaceholderImage(skin.name)}
+                    src={getSkinImageUrl(skin.name, skin.image)}
                     alt={skin.name}
 onError={(e) => handleImageError(e, skin)}
                     style={{

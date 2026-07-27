@@ -56,10 +56,38 @@ function isValidSteamHash(hash) {
 }
 
 // ---------------------------------------------------------------------------
-// CDN Source Definitions (4-tier fallback chain)
+// CDN Source Definitions (7-tier fallback chain — name-based CDNs first)
 // ---------------------------------------------------------------------------
 
 const CDN_TIERS = [
+  {
+    name: 'ByMykel CS2 GitHub API',
+    buildUrl: function(cleanName) {
+      if (!cleanName) return null;
+      return 'https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/images/items/' + encodeURIComponent(cleanName) + '.png';
+    },
+  },
+  {
+    name: 'CS2 Stash Mirror',
+    buildUrl: function(cleanName) {
+      if (!cleanName) return null;
+      return 'https://csgostash.com/img/skins/large/' + encodeURIComponent(cleanName) + '.png';
+    },
+  },
+  {
+    name: 'Swap.gg Public CDN',
+    buildUrl: function(cleanName) {
+      if (!cleanName) return null;
+      return 'https://market-cdn.swap.gg/v1/images/p/' + encodeURIComponent(cleanName) + '.png';
+    },
+  },
+  {
+    name: 'ByMykel Web Mirror JSON',
+    buildUrl: function(cleanName) {
+      if (!cleanName) return null;
+      return 'https://bymykel.github.io/CSGO-API/api/en/skins/' + encodeURIComponent(cleanName) + '.json';
+    },
+  },
   {
     name: 'Steam CloudFlare CDN',
     buildUrl: function(hash) {
@@ -72,20 +100,6 @@ const CDN_TIERS = [
     buildUrl: function(hash) {
       if (!hash) return null;
       return 'https://steamcommunity-a.akamaihd.net/economy/image/' + hash;
-    },
-  },
-  {
-    name: 'ByMykel CS2 GitHub API',
-    buildUrl: function(cleanName) {
-      if (!cleanName) return null;
-      return 'https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/images/items/' + encodeURIComponent(cleanName) + '.png';
-    },
-  },
-  {
-    name: 'CS2 Stash / SwapGG Mirror',
-    buildUrl: function(cleanName) {
-      if (!cleanName) return null;
-      return 'https://csgostash.com/img/skins/large/' + encodeURIComponent(cleanName) + '.png';
     },
   },
 ];
@@ -202,30 +216,48 @@ export function getSkinImageSources(skin) {
   // Skip Steam CDN tiers entirely if the hash is not genuinely valid.
   var steamHashValid = isValidSteamHash(hash);
 
-  // Tier 1: Steam CloudFlare CDN (hash-based)
-  if (hash && steamHashValid) {
-    sources.push(CDN_TIERS[0].buildUrl(hash));
+  // --- NAME-BASED CDNs (Priority 1-4) ---
+
+  // Tier 1: ByMykel CS2 GitHub API CDN (name-based)
+  if (cleanName) {
+    sources.push(CDN_TIERS[0].buildUrl(cleanName));
   } else {
     sources.push(null);
   }
 
-  // Tier 2: Steam Akamai CDN (hash-based)
-  if (hash && steamHashValid) {
-    sources.push(CDN_TIERS[1].buildUrl(hash));
+  // Tier 2: CS2 Stash Mirror (name-based)
+  if (cleanName) {
+    sources.push(CDN_TIERS[1].buildUrl(cleanName));
   } else {
     sources.push(null);
   }
 
-  // Tier 3: ByMykel CS2 GitHub API CDN (name-based)
+  // Tier 3: Swap.gg Public CDN (name-based)
   if (cleanName) {
     sources.push(CDN_TIERS[2].buildUrl(cleanName));
   } else {
     sources.push(null);
   }
 
-  // Tier 4: CS2 Stash / SwapGG Mirror (name-based)
+  // Tier 4: ByMykel Web Mirror JSON (name-based)
   if (cleanName) {
     sources.push(CDN_TIERS[3].buildUrl(cleanName));
+  } else {
+    sources.push(null);
+  }
+
+  // --- HASH-BASED CDNs (Priority 5-6, fallback) ---
+
+  // Tier 5: Steam CloudFlare CDN (hash-based)
+  if (hash && steamHashValid) {
+    sources.push(CDN_TIERS[4].buildUrl(hash));
+  } else {
+    sources.push(null);
+  }
+
+  // Tier 6: Steam Akamai CDN (hash-based)
+  if (hash && steamHashValid) {
+    sources.push(CDN_TIERS[5].buildUrl(hash));
   } else {
     sources.push(null);
   }
