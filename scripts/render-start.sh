@@ -86,13 +86,24 @@ node init_db.js || {
   echo "  ⚠️  init_db.js falló, intentando con init-db.sql..."
   # Fallback: ejecutar script SQL directamente si psql está disponible
   if command -v psql &> /dev/null; then
-    # Parse DATABASE_URL to force TCP/IP connection
-    # Format: postgres://user:password@host:port/database
-    DB_USER=$(echo "$DATABASE_URL" | grep -oP '(?<=://)[^:]+')
-    DB_PASS=$(echo "$DATABASE_URL" | grep -oP '(?<=:)[^@]+' | head -1)
-    DB_HOST=$(echo "$DATABASE_URL" | grep -oP '(?<=@)[^:]+')
-    DB_PORT=$(echo "$DATABASE_URL" | grep -oP '(?<=:)[^/]+' | tail -1)
-    DB_NAME=$(echo "$DATABASE_URL" | grep -oP '(?<=/)[^?]+')
+    # Use Node.js URL parser to safely handle special chars in password
+    DB_PARAMS=$(node -e "
+    const { URL } = require('url');
+    const url = new URL(process.env.DATABASE_URL);
+    console.log(JSON.stringify({
+      user: url.username,
+      pass: url.password || '',
+      host: url.hostname,
+      port: url.port || '5432',
+      dbname: url.pathname.replace(/^\//, '')
+    }));
+    ")
+    
+    DB_USER=$(echo "$DB_PARAMS" | node -e "const d=require('fs').readFileSync(0,'utf8');const j=JSON.parse(d);console.log(j.user);")
+    DB_PASS=$(echo "$DB_PARAMS" | node -e "const d=require('fs').readFileSync(0,'utf8');const j=JSON.parse(d);console.log(j.pass);")
+    DB_HOST=$(echo "$DB_PARAMS" | node -e "const d=require('fs').readFileSync(0,'utf8');const j=JSON.parse(d);console.log(j.host);")
+    DB_PORT=$(echo "$DB_PARAMS" | node -e "const d=require('fs').readFileSync(0,'utf8');const j=JSON.parse(d);console.log(j.port);")
+    DB_NAME=$(echo "$DB_PARAMS" | node -e "const d=require('fs').readFileSync(0,'utf8');const j=JSON.parse(d);console.log(j.dbname);")
     
     # Use explicit flags to force TCP/IP connection
     PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -f "$(dirname "$0")/init-db.sql" || true
