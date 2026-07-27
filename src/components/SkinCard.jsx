@@ -1,6 +1,6 @@
 import { motion as Motion } from "framer-motion";
 import { getRarityColor } from "../constants/colors";
-import { getPlaceholderImage, handleImageError } from "../services/ImageService";
+import { getSkinImageUrl, handleImageError } from "../services/ImageService";
 
 export default function SkinCard({ skin }) {
   const rarity = skin.rarity || "Mil-Spec Grade";
@@ -65,7 +65,7 @@ export default function SkinCard({ skin }) {
         {/* Image Container */}
         <div style={{ position: 'relative', height: '160px', marginBottom: '20px', zIndex: 1 }}>
           <img
-            src={skin.image || getPlaceholderImage(skin.name)}
+            src={getSkinImageUrl(skin.name, skin.image)}
             alt={skin.name}
 onError={(e) => handleImageError(e, skin)}
             style={{
