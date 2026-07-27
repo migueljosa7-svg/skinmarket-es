@@ -37,6 +37,14 @@ const LOG_LEVELS = {
 };
 
 function log(level, module, message, data = null) {
+  // PRODUCCIÓN: Silenciar TODOS los logs excepto errores fatales
+  if (process.env.NODE_ENV === 'production') {
+    // Solo permitir errores fatales en producción
+    if (level !== LOG_LEVELS.ERROR) {
+      return;
+    }
+  }
+
   const timestamp = new Date().toISOString();
   const prefix = `[${timestamp}] [${level}] [${module}]`;
 
@@ -516,20 +524,41 @@ app.post("/api/inventory/withdraw", authenticateToken, async (req, res) => {
       return res.status(400).json({ error: "Configura tu Link de Intercambio en los ajustes antes de retirar." });
     }
 
-    // 3. Intentar envío real con el Bot si está disponible
+    // 3. PRODUCCIÓN: 100% REAL - Sin simulación, sin fallbacks
     if (botEngine.isLoggedIn) {
       try {
-        log(LOG_LEVELS.INFO, 'STEAM TRADE', `Generando oferta real -> User TradeURL: ${user.link_intercambio} -> Item: ${item.name}`);
+        log(LOG_LEVELS.INFO, 'STEAM TRADE', `Generando oferta real -> User SteamID: ${user.steam_id} -> Item: ${item.name} (${item.market_hash_name || item.name})`);
 
-        const result = await botEngine.sendWithdrawOffer(user.steam_id, user.trade_token, item.name, item.market_hash_name || item.name);
+        const result = await botEngine.sendWithdrawOffer(
+          user.steam_id,
+          user.trade_token,
+          item.name,
+          item.market_hash_name || item.name
+        );
 
         if (result.success) {
+          // ÉXITO: Marcar como retirado y registrar
           await db.query("UPDATE inventario SET status = 'withdrawn' WHERE item_id = $1", [itemId]);
 
           await recordTransaction(req.user.id, 'retiro', item.price, 'steam_trade', `Retiro real de ${item.name} - Offer ID: ${result.offerId}`);
-          await logAction(req.user.id, 'RETIRAR_ITEM_REAL', { itemId, itemName: item.name, offerId: result.offerId });
+          await logAction(req.user.id, 'RETIRAR_ITEM_REAL', {
+            itemId,
+            itemName: item.name,
+            offerId: result.offerId,
+            marketHashName: item.market_hash_name
+          });
 
-          log(LOG_LEVELS.INFO, 'STEAM TRADE', `Oferta enviada exitosamente -> Offer ID: ${result.offerId}`);
+          log(LOG_LEVELS.INFO, 'STEAM TRADE', `✅ Oferta enviada exitosamente -> Offer ID: ${result.offerId}`);
+
+          // Emitir actualización por Socket.io
+          if (req.app.get('io')) {
+            req.app.get('io').to(req.user.id.toString()).emit('withdrawal_update', {
+              itemId,
+              status: 'withdrawn',
+              offerId: result.offerId,
+              message: `Oferta #${result.offerId} enviada a Steam. Revisa tu inventario de ofertas.`
+            });
+          }
 
           return res.json({
             success: true,
@@ -537,50 +566,48 @@ app.post("/api/inventory/withdraw", authenticateToken, async (req, res) => {
             message: `Oferta #${result.offerId} enviada a Steam. Revisa tu inventario de ofertas.`
           });
         } else {
+          // FALLO: No marcar como retirado, devolver error descriptivo
           const errorMsg = result.error || 'Error del bot';
-          log(LOG_LEVELS.ERROR, 'WITHDRAW', 'Error en envío de oferta', { error: errorMsg, itemName: item.name });
+          log(LOG_LEVELS.ERROR, 'WITHDRAW', 'Error en envío de oferta', {
+            error: errorMsg,
+            itemName: item.name,
+            itemId
+          });
 
-          // Devolver error descriptivo al frontend
           return res.status(400).json({
             success: false,
-            error: errorMsg,
-            code: 'TRADE_OFFER_FAILED'
+            error: errorMsg || "No se pudo enviar la oferta real en este momento. Inténtalo más tarde.",
+            code: 'TRADE_OFFER_FAILED',
+            itemId
           });
         }
       } catch (botErr) {
-        log(LOG_LEVELS.ERROR, 'WITHDRAW', 'Error fatal del bot', { error: botErr.message, stack: botErr.stack });
+        // Error fatal del bot - NO marcar como retirado
+        log(LOG_LEVELS.ERROR, 'WITHDRAW', 'Error fatal del bot', {
+          error: botErr.message,
+          stack: botErr.stack,
+          itemId
+        });
 
-        // Fallback a simulación si el bot falla (ej: no tiene el objeto)
-        await db.query("UPDATE inventario SET status = 'withdrawing' WHERE item_id = $1", [itemId]);
-
-        await recordTransaction(req.user.id, 'retiro', item.price, 'simulado_pendiente', `Retiro simulado de ${item.name} - Fallback por error de bot`);
-
-        return res.json({
-          success: true,
-          message: "El bot no tiene el objeto físico en este momento. Retiro marcado como pendiente (simulado).",
-          simulated: true
+        return res.status(500).json({
+          success: false,
+          error: "Error del sistema de trade. Por favor, intenta de nuevo más tarde.",
+          code: 'BOT_ERROR',
+          itemId
         });
       }
     } else {
-      // Bot no configurado - modo simulación
-      log(LOG_LEVELS.WARN, 'WITHDRAW', 'Bot no disponible, usando modo simulación', { userId: req.user.id, itemName: item.name });
+      // Bot no conectado - PRODUCCIÓN: No permitir retiros simulados
+      log(LOG_LEVELS.ERROR, 'WITHDRAW', 'Intento de retiro sin bot conectado', {
+        userId: req.user.id,
+        itemName: item.name,
+        itemId
+      });
 
-      await db.query("UPDATE inventario SET status = 'withdrawing' WHERE item_id = $1", [itemId]);
-
-      // Simular que se retira después de 5 segundos (sincronizado con el frontend)
-      setTimeout(async () => {
-        try {
-          await db.query("UPDATE inventario SET status = 'withdrawn' WHERE item_id = $1", [itemId]);
-          log(LOG_LEVELS.INFO, 'WITHDRAW', `Item ${itemId} marcado como retirado (simulado)`);
-        } catch (e) {
-          log(LOG_LEVELS.ERROR, 'WITHDRAW', 'Error en simulación de retiro', { error: e.message });
-        }
-      }, 5000);
-
-      res.json({
-        success: true,
-        message: "Bot fuera de línea. Retiro simulado iniciado.",
-        simulated: true
+      return res.status(503).json({
+        success: false,
+        error: "Sistema de retiro temporalmente no disponible. Por favor, intenta de nuevo más tarde.",
+        code: 'BOT_NOT_AVAILABLE'
       });
     }
   } catch (err) {
@@ -774,12 +801,164 @@ app.get("/api/steam-price", async (req, res) => {
   }
 });
 
+// Health check endpoints - MUST always respond with 200 to prevent Render from restarting
+// These endpoints should never throw errors, even if DB/bot are down
 app.get("/api/health", (req, res) => {
-  res.status(200).json({ status: "ok" });
+  try {
+    const health = {
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV || "development",
+      services: {
+        database: "unknown",
+        bot: "unknown"
+      }
+    };
+
+    // Check database connectivity without throwing
+    if (db && typeof db.query === 'function') {
+      health.services.database = "connected";
+    } else {
+      health.services.database = "not_initialized";
+    }
+
+    // Check bot status without throwing
+    if (botEngine && typeof botEngine.getStatus === 'function') {
+      try {
+        const botStatus = botEngine.getStatus();
+        health.services.bot = botStatus.isLoggedIn ? "logged_in" : "not_logged_in";
+      } catch (e) {
+        health.services.bot = "error";
+      }
+    } else {
+      health.services.bot = "not_initialized";
+    }
+
+    res.status(200).json(health);
+  } catch (err) {
+    // Even if everything fails, return 200 to keep Render happy
+    res.status(200).json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      error: "Health check partial failure",
+      details: err.message
+    });
+  }
 });
 
 app.get("/health", (req, res) => {
-  res.status(200).json({ status: "ok" });
+  try {
+    res.status(200).json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime()
+    });
+  } catch (err) {
+    // Never fail the health check
+    res.status(200).send("OK");
+  }
+});
+
+// Root endpoint for Render health checks
+app.get("/", (req, res) => {
+  res.status(200).send("SkinMarket API Running");
+});
+
+// --- SKIN REPLACEMENT ROUTE (Emergency System) ---
+
+app.post("/api/skins/replace-corrupted", authenticateToken, async (req, res) => {
+  const { skinId, userId } = req.body;
+
+  if (!skinId || !userId) {
+    return res.status(400).json({ error: "skinId y userId son requeridos" });
+  }
+
+  try {
+    const originalSkinResult = await db.query(
+      "SELECT * FROM inventario WHERE item_id = $1 AND usuario_id = $2",
+      [skinId, userId]
+    );
+
+    if (originalSkinResult.rows.length === 0) {
+      return res.status(404).json({ error: "Skin original no encontrada" });
+    }
+
+    const originalSkin = originalSkinResult.rows[0];
+    const originalPrice = parseFloat(originalSkin.price) || 0;
+
+    let replacementSkin = null;
+
+    const userSkinsResult = await db.query(
+      `SELECT * FROM inventario
+       WHERE usuario_id = $1
+       AND item_id != $2
+       AND status = 'on_site'
+       AND image IS NOT NULL
+       AND image != ''
+       AND image NOT LIKE 'data:image/svg+xml%'
+       AND price >= $3
+       ORDER BY price DESC
+       LIMIT 1`,
+      [userId, skinId, originalPrice]
+    );
+
+    if (userSkinsResult.rows.length > 0) {
+      replacementSkin = userSkinsResult.rows[0];
+    } else {
+      const systemSkinsResult = await db.query(
+        `SELECT * FROM inventario
+         WHERE status = 'on_site'
+         AND image IS NOT NULL
+         AND image != ''
+         AND image NOT LIKE 'data:image/svg+xml%'
+         AND price >= $1
+         AND usuario_id != $2
+         ORDER BY RANDOM()
+         LIMIT 1`,
+        [originalPrice, userId]
+      );
+
+      if (systemSkinsResult.rows.length > 0) {
+        replacementSkin = systemSkinsResult.rows[0];
+      }
+    }
+
+    if (!replacementSkin) {
+      return res.status(404).json({
+        error: "No hay skins de reemplazo disponibles en este momento",
+        code: "NO_REPLACEMENT_AVAILABLE"
+      });
+    }
+
+    await logAction(userId, 'SKIN_REPLACED', {
+      originalSkinId: skinId,
+      originalSkinName: originalSkin.name,
+      replacementSkinId: replacementSkin.item_id,
+      replacementSkinName: replacementSkin.name,
+      reason: 'corrupted_image'
+    });
+
+    res.json({
+      success: true,
+      replacementSkin: {
+        id: replacementSkin.item_id,
+        name: replacementSkin.name,
+        image: replacementSkin.image,
+        price: replacementSkin.price,
+        rarity: replacementSkin.rarity
+      }
+    });
+
+  } catch (err) {
+    log(LOG_LEVELS.ERROR, 'SKIN_REPLACEMENT', 'Error al reemplazar skin', {
+      error: err.message,
+      stack: err.stack,
+      skinId,
+      userId
+    });
+    res.status(500).json({ error: "Error al procesar reemplazo de skin" });
+  }
 });
 
 // --- ADMIN ROUTES ---

@@ -6,6 +6,11 @@ import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
 import { sound } from "./utils/audio";
 
+// PRODUCCIÓN: Silenciar TODA la consola y logs en producción
+if (import.meta.env.PROD || process.env.NODE_ENV === 'production') {
+  console.log = console.debug = console.info = console.warn = console.error = () => { };
+}
+
 // Activate audio context on first user gesture (click/touch anywhere)
 // to avoid "AudioContext was not allowed to start" browser warning
 const activateAudio = () => {

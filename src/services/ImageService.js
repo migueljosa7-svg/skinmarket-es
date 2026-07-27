@@ -30,6 +30,29 @@ const GRADIENT_COLORS = [
 // ---------------------------------------------------------------------------
 
 /**
+ * Cleans a Steam economy image hash by removing truncated/corrupted suffixes.
+ * Steam hashes should be complete base64-ish strings. This function removes
+ * common truncation patterns like trailing "..." or incomplete base64 padding.
+ *
+ * @param {string} hash - The raw Steam image hash
+ * @returns {string} Cleaned hash, or empty string if invalid
+ */
+function cleanSteamHash(hash) {
+  if (!hash || typeof hash !== 'string') return '';
+
+  // Remove trailing ellipsis or truncation indicators
+  var cleaned = hash.replace(/\.{2,}$/, '').trim();
+
+  // Remove any non-base64 characters that might have been introduced
+  cleaned = cleaned.replace(/[^a-zA-Z0-9_\-/=]/, '');
+
+  // Ensure minimum length (genuine Steam hashes are 150+ chars)
+  if (cleaned.length < 150) return '';
+
+  return cleaned;
+}
+
+/**
  * Validates whether a Steam economy image hash appears to be genuine and not
  * truncated/corrupted. Real Steam hashes are long base64-ish strings (150+ chars)
  * that start with a dash or alphanumeric character and contain no spaces.
@@ -40,17 +63,21 @@ const GRADIENT_COLORS = [
 function isValidSteamHash(hash) {
   if (!hash || typeof hash !== 'string') return false;
 
+  // Clean the hash first to remove truncation artifacts
+  var cleanedHash = cleanSteamHash(hash);
+  if (!cleanedHash) return false;
+
   // A real Steam hash must be sufficiently long (genuine hashes are >150 chars)
-  if (hash.length < 150) return false;
+  if (cleanedHash.length < 150) return false;
 
   // Must not contain whitespace
-  if (/\s/.test(hash)) return false;
+  if (/\s/.test(cleanedHash)) return false;
 
   // Must contain only valid URL-safe base64 characters plus hyphens and underscores
-  if (!/^[a-zA-Z0-9_\-/=]+$/.test(hash)) return false;
+  if (!/^[a-zA-Z0-9_\-/=]+$/.test(cleanedHash)) return false;
 
   // Genuine hashes typically start with a dash or alphanumeric character
-  if (!/^[a-zA-Z0-9\-_]/.test(hash.charAt(0))) return false;
+  if (!/^[a-zA-Z0-9\-_]/.test(cleanedHash.charAt(0))) return false;
 
   return true;
 }
@@ -292,10 +319,74 @@ export function getSkinImageUrlSilent(skinName, originalImage) {
 }
 
 // ---------------------------------------------------------------------------
-// Public API: handleImageError — silent multi-tier fallback handler (uses data-try-index)
+// Emergency Skin Replacement System
 // ---------------------------------------------------------------------------
 
-export function handleImageError(event, skin) {
+/**
+ * Try to load emergency skin from local database
+ * @param {string} skinId - The skin ID to look up
+ * @returns {Promise<string|null>} Emergency image URL or null
+ */
+async function loadEmergencySkinImage(skinId) {
+  try {
+    // Try to load from local emergency skins directory
+    const response = await fetch(`/images/emergency-skins/${skinId}.png`);
+    if (response.ok) {
+      return `/images/emergency-skins/${skinId}.png`;
+    }
+
+    // Try webp format
+    const responseWebp = await fetch(`/images/emergency-skins/${skinId}.webp`);
+    if (responseWebp.ok) {
+      return `/images/emergency-skins/${skinId}.webp`;
+    }
+
+    // Try jpg format
+    const responseJpg = await fetch(`/images/emergency-skins/${skinId}.jpg`);
+    if (responseJpg.ok) {
+      return `/images/emergency-skins/${skinId}.jpg`;
+    }
+  } catch (err) {
+    // Silent fail - emergency images are optional
+  }
+  return null;
+}
+
+/**
+ * Request backend to replace corrupted skin with valid one
+ * @param {string} skinId - The corrupted skin ID
+ * @param {number} userId - The user ID requesting replacement
+ * @returns {Promise<Object|null>} Replacement skin object or null
+ */
+async function replaceWithValidSkin(skinId, userId) {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) return null;
+
+    const response = await fetch('/api/skins/replace-corrupted', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ skinId, userId })
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      return data.replacementSkin;
+    }
+  } catch (err) {
+    // Silent fail
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Public API: handleImageError — ultra-aggressive multi-tier fallback handler
+// ---------------------------------------------------------------------------
+
+export async function handleImageError(event, skin) {
   var img = event && event.target;
   if (!img || !img.src) return;
 
@@ -334,7 +425,45 @@ export function handleImageError(event, skin) {
     return;
   }
 
-  // All CDNs exhausted: silent SVG placeholder fallback
+  // All CDNs exhausted: Try emergency skin database (Level 1)
+  if (skin && skin.id) {
+    var emergencyUrl = await loadEmergencySkinImage(skin.id);
+    if (emergencyUrl) {
+      img.onerror = null;
+      img.src = emergencyUrl;
+      img.style.opacity = '1';
+      img.style.objectFit = 'contain';
+      img.removeAttribute('data-try-index');
+      return;
+    }
+
+    // No emergency image: Request backend replacement (Level 2 - Critical)
+    var userId = skin.userId || getCurrentUserId();
+    if (userId) {
+      var replacementSkin = await replaceWithValidSkin(skin.id, userId);
+      if (replacementSkin && replacementSkin.image) {
+        // Update the skin object in place if possible
+        if (skin.image !== replacementSkin.image) {
+          skin.image = replacementSkin.image;
+          skin.name = replacementSkin.name;
+        }
+
+        img.onerror = null;
+        img.src = replacementSkin.image;
+        img.style.opacity = '1';
+        img.style.objectFit = 'contain';
+        img.removeAttribute('data-try-index');
+
+        // Dispatch custom event to notify UI of replacement
+        window.dispatchEvent(new CustomEvent('skinReplaced', {
+          detail: { originalSkin: skin, replacementSkin: replacementSkin }
+        }));
+        return;
+      }
+    }
+  }
+
+  // All fallbacks exhausted: silent SVG placeholder fallback
   // Disable further error handling to prevent infinite loops
   img.onerror = null;
 
@@ -346,6 +475,23 @@ export function handleImageError(event, skin) {
 
   // Remove data-try-index since we've exhausted all sources
   img.removeAttribute('data-try-index');
+}
+
+/**
+ * Get current user ID from localStorage
+ * @returns {string|null} User ID or null
+ */
+function getCurrentUserId() {
+  try {
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      const user = JSON.parse(userData);
+      return user.usuario_id || user.id || null;
+    }
+  } catch (err) {
+    // Silent fail
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -360,14 +506,22 @@ export function resetImageCache() {
   failedUrls.clear();
 }
 
-export function preloadSkinImage(skinName, originalImage) {
+export async function preloadSkinImage(skinName, originalImage) {
   return new Promise(function (resolve) {
     var url = getSkinImageUrl(skinName, originalImage);
     var img = new Image();
     img.onload = function () { resolve(url); };
-    img.onerror = function () {
+    img.onerror = async function () {
       failedUrls.add(url);
-      resolve(getSkinImageUrl(skinName, originalImage));
+
+      // Try emergency skin if original fails
+      var skin = { name: skinName, image: originalImage };
+      var emergencyUrl = await loadEmergencySkinImage(skinName);
+      if (emergencyUrl) {
+        resolve(emergencyUrl);
+      } else {
+        resolve(getSkinImageUrl(skinName, originalImage));
+      }
     };
     img.src = url;
   });
