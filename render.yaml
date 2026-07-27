@@ -1,13 +1,10 @@
 # ============================================================
 # SKINMARKET ES - Render Blueprint (Automated Infrastructure)
 # ============================================================
-# This file defines the entire infrastructure for Render:
+# Infrastructure definition for Render:
 #   - PostgreSQL Managed Database
 #   - Backend Web Service (Express + Socket.io + Steam Bot)
 #   - Frontend Static Site (React / Vite + SPA Routing)
-#
-# When you connect this repo to Render, all 3 services
-# are provisioned automatically — no manual setup needed!
 # ============================================================
 
 # ─────────────────────────────────────────────────────────────
@@ -18,7 +15,7 @@ databases:
     databaseName: skinmarket
     user: skinmarket_user
     plan: free
-    ipAllowList: [] # 0.0.0.0/0 — allow all (Render internal connections are secure)
+    ipAllowList: [] # Allow internal access
 
 # ─────────────────────────────────────────────────────────────
 # 2. Backend Web Service (Node.js + Socket.io + BotEngine)
@@ -50,22 +47,7 @@ services:
       - key: JWT_SECRET
         generateValue: true
 
-      # ── URLs ──
-      # BACKEND_URL: se resuelve automáticamente como la URL asignada por Render
-      - key: BACKEND_URL
-        fromService:
-          type: web
-          name: skinmarket-backend
-          property: url
-      # FRONTEND_URL: como el frontend es servido por el backend en producción,
-      # usamos la misma URL del backend (sin /api)
-      - key: FRONTEND_URL
-        fromService:
-          type: web
-          name: skinmarket-backend
-          property: url
-
-      # ── Steam (user must configure these in Render Dashboard) ──
+      # ── Steam Credentials (Configurar en el Dashboard de Render) ──
       - key: STEAM_API_KEY
         value: TU_STEAM_API_KEY_AQUI
       - key: BOT_USERNAME
@@ -91,11 +73,7 @@ services:
         source: /*
         destination: /index.html
     envVars:
-      # Nota: Render Static Sites NO soportan "fromService" en envVars.
-      # VITE_API_URL y VITE_WS_URL se deben configurar MANUALMENTE en el Dashboard de Render
-      # apuntando a la URL del backend (ej: https://skinmarket-backend.onrender.com)
       - key: VITE_API_URL
         sync: false
       - key: VITE_WS_URL
         sync: false
-
