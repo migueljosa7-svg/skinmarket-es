@@ -1,5 +1,5 @@
 // src/pages/CaseView.jsx
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import { generateAllCases } from "../constants/cases.js";
@@ -11,7 +11,7 @@ import { getPlaceholderImage, handleImageError } from "../services/ImageService"
 import { useToast } from "../components/Toast";
 import ProvablyFairModal from "../components/ProvablyFairModal";
 
-const SingleMultiRoulette = ({ items, quantity, isSpinning, onComplete }) => {
+const SingleMultiRoulette = React.memo(({ items, quantity, isSpinning, onComplete }) => {
   const containerRef = useRef(null);
   const onCompleteRef = useRef(onComplete);
 
@@ -218,7 +218,7 @@ const SingleMultiRoulette = ({ items, quantity, isSpinning, onComplete }) => {
       </div>
     </div>
   );
-};
+});
 
 export default function CaseView() {
   const { id } = useParams();
@@ -263,7 +263,7 @@ export default function CaseView() {
   }, [allSkins, caseData]);
 
   const startSpin = useCallback(() => {
-    if (!user) return toast.error("Inicia sesión para abrir cajas");
+    if (!user || !user.balance) return toast.error("Inicia sesión para abrir cajas");
     const totalCost = parseFloat(caseData.price) * quantity;
 
     if (user.balance < totalCost) {

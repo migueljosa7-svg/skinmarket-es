@@ -262,17 +262,13 @@ app.post("/api/login", async (req, res) => {
 
 // ─── LEVEL SYSTEM ────────────────────────────────────
 // KeyDrop-style: Level based on total deposited/apostado
+// Rewards limitados a máx 2.00€ para cajas diarias (KeyDrop real economy)
 const LEVEL_THRESHOLDS = [
   { level: 1, minDeposit: 0, dailyCaseId: "eco-1", caseLabel: "Caja Eco", reward: 0.15 },
-  { level: 2, minDeposit: 10, dailyCaseId: "eco-1", caseLabel: "Caja Eco", reward: 0.35 },
-  { level: 3, minDeposit: 50, dailyCaseId: "eco-1", caseLabel: "Caja Eco", reward: 0.65 },
+  { level: 2, minDeposit: 10, dailyCaseId: "eco-1", caseLabel: "Caja Eco", reward: 0.25 },
+  { level: 3, minDeposit: 50, dailyCaseId: "eco-1", caseLabel: "Caja Eco", reward: 0.50 },
   { level: 4, minDeposit: 100, dailyCaseId: "mid-1", caseLabel: "Caja Mid", reward: 1.00 },
   { level: 5, minDeposit: 250, dailyCaseId: "mid-1", caseLabel: "Caja Mid", reward: 2.00 },
-  { level: 6, minDeposit: 500, dailyCaseId: "mid-1", caseLabel: "Caja Mid", reward: 3.50 },
-  { level: 7, minDeposit: 1000, dailyCaseId: "premium-1", caseLabel: "Caja Premium", reward: 5.00 },
-  { level: 8, minDeposit: 2500, dailyCaseId: "premium-1", caseLabel: "Caja Premium", reward: 8.00 },
-  { level: 9, minDeposit: 5000, dailyCaseId: "premium-1", caseLabel: "Caja Premium", reward: 12.00 },
-  { level: 10, minDeposit: 10000, dailyCaseId: "premium-1", caseLabel: "Caja Legendaria", reward: 20.00 }
 ];
 
 function calculateLevel(totalDeposited) {
@@ -334,6 +330,7 @@ app.get("/api/ranking", async (req, res) => {
 // ─────────────────────────────────────────────────────────────────
 // DAILY CASE SYSTEM - Level-based (KeyDrop-style) - 24h cooldown
 // ─────────────────────────────────────────────────────────────────
+// KeyDrop-style: Requiere depósito acumulado >= 2.00€ O Nivel 1+ para reclamar
 
 app.post("/api/claim-daily", authenticateToken, dailyCaseLimiter, async (req, res) => {
   try {
@@ -368,10 +365,22 @@ app.post("/api/claim-daily", authenticateToken, dailyCaseLimiter, async (req, re
       [req.user.id]
     );
     const totalDepositado = parseFloat(depositResult.rows[0].total_depositado) || 0;
+
+    // ─── KEYDROP-STYLE VALIDATION: Require >= 2.00€ deposit OR Nivel 1+ ───
+    const userLevelRaw = user.nivel || 0;
+    if (totalDepositado < 2.00 && userLevelRaw < 1) {
+      return res.status(403).json({
+        error: "Debes tener un depósito acumulado de al menos 2.00€ o alcanzar el Nivel 1 para reclamar la caja diaria. ¡Deposita para desbloquear!",
+        code: "DAILY_LOCKED",
+        requiredDeposit: 2.00,
+        currentDeposit: totalDepositado
+      });
+    }
+
     const userLevel = calculateLevel(totalDepositado);
     const dailyCase = getDailyCaseForLevel(userLevel);
 
-    // Calculate reward with random factor
+    // Calculate reward with random factor (máx 2.00€ para cajas diarias)
     const baseReward = dailyCase.reward;
     const randomBonus = Math.random() * baseReward;
     const reward = parseFloat((baseReward + randomBonus).toFixed(2));

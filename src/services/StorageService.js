@@ -8,23 +8,23 @@ const STORAGE_KEY = "skinmarket_db_v1";
 
 const DEFAULT_USER = {
   id: "usr_local_main",
-  nombre_usuario: "ProGamer_ES",
-  email: "player@skinmarket.es",
+  nombre_usuario: "Invitado",
+  email: "guest@skinmarket.es",
   avatar: "https://images.unsplash.com/photo-1566492031773-4f4e44671857?w=150&auto=format&fit=crop&q=80",
-  saldo: 1000.00,
-  balance: 1000.00,
-  nivel: 15,
-  experiencia: 3450,
-  steam_id: "76561198888888888",
-  link_intercambio: "https://steamcommunity.com/tradeoffer/new/?partner=88888888&token=SkinMarket",
-  role: "admin",
+  saldo: 0.00,
+  balance: 0.00,
+  nivel: 0,
+  experiencia: 0,
+  steam_id: null,
+  link_intercambio: null,
+  role: "user",
   ultimo_reclamo_diario: null,
   stats: {
-    casesOpened: 28,
-    battlesWon: 8,
-    totalSpent: 450.00,
-    totalWon: 1280.00,
-    upgradesWon: 5
+    casesOpened: 0,
+    battlesWon: 0,
+    totalSpent: 0.00,
+    totalWon: 0.00,
+    upgradesWon: 0
   }
 };
 

@@ -112,15 +112,15 @@ const SettingsModal = ({ open, onClose }) => {
 // ─── LEVEL-BASED DAILY CASE ───────────────────────────
 const LEVEL_CONFIG = [
   { level: 1, minDeposit: 0, dailyCaseId: "eco-1", caseLabel: "Caja Eco 💚", reward: 0.15, caseImage: "/case_eco.png" },
-  { level: 2, minDeposit: 10, dailyCaseId: "eco-1", caseLabel: "Caja Eco 💚", reward: 0.35, caseImage: "/case_eco.png" },
-  { level: 3, minDeposit: 50, dailyCaseId: "eco-1", caseLabel: "Caja Eco 💚", reward: 0.65, caseImage: "/case_eco.png" },
-  { level: 4, minDeposit: 100, dailyCaseId: "mid-1", caseLabel: "Caja Mid 💙", reward: 1.00, caseImage: "/case_mid.png" },
-  { level: 5, minDeposit: 250, dailyCaseId: "mid-1", caseLabel: "Caja Mid 💙", reward: 2.00, caseImage: "/case_mid.png" },
-  { level: 6, minDeposit: 500, dailyCaseId: "mid-1", caseLabel: "Caja Mid 💙", reward: 3.50, caseImage: "/case_mid.png" },
-  { level: 7, minDeposit: 1000, dailyCaseId: "premium-1", caseLabel: "Caja Premium 💜", reward: 5.00, caseImage: "/case_premium.png" },
-  { level: 8, minDeposit: 2500, dailyCaseId: "premium-1", caseLabel: "Caja Premium 💜", reward: 8.00, caseImage: "/case_premium.png" },
-  { level: 9, minDeposit: 5000, dailyCaseId: "premium-1", caseLabel: "Caja Premium 💜", reward: 12.00, caseImage: "/case_premium.png" },
-  { level: 10, minDeposit: 10000, dailyCaseId: "premium-1", caseLabel: "Caja Legendaria 👑", reward: 20.00, caseImage: "/case_premium.png" }
+  { level: 2, minDeposit: 10, dailyCaseId: "eco-1", caseLabel: "Caja Eco 💚", reward: 0.25, caseImage: "/case_eco.png" },
+  { level: 3, minDeposit: 50, dailyCaseId: "eco-1", caseLabel: "Caja Eco 💚", reward: 0.50, caseImage: "/case_eco.png" },
+  { level: 4, minDeposit: 100, dailyCaseId: "mid-1", caseLabel: "Caja Mid 💙", reward: 0.75, caseImage: "/case_mid.png" },
+  { level: 5, minDeposit: 250, dailyCaseId: "mid-1", caseLabel: "Caja Mid 💙", reward: 1.00, caseImage: "/case_mid.png" },
+  { level: 6, minDeposit: 500, dailyCaseId: "mid-1", caseLabel: "Caja Mid 💙", reward: 1.25, caseImage: "/case_mid.png" },
+  { level: 7, minDeposit: 1000, dailyCaseId: "premium-1", caseLabel: "Caja Premium 💜", reward: 1.50, caseImage: "/case_premium.png" },
+  { level: 8, minDeposit: 2500, dailyCaseId: "premium-1", caseLabel: "Caja Premium 💜", reward: 1.75, caseImage: "/case_premium.png" },
+  { level: 9, minDeposit: 5000, dailyCaseId: "premium-1", caseLabel: "Caja Premium 💜", reward: 2.00, caseImage: "/case_premium.png" },
+  { level: 10, minDeposit: 10000, dailyCaseId: "premium-1", caseLabel: "Caja Legendaria 👑", reward: 2.00, caseImage: "/case_premium.png" }
 ];
 
 function getLevelConfig(level) {

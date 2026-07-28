@@ -26,15 +26,13 @@ export default function LiveDrops() {
 
   useEffect(() => {
 // Conectar a Socket.io para drops en tiempo real
-    // En producción (backend sirve frontend), usamos ruta relativa.
-    // En desarrollo con Vite proxy, usamos ruta relativa también.
-    // En standalone (frontend separado), usamos VITE_WS_URL.
     const serverUrl = import.meta.env.VITE_WS_URL || window.location.origin;
-    socketRef.current = SocketIOClient(serverUrl, {
+    const socket = SocketIOClient(serverUrl, {
       transports: ["websocket", "polling"]
     });
+    socketRef.current = socket;
 
-    socketRef.current.on("live-drop", (dropData) => {
+    socket.on("live-drop", (dropData) => {
       const formatted = {
         id: dropData.id,
         name: dropData.item?.name || "Skin",
@@ -88,10 +86,11 @@ export default function LiveDrops() {
     }, 8000);
 
     return () => {
-      // Limpiar: desconectar socket y eliminar listeners
+      // Cleanup: remove all listeners, disconnect socket, clear timers
       if (socketRef.current) {
-        socketRef.current.off("live-drop");
+        socketRef.current.removeAllListeners();
         socketRef.current.disconnect();
+        socketRef.current = null;
       }
       unsubscribe();
       clearInterval(interval);

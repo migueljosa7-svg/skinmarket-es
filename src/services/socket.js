@@ -3,12 +3,14 @@
  *
  * Creates a singleton Socket.io client instance with progressive reconnection.
  * Uses configurable transports with fallback and exponential back-off.
+ *
+ * PRODUCCIÓN: Todos los logs silenciados completamente (0 salida a consola).
  */
 import { io } from "socket.io-client";
 
 const isProd = typeof process !== "undefined" && process.env && process.env.NODE_ENV === "production";
-const _log = isProd ? () => {} : (...args) => _log(...args);
-const _warn = isProd ? () => {} : (...args) => _warn(...args);
+const _log = isProd ? () => {} : () => {};
+const _warn = isProd ? () => {} : () => {};
 
 const SOCKET_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
 
