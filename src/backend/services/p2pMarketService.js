@@ -21,6 +21,11 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+const isProd = process.env.NODE_ENV === "production";
+const _log = isProd ? () => {} : (...args) => _log(...args);
+const _warn = isProd ? () => {} : (...args) => _warn(...args);
+const _error = (...args) => _error(...args);
+
 class P2PMarketService {
   constructor() {
     // Provider configuration
@@ -56,7 +61,7 @@ class P2PMarketService {
     this.searchCache = new Map();
     this.cacheTTL = 30000; // 30 seconds
 
-    console.log(`[P2P] Servicio de mercado inicializado. Proveedor: ${this.provider || "ninguno (simulación)"}`);
+    _log(`[P2P] Servicio de mercado inicializado. Proveedor: ${this.provider || "ninguno (simulación)"}`);
   }
 
   // ─── Public API ─────────────────────────────────────────────
@@ -83,7 +88,7 @@ class P2PMarketService {
     if (this.searchCache.has(cacheKey)) {
       const cached = this.searchCache.get(cacheKey);
       if (Date.now() - cached.timestamp < this.cacheTTL) {
-        console.log(`[P2P] Usando caché para "${marketHashName}"`);
+        _log(`[P2P] Usando caché para "${marketHashName}"`);
         return cached.data;
       }
       this.searchCache.delete(cacheKey);
@@ -106,7 +111,7 @@ class P2PMarketService {
             results = this._simulateSearch(marketHashName, options);
         }
       } else {
-        console.log(`[P2P] API no configurada. Usando datos simulados para "${marketHashName}".`);
+        _log(`[P2P] API no configurada. Usando datos simulados para "${marketHashName}".`);
         results = this._simulateSearch(marketHashName, options);
       }
 
@@ -119,13 +124,13 @@ class P2PMarketService {
         timestamp: Date.now(),
       });
 
-      console.log(`[P2P] Búsqueda para "${marketHashName}": ${results.length} resultados. Más barato: €${results[0]?.price?.toFixed(2) || "N/A"}`);
+      _log(`[P2P] Búsqueda para "${marketHashName}": ${results.length} resultados. Más barato: €${results[0]?.price?.toFixed(2) || "N/A"}`);
       return results;
     } catch (err) {
-      console.error(`[P2P] Error en búsqueda de "${marketHashName}":`, err.message);
+      _error(`[P2P] Error en búsqueda de "${marketHashName}":`, err.message);
       // Fallback to simulated data on API error
       const fallback = this._simulateSearch(marketHashName, options);
-      console.log(`[P2P] Usando datos de respaldo (simulados) para "${marketHashName}"`);
+      _log(`[P2P] Usando datos de respaldo (simulados) para "${marketHashName}"`);
       return fallback;
     }
   }
@@ -140,7 +145,7 @@ class P2PMarketService {
    * @returns {Promise<{success: boolean, offerId?: string, price?: number, error?: string}>}
    */
   async purchaseAndSend(listingId, marketHashName, partnerSteamID64, tradeToken, maxPrice) {
-    console.log(`[P2P] Iniciando compra de "${marketHashName}" (listing: ${listingId}) para ${partnerSteamID64}...`);
+    _log(`[P2P] Iniciando compra de "${marketHashName}" (listing: ${listingId}) para ${partnerSteamID64}...`);
 
     await this._enforceRateLimit();
 
@@ -173,12 +178,12 @@ class P2PMarketService {
         }
 
         if (result.success) {
-          console.log(`[P2P] ✅ Compra exitosa de "${marketHashName}" por €${result.price?.toFixed(2)}. Oferta #${result.offerId}`);
+          _log(`[P2P] ✅ Compra exitosa de "${marketHashName}" por €${result.price?.toFixed(2)}. Oferta #${result.offerId}`);
         }
 
         return result;
       } catch (err) {
-        console.error(`[P2P] Intento ${attempt + 1}/${this.maxRetries} falló:`, err.message);
+        _error(`[P2P] Intento ${attempt + 1}/${this.maxRetries} falló:`, err.message);
         if (attempt < this.maxRetries - 1) {
           await this._sleep(this.retryDelay * (attempt + 1));
         } else {
@@ -215,7 +220,7 @@ class P2PMarketService {
       }
       return 5000.00; // Simulated balance for demo
     } catch (err) {
-      console.error("[P2P] Error al obtener balance:", err.message);
+      _error("[P2P] Error al obtener balance:", err.message);
       return 0;
     }
   }
@@ -373,7 +378,7 @@ class P2PMarketService {
       options.body = JSON.stringify(data);
     }
 
-    console.log(`[P2P API] ${method.toUpperCase()} ${url}`);
+    _log(`[P2P API] ${method.toUpperCase()} ${url}`);
 
     const response = await fetch(url, options);
 

@@ -1,4 +1,4 @@
-console.log("=== INICIO DE SERVER.JS ===");
+// console.log("=== INICIO DE SERVER.JS ===");
 import express from "express";
 import cors from "cors";
 import bcrypt from "bcrypt";
@@ -204,7 +204,7 @@ async function logAction(usuario_id, accion, detalles = null) {
       [usuario_id, accion, detalles ? JSON.stringify(detalles) : null]
     );
   } catch (err) {
-    console.error("Error al registrar log de auditoría:", err);
+    log(LOG_LEVELS.ERROR, 'SYSTEM', 'Error al registrar log de auditoría', err);
   }
 }
 
@@ -216,7 +216,7 @@ async function recordTransaction(usuario_id, tipo, monto, metodo, detalles = nul
       [usuario_id, tipo, monto, metodo, detalles]
     );
   } catch (err) {
-    console.error("Error al registrar transacción:", err);
+    log(LOG_LEVELS.ERROR, 'SYSTEM', 'Error al registrar transacción', err);
   }
 }
 
@@ -304,7 +304,7 @@ app.post("/api/login", async (req, res) => {
 
     res.json({ user: userData, token });
   } catch (err) {
-    console.error(err);
+    log(LOG_LEVELS.ERROR, 'SYSTEM', err);
     res.status(500).json({ error: "Error al iniciar sesión" });
   }
 });
@@ -326,7 +326,7 @@ app.get("/api/me", authenticateToken, async (req, res) => {
     }));
     res.json(user);
   } catch (err) {
-    console.error(err);
+    log(LOG_LEVELS.ERROR, 'SYSTEM', err);
     res.status(500).json({ error: "Error al obtener datos del usuario" });
   }
 });
@@ -379,7 +379,7 @@ app.post("/api/claim-daily", authenticateToken, async (req, res) => {
       message: `¡Has recibido ${reward}€ y ${expReward} de EXP!`
     });
   } catch (err) {
-    console.error(err);
+    log(LOG_LEVELS.ERROR, 'SYSTEM', err);
     res.status(500).json({ error: "Error al procesar reclamo diario" });
   }
 });
@@ -446,7 +446,7 @@ app.post("/api/cases/open", authenticateToken, async (req, res) => {
 
     res.json({ success: true, items: results, newBalance: newBalanceResult.rows[0].saldo });
   } catch (err) {
-    console.error(err);
+    log(LOG_LEVELS.ERROR, 'SYSTEM', err);
     res.status(500).json({ error: "Error al abrir la caja" });
   }
 });
@@ -484,7 +484,7 @@ app.post("/api/inventory/add", authenticateToken, async (req, res) => {
     }
     res.json({ success: true, items: addedItems });
   } catch (err) {
-    console.error(err);
+    log(LOG_LEVELS.ERROR, 'SYSTEM', err);
     res.status(500).json({ error: "Error al añadir al inventario" });
   }
 });
@@ -640,7 +640,7 @@ app.post("/api/update-profile", authenticateToken, async (req, res) => {
     );
     res.json({ success: true, profile: result.rows[0] });
   } catch (err) {
-    console.error(err);
+    log(LOG_LEVELS.ERROR, 'SYSTEM', err);
     res.status(500).json({ error: "Error al actualizar perfil" });
   }
 });
@@ -681,7 +681,7 @@ app.get("/api/steam-inventory/:steamId", authenticateToken, async (req, res) => 
   // Verificar cache
   const cached = steamInventoryCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < STEAM_CACHE_TTL) {
-    console.log(`[STEAM] Cache hit para: ${steamId}`);
+    log(LOG_LEVELS.INFO, 'STEAM', `Cache hit para: ${steamId}`);
     return res.json(cached.data);
   }
 
@@ -711,6 +711,7 @@ app.get("/api/steam-inventory/:steamId", authenticateToken, async (req, res) => 
 
     if (response.status !== 200) {
       const errorText = await response.text();
+      console.error(`[STEAM_API_ERROR] Steam API responded with ${response.status} ${response.statusText} for steamId: ${steamId}. Body: ${errorText.substring(0, 500)}`);
       log(LOG_LEVELS.ERROR, 'STEAM', `Error from Steam API: ${response.status} ${response.statusText}`, { body: errorText });
       return res.status(response.status).json({
         error: `Steam respondió con error ${response.status}`,
@@ -726,7 +727,7 @@ app.get("/api/steam-inventory/:steamId", authenticateToken, async (req, res) => 
     }
 
     if (!data.assets || !data.descriptions) {
-      console.log("[STEAM] No se encontraron objetos.");
+      log(LOG_LEVELS.INFO, 'STEAM', 'No se encontraron objetos.');
       return res.json([]);
     }
 
@@ -743,6 +744,8 @@ app.get("/api/steam-inventory/:steamId", authenticateToken, async (req, res) => 
       return {
         id: asset.assetid,
         name: description.market_hash_name,
+        market_hash_name: description.market_hash_name,
+        assetid: asset.assetid,
         image: `https://community.cloudflare.steamstatic.com/economy/image/${description.icon_url}`,
         price: parseFloat(basePrice.toFixed(2)) ?? 0.00,
         rarity: rarity,
@@ -1001,7 +1004,7 @@ app.get("/api/admin/settings/probabilities", authenticateToken, isAdmin, async (
     const result = await db.query("SELECT valor FROM configuracion WHERE clave = 'probabilidades'");
     res.json(result.rows[0]?.valor || {});
   } catch (err) {
-    console.error(err);
+    log(LOG_LEVELS.ERROR, 'SYSTEM', err);
     res.status(500).json({ error: "Error al obtener probabilidades" });
   }
 });

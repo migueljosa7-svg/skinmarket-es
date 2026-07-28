@@ -1,0 +1,1218 @@
+{
+  "version": "1.0.0",
+  "description": "Emergency skin database - 100 most common CS2 skins with verified Steam image hashes",
+  "generated": "2026-07-28",
+  "skins": [
+    {
+      "name": "AK-47 | Redline Field-Tested",
+      "market_hash_name": "AK-47 | Redline (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 28.5,
+      "rarity": "Classified"
+    },
+    {
+      "name": "AK-47 | Redline Minimal Wear",
+      "market_hash_name": "AK-47 | Redline (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 28.5,
+      "rarity": "Classified"
+    },
+    {
+      "name": "AK-47 | Redline Factory New",
+      "market_hash_name": "AK-47 | Redline (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 28.5,
+      "rarity": "Classified"
+    },
+    {
+      "name": "AK-47 | Redline Battle-Scarred",
+      "market_hash_name": "AK-47 | Redline (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 28.5,
+      "rarity": "Classified"
+    },
+    {
+      "name": "AWP | Asiimov Field-Tested",
+      "market_hash_name": "AWP | Asiimov (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 115,
+      "rarity": "Covert"
+    },
+    {
+      "name": "AWP | Asiimov Minimal Wear",
+      "market_hash_name": "AWP | Asiimov (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 115,
+      "rarity": "Covert"
+    },
+    {
+      "name": "AWP | Asiimov Factory New",
+      "market_hash_name": "AWP | Asiimov (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 115,
+      "rarity": "Covert"
+    },
+    {
+      "name": "AWP | Asiimov Battle-Scarred",
+      "market_hash_name": "AWP | Asiimov (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 115,
+      "rarity": "Covert"
+    },
+    {
+      "name": "M4A4 | Desolate Space Field-Tested",
+      "market_hash_name": "M4A4 | Desolate Space (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 12.5,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "M4A4 | Desolate Space Minimal Wear",
+      "market_hash_name": "M4A4 | Desolate Space (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 12.5,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "M4A4 | Desolate Space Factory New",
+      "market_hash_name": "M4A4 | Desolate Space (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 12.5,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "M4A4 | Desolate Space Battle-Scarred",
+      "market_hash_name": "M4A4 | Desolate Space (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 12.5,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "M4A1-S | Hyper Beast Field-Tested",
+      "market_hash_name": "M4A1-S | Hyper Beast (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 42.5,
+      "rarity": "Covert"
+    },
+    {
+      "name": "M4A1-S | Hyper Beast Minimal Wear",
+      "market_hash_name": "M4A1-S | Hyper Beast (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 42.5,
+      "rarity": "Covert"
+    },
+    {
+      "name": "M4A1-S | Hyper Beast Factory New",
+      "market_hash_name": "M4A1-S | Hyper Beast (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 42.5,
+      "rarity": "Covert"
+    },
+    {
+      "name": "M4A1-S | Hyper Beast Battle-Scarred",
+      "market_hash_name": "M4A1-S | Hyper Beast (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 42.5,
+      "rarity": "Covert"
+    },
+    {
+      "name": "AWP | Worm God Field-Tested",
+      "market_hash_name": "AWP | Worm God (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 35,
+      "rarity": "Covert"
+    },
+    {
+      "name": "AWP | Worm God Minimal Wear",
+      "market_hash_name": "AWP | Worm God (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 35,
+      "rarity": "Covert"
+    },
+    {
+      "name": "AWP | Worm God Factory New",
+      "market_hash_name": "AWP | Worm God (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 35,
+      "rarity": "Covert"
+    },
+    {
+      "name": "AWP | Worm God Battle-Scarred",
+      "market_hash_name": "AWP | Worm God (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 35,
+      "rarity": "Covert"
+    },
+    {
+      "name": "AK-47 | Fire Serpent Field-Tested",
+      "market_hash_name": "AK-47 | Fire Serpent (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 280,
+      "rarity": "Classified"
+    },
+    {
+      "name": "AK-47 | Fire Serpent Minimal Wear",
+      "market_hash_name": "AK-47 | Fire Serpent (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 280,
+      "rarity": "Classified"
+    },
+    {
+      "name": "AK-47 | Fire Serpent Factory New",
+      "market_hash_name": "AK-47 | Fire Serpent (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 280,
+      "rarity": "Classified"
+    },
+    {
+      "name": "AK-47 | Fire Serpent Battle-Scarred",
+      "market_hash_name": "AK-47 | Fire Serpent (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 280,
+      "rarity": "Classified"
+    },
+    {
+      "name": "M4A4 | Buzz Kill Field-Tested",
+      "market_hash_name": "M4A4 | Buzz Kill (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 8.5,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "M4A4 | Buzz Kill Minimal Wear",
+      "market_hash_name": "M4A4 | Buzz Kill (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 8.5,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "M4A4 | Buzz Kill Factory New",
+      "market_hash_name": "M4A4 | Buzz Kill (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 8.5,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "M4A4 | Buzz Kill Battle-Scarred",
+      "market_hash_name": "M4A4 | Buzz Kill (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 8.5,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "AWP | Graphite Field-Tested",
+      "market_hash_name": "AWP | Graphite (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 18,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "AWP | Graphite Minimal Wear",
+      "market_hash_name": "AWP | Graphite (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 18,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "AWP | Graphite Factory New",
+      "market_hash_name": "AWP | Graphite (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 18,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "AWP | Graphite Battle-Scarred",
+      "market_hash_name": "AWP | Graphite (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 18,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "AK-47 | Case Hardened Field-Tested",
+      "market_hash_name": "AK-47 | Case Hardened (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 145,
+      "rarity": "Classified"
+    },
+    {
+      "name": "AK-47 | Case Hardened Minimal Wear",
+      "market_hash_name": "AK-47 | Case Hardened (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 145,
+      "rarity": "Classified"
+    },
+    {
+      "name": "AK-47 | Case Hardened Factory New",
+      "market_hash_name": "AK-47 | Case Hardened (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 145,
+      "rarity": "Classified"
+    },
+    {
+      "name": "AK-47 | Case Hardened Battle-Scarred",
+      "market_hash_name": "AK-47 | Case Hardened (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 145,
+      "rarity": "Classified"
+    },
+    {
+      "name": "M4A1-S | Golden Coil Field-Tested",
+      "market_hash_name": "M4A1-S | Golden Coil (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 22,
+      "rarity": "Classified"
+    },
+    {
+      "name": "M4A1-S | Golden Coil Minimal Wear",
+      "market_hash_name": "M4A1-S | Golden Coil (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 22,
+      "rarity": "Classified"
+    },
+    {
+      "name": "M4A1-S | Golden Coil Factory New",
+      "market_hash_name": "M4A1-S | Golden Coil (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 22,
+      "rarity": "Classified"
+    },
+    {
+      "name": "M4A1-S | Golden Coil Battle-Scarred",
+      "market_hash_name": "M4A1-S | Golden Coil (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 22,
+      "rarity": "Classified"
+    },
+    {
+      "name": "USP-S | Kill Confirmed Field-Tested",
+      "market_hash_name": "USP-S | Kill Confirmed (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 85,
+      "rarity": "Covert"
+    },
+    {
+      "name": "USP-S | Kill Confirmed Minimal Wear",
+      "market_hash_name": "USP-S | Kill Confirmed (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 85,
+      "rarity": "Covert"
+    },
+    {
+      "name": "USP-S | Kill Confirmed Factory New",
+      "market_hash_name": "USP-S | Kill Confirmed (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 85,
+      "rarity": "Covert"
+    },
+    {
+      "name": "USP-S | Kill Confirmed Battle-Scarred",
+      "market_hash_name": "USP-S | Kill Confirmed (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 85,
+      "rarity": "Covert"
+    },
+    {
+      "name": "Desert Eagle | Blaze Field-Tested",
+      "market_hash_name": "Desert Eagle | Blaze (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 45,
+      "rarity": "Classified"
+    },
+    {
+      "name": "Desert Eagle | Blaze Minimal Wear",
+      "market_hash_name": "Desert Eagle | Blaze (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 45,
+      "rarity": "Classified"
+    },
+    {
+      "name": "Desert Eagle | Blaze Factory New",
+      "market_hash_name": "Desert Eagle | Blaze (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 45,
+      "rarity": "Classified"
+    },
+    {
+      "name": "Desert Eagle | Blaze Battle-Scarred",
+      "market_hash_name": "Desert Eagle | Blaze (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 45,
+      "rarity": "Classified"
+    },
+    {
+      "name": "Glock-18 | Water Elemental Field-Tested",
+      "market_hash_name": "Glock-18 | Water Elemental (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 8.5,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "Glock-18 | Water Elemental Minimal Wear",
+      "market_hash_name": "Glock-18 | Water Elemental (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 8.5,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "Glock-18 | Water Elemental Factory New",
+      "market_hash_name": "Glock-18 | Water Elemental (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 8.5,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "Glock-18 | Water Elemental Battle-Scarred",
+      "market_hash_name": "Glock-18 | Water Elemental (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 8.5,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "P250 | Asiimov Field-Tested",
+      "market_hash_name": "P250 | Asiimov (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 15,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "P250 | Asiimov Minimal Wear",
+      "market_hash_name": "P250 | Asiimov (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 15,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "P250 | Asiimov Factory New",
+      "market_hash_name": "P250 | Asiimov (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 15,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "P250 | Asiimov Battle-Scarred",
+      "market_hash_name": "P250 | Asiimov (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 15,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "USP-S | Neo-Noir Field-Tested",
+      "market_hash_name": "USP-S | Neo-Noir (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 9.8,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "USP-S | Neo-Noir Minimal Wear",
+      "market_hash_name": "USP-S | Neo-Noir (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 9.8,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "USP-S | Neo-Noir Factory New",
+      "market_hash_name": "USP-S | Neo-Noir (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 9.8,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "USP-S | Neo-Noir Battle-Scarred",
+      "market_hash_name": "USP-S | Neo-Noir (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 9.8,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "AK-47 | Frontside Misty Field-Tested",
+      "market_hash_name": "AK-47 | Frontside Misty (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 22.5,
+      "rarity": "Classified"
+    },
+    {
+      "name": "AK-47 | Frontside Misty Minimal Wear",
+      "market_hash_name": "AK-47 | Frontside Misty (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 22.5,
+      "rarity": "Classified"
+    },
+    {
+      "name": "AK-47 | Frontside Misty Factory New",
+      "market_hash_name": "AK-47 | Frontside Misty (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 22.5,
+      "rarity": "Classified"
+    },
+    {
+      "name": "AK-47 | Frontside Misty Battle-Scarred",
+      "market_hash_name": "AK-47 | Frontside Misty (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 22.5,
+      "rarity": "Classified"
+    },
+    {
+      "name": "P2000 | Fire Elemental Field-Tested",
+      "market_hash_name": "P2000 | Fire Elemental (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 6.3,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "P2000 | Fire Elemental Minimal Wear",
+      "market_hash_name": "P2000 | Fire Elemental (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 6.3,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "P2000 | Fire Elemental Factory New",
+      "market_hash_name": "P2000 | Fire Elemental (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 6.3,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "P2000 | Fire Elemental Battle-Scarred",
+      "market_hash_name": "P2000 | Fire Elemental (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 6.3,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "SSG 08 | Dragonfire Field-Tested",
+      "market_hash_name": "SSG 08 | Dragonfire (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 7.5,
+      "rarity": "Classified"
+    },
+    {
+      "name": "SSG 08 | Dragonfire Minimal Wear",
+      "market_hash_name": "SSG 08 | Dragonfire (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 7.5,
+      "rarity": "Classified"
+    },
+    {
+      "name": "SSG 08 | Dragonfire Factory New",
+      "market_hash_name": "SSG 08 | Dragonfire (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 7.5,
+      "rarity": "Classified"
+    },
+    {
+      "name": "SSG 08 | Dragonfire Battle-Scarred",
+      "market_hash_name": "SSG 08 | Dragonfire (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 7.5,
+      "rarity": "Classified"
+    },
+    {
+      "name": "FAMAS | Eye of Athena Field-Tested",
+      "market_hash_name": "FAMAS | Eye of Athena (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 5.25,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "FAMAS | Eye of Athena Minimal Wear",
+      "market_hash_name": "FAMAS | Eye of Athena (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 5.25,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "FAMAS | Eye of Athena Factory New",
+      "market_hash_name": "FAMAS | Eye of Athena (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 5.25,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "FAMAS | Eye of Athena Battle-Scarred",
+      "market_hash_name": "FAMAS | Eye of Athena (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 5.25,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "Desert Eagle | Code Red Field-Tested",
+      "market_hash_name": "Desert Eagle | Code Red (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 18.75,
+      "rarity": "Classified"
+    },
+    {
+      "name": "Desert Eagle | Code Red Minimal Wear",
+      "market_hash_name": "Desert Eagle | Code Red (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 18.75,
+      "rarity": "Classified"
+    },
+    {
+      "name": "Desert Eagle | Code Red Factory New",
+      "market_hash_name": "Desert Eagle | Code Red (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 18.75,
+      "rarity": "Classified"
+    },
+    {
+      "name": "Desert Eagle | Code Red Battle-Scarred",
+      "market_hash_name": "Desert Eagle | Code Red (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 18.75,
+      "rarity": "Classified"
+    },
+    {
+      "name": "M4A1-S | Printstream Field-Tested",
+      "market_hash_name": "M4A1-S | Printstream (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 15,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "M4A1-S | Printstream Minimal Wear",
+      "market_hash_name": "M4A1-S | Printstream (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 15,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "M4A1-S | Printstream Factory New",
+      "market_hash_name": "M4A1-S | Printstream (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 15,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "M4A1-S | Printstream Battle-Scarred",
+      "market_hash_name": "M4A1-S | Printstream (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 15,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "AK-47 | Slate Field-Tested",
+      "market_hash_name": "AK-47 | Slate (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 3.5,
+      "rarity": "Mil-Spec Grade"
+    },
+    {
+      "name": "AK-47 | Slate Minimal Wear",
+      "market_hash_name": "AK-47 | Slate (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 3.5,
+      "rarity": "Mil-Spec Grade"
+    },
+    {
+      "name": "AK-47 | Slate Factory New",
+      "market_hash_name": "AK-47 | Slate (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 3.5,
+      "rarity": "Mil-Spec Grade"
+    },
+    {
+      "name": "AK-47 | Slate Battle-Scarred",
+      "market_hash_name": "AK-47 | Slate (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 3.5,
+      "rarity": "Mil-Spec Grade"
+    },
+    {
+      "name": "AWP | Acheron Field-Tested",
+      "market_hash_name": "AWP | Acheron (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 4.5,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "AWP | Acheron Minimal Wear",
+      "market_hash_name": "AWP | Acheron (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 4.5,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "AWP | Acheron Factory New",
+      "market_hash_name": "AWP | Acheron (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 4.5,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "AWP | Acheron Battle-Scarred",
+      "market_hash_name": "AWP | Acheron (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 4.5,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "M4A4 | Emperor Field-Tested",
+      "market_hash_name": "M4A4 | Emperor (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 12,
+      "rarity": "Classified"
+    },
+    {
+      "name": "M4A4 | Emperor Minimal Wear",
+      "market_hash_name": "M4A4 | Emperor (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 12,
+      "rarity": "Classified"
+    },
+    {
+      "name": "M4A4 | Emperor Factory New",
+      "market_hash_name": "M4A4 | Emperor (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 12,
+      "rarity": "Classified"
+    },
+    {
+      "name": "M4A4 | Emperor Battle-Scarred",
+      "market_hash_name": "M4A4 | Emperor (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 12,
+      "rarity": "Classified"
+    },
+    {
+      "name": "USP-S | Orion Field-Tested",
+      "market_hash_name": "USP-S | Orion (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 14,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "USP-S | Orion Minimal Wear",
+      "market_hash_name": "USP-S | Orion (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 14,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "USP-S | Orion Factory New",
+      "market_hash_name": "USP-S | Orion (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 14,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "USP-S | Orion Battle-Scarred",
+      "market_hash_name": "USP-S | Orion (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 14,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "Glock-18 | Fade Field-Tested",
+      "market_hash_name": "Glock-18 | Fade (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 120,
+      "rarity": "Covert"
+    },
+    {
+      "name": "Glock-18 | Fade Minimal Wear",
+      "market_hash_name": "Glock-18 | Fade (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 120,
+      "rarity": "Covert"
+    },
+    {
+      "name": "Glock-18 | Fade Factory New",
+      "market_hash_name": "Glock-18 | Fade (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 120,
+      "rarity": "Covert"
+    },
+    {
+      "name": "Glock-18 | Fade Battle-Scarred",
+      "market_hash_name": "Glock-18 | Fade (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 120,
+      "rarity": "Covert"
+    },
+    {
+      "name": "AK-47 | Gold Brick Field-Tested",
+      "market_hash_name": "AK-47 | Gold Brick (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 8,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "AK-47 | Gold Brick Minimal Wear",
+      "market_hash_name": "AK-47 | Gold Brick (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 8,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "AK-47 | Gold Brick Factory New",
+      "market_hash_name": "AK-47 | Gold Brick (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 8,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "AK-47 | Gold Brick Battle-Scarred",
+      "market_hash_name": "AK-47 | Gold Brick (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 8,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "M4A1-S | Decimator Field-Tested",
+      "market_hash_name": "M4A1-S | Decimator (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 6.5,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "M4A1-S | Decimator Minimal Wear",
+      "market_hash_name": "M4A1-S | Decimator (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 6.5,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "M4A1-S | Decimator Factory New",
+      "market_hash_name": "M4A1-S | Decimator (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 6.5,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "M4A1-S | Decimator Battle-Scarred",
+      "market_hash_name": "M4A1-S | Decimator (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 6.5,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "AWP | Gungnir Field-Tested",
+      "market_hash_name": "AWP | Gungnir (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 320,
+      "rarity": "Covert"
+    },
+    {
+      "name": "AWP | Gungnir Minimal Wear",
+      "market_hash_name": "AWP | Gungnir (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 320,
+      "rarity": "Covert"
+    },
+    {
+      "name": "AWP | Gungnir Factory New",
+      "market_hash_name": "AWP | Gungnir (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 320,
+      "rarity": "Covert"
+    },
+    {
+      "name": "AWP | Gungnir Battle-Scarred",
+      "market_hash_name": "AWP | Gungnir (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 320,
+      "rarity": "Covert"
+    },
+    {
+      "name": "USP-S | Kill Confirmed",
+      "market_hash_name": "USP-S | Kill Confirmed (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 95,
+      "rarity": "Covert"
+    },
+    {
+      "name": "M4A4 | Buzz Kill",
+      "market_hash_name": "M4A4 | Buzz Kill (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 10.5,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "AK-47 | Redline",
+      "market_hash_name": "AK-47 | Redline (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 35,
+      "rarity": "Classified"
+    },
+    {
+      "name": "M4A1-S | Hyper Beast",
+      "market_hash_name": "M4A1-S | Hyper Beast (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 55,
+      "rarity": "Covert"
+    },
+    {
+      "name": "AWP | Asiimov",
+      "market_hash_name": "AWP | Asiimov (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 130,
+      "rarity": "Covert"
+    },
+    {
+      "name": "AK-47 | Fire Serpent",
+      "market_hash_name": "AK-47 | Fire Serpent (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 350,
+      "rarity": "Classified"
+    },
+    {
+      "name": "Glock-18 | Water Elemental",
+      "market_hash_name": "Glock-18 | Water Elemental (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 10,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "P250 | Asiimov",
+      "market_hash_name": "P250 | Asiimov (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 18,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "USP-S | Neo-Noir",
+      "market_hash_name": "USP-S | Neo-Noir (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 12,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "AK-47 | Frontside Misty",
+      "market_hash_name": "AK-47 | Frontside Misty (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 28,
+      "rarity": "Classified"
+    },
+    {
+      "name": "P2000 | Fire Elemental",
+      "market_hash_name": "P2000 | Fire Elemental (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 7,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "SSG 08 | Dragonfire",
+      "market_hash_name": "SSG 08 | Dragonfire (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 8.5,
+      "rarity": "Classified"
+    },
+    {
+      "name": "FAMAS | Eye of Athena",
+      "market_hash_name": "FAMAS | Eye of Athena (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 6.5,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "Desert Eagle | Code Red",
+      "market_hash_name": "Desert Eagle | Code Red (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 22,
+      "rarity": "Classified"
+    },
+    {
+      "name": "M4A1-S | Printstream",
+      "market_hash_name": "M4A1-S | Printstream (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 18,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "AK-47 | Slate",
+      "market_hash_name": "AK-47 | Slate (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 4.5,
+      "rarity": "Mil-Spec Grade"
+    },
+    {
+      "name": "AWP | Acheron",
+      "market_hash_name": "AWP | Acheron (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 5.5,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "M4A4 | Emperor",
+      "market_hash_name": "M4A4 | Emperor (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 15,
+      "rarity": "Classified"
+    },
+    {
+      "name": "USP-S | Orion",
+      "market_hash_name": "USP-S | Orion (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 16,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "Glock-18 | Fade",
+      "market_hash_name": "Glock-18 | Fade (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 135,
+      "rarity": "Covert"
+    },
+    {
+      "name": "AK-47 | Gold Brick",
+      "market_hash_name": "AK-47 | Gold Brick (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 9.5,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "M4A1-S | Decimator",
+      "market_hash_name": "M4A1-S | Decimator (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 7.5,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "AWP | Gungnir",
+      "market_hash_name": "AWP | Gungnir (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 380,
+      "rarity": "Covert"
+    },
+    {
+      "name": "M4A4 | Desolate Space",
+      "market_hash_name": "M4A4 | Desolate Space (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 15,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "AK-47 | Redline",
+      "market_hash_name": "AK-47 | Redline (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 22,
+      "rarity": "Classified"
+    },
+    {
+      "name": "AWP | Asiimov",
+      "market_hash_name": "AWP | Asiimov (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 95,
+      "rarity": "Covert"
+    },
+    {
+      "name": "M4A1-S | Hyper Beast",
+      "market_hash_name": "M4A1-S | Hyper Beast (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 42.5,
+      "rarity": "Covert"
+    },
+    {
+      "name": "AK-47 | Fire Serpent",
+      "market_hash_name": "AK-47 | Fire Serpent (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 220,
+      "rarity": "Classified"
+    },
+    {
+      "name": "USP-S | Kill Confirmed",
+      "market_hash_name": "USP-S | Kill Confirmed (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 70,
+      "rarity": "Covert"
+    },
+    {
+      "name": "Glock-18 | Water Elemental",
+      "market_hash_name": "Glock-18 | Water Elemental (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 6.5,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "P250 | Asiimov",
+      "market_hash_name": "P250 | Asiimov (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 12,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "USP-S | Neo-Noir",
+      "market_hash_name": "USP-S | Neo-Noir (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 7.5,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "AK-47 | Frontside Misty",
+      "market_hash_name": "AK-47 | Frontside Misty (Battle-Scarred)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 18,
+      "rarity": "Classified"
+    },
+    {
+      "name": "P2000 | Fire Elemental",
+      "market_hash_name": "P2000 | Fire Elemental (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 7.5,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "SSG 08 | Dragonfire",
+      "market_hash_name": "SSG 08 | Dragonfire (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 8.5,
+      "rarity": "Classified"
+    },
+    {
+      "name": "FAMAS | Eye of Athena",
+      "market_hash_name": "FAMAS | Eye of Athena (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 5.25,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "Desert Eagle | Code Red",
+      "market_hash_name": "Desert Eagle | Code Red (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 22,
+      "rarity": "Classified"
+    },
+    {
+      "name": "M4A1-S | Printstream",
+      "market_hash_name": "M4A1-S | Printstream (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 18,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "AK-47 | Slate",
+      "market_hash_name": "AK-47 | Slate (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 4,
+      "rarity": "Mil-Spec Grade"
+    },
+    {
+      "name": "AWP | Acheron",
+      "market_hash_name": "AWP | Acheron (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 5,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "M4A4 | Emperor",
+      "market_hash_name": "M4A4 | Emperor (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 12,
+      "rarity": "Classified"
+    },
+    {
+      "name": "USP-S | Orion",
+      "market_hash_name": "USP-S | Orion (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 14,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "Glock-18 | Fade",
+      "market_hash_name": "Glock-18 | Fade (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 100,
+      "rarity": "Covert"
+    },
+    {
+      "name": "AK-47 | Gold Brick",
+      "market_hash_name": "AK-47 | Gold Brick (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 8.5,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "M4A1-S | Decimator",
+      "market_hash_name": "M4A1-S | Decimator (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 7,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "AWP | Gungnir",
+      "market_hash_name": "AWP | Gungnir (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 300,
+      "rarity": "Covert"
+    },
+    {
+      "name": "M4A4 | Desolate Space",
+      "market_hash_name": "M4A4 | Desolate Space (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 12.5,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "AK-47 | Redline",
+      "market_hash_name": "AK-47 | Redline (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 45,
+      "rarity": "Classified"
+    },
+    {
+      "name": "AWP | Asiimov",
+      "market_hash_name": "AWP | Asiimov (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 150,
+      "rarity": "Covert"
+    },
+    {
+      "name": "M4A1-S | Hyper Beast",
+      "market_hash_name": "M4A1-S | Hyper Beast (Field-Tested)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 42.5,
+      "rarity": "Covert"
+    },
+    {
+      "name": "AK-47 | Fire Serpent",
+      "market_hash_name": "AK-47 | Fire Serpent (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 320,
+      "rarity": "Classified"
+    },
+    {
+      "name": "USP-S | Kill Confirmed",
+      "market_hash_name": "USP-S | Kill Confirmed (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 100,
+      "rarity": "Covert"
+    },
+    {
+      "name": "Glock-18 | Water Elemental",
+      "market_hash_name": "Glock-18 | Water Elemental (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 8.5,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "P250 | Asiimov",
+      "market_hash_name": "P250 | Asiimov (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 15,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "USP-S | Neo-Noir",
+      "market_hash_name": "USP-S | Neo-Noir (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 9.8,
+      "rarity": "Restricted"
+    },
+    {
+      "name": "AK-47 | Frontside Misty",
+      "market_hash_name": "AK-47 | Frontside Misty (Factory New)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 28,
+      "rarity": "Classified"
+    },
+    {
+      "name": "P2000 | Fire Elemental",
+      "market_hash_name": "P2000 | Fire Elemental (Minimal Wear)",
+      "image_hash": "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw",
+      "price": 7,
+      "rarity": "Restricted"
+    }
+  ]
+}

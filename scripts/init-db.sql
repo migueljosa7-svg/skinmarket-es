@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS inventario (
     rarity TEXT,
     marketable BOOLEAN DEFAULT TRUE,
     status VARCHAR(20) DEFAULT 'on_site',
+    market_hash_name VARCHAR(255),
+    assetid VARCHAR(50),
     fecha_obtencion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 

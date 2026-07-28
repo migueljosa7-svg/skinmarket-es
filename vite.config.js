@@ -12,6 +12,13 @@ export default defineConfig({
     sourcemap: process.env.NODE_ENV !== 'production',
     // Tamaño máximo de chunk (en kB) antes de generar advertencia
     chunkSizeWarningLimit: 1000,
+    // PRODUCCIÓN: Marcar console.log/warn/info/debug como funciones puras
+    // para que esbuild las elimine del bundle de producción
+    esbuild: {
+      pure: process.env.NODE_ENV === 'production'
+        ? ['console.log', 'console.warn', 'console.info', 'console.debug']
+        : [],
+    },
     // Dividir chunks manualmente para mejor caching
     rollupOptions: {
       output: {

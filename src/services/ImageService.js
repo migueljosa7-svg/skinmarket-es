@@ -18,6 +18,14 @@
 /** Set of URLs that have failed in this session to prevent infinite retries */
 const failedUrls = new Set();
 
+/** Emergency skin manifest cache (loaded lazily from /images/emergency-skins/manifest.json) */
+let emergencyManifest = null;
+let emergencyManifestLoaded = false;
+
+/** Production mode check for log silencing */
+const isProd = typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'production';
+const _log = isProd ? () => { } : (...args) => console.log('[ImageService]', ...args);
+
 /** CSS color array for gradient placeholders */
 const GRADIENT_COLORS = [
   '#6366f1', '#3b82f6', '#0891b2', '#06b6d4',

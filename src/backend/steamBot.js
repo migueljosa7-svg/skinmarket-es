@@ -5,6 +5,11 @@ import SteamTotp from 'steam-totp';
 import dotenv from 'dotenv';
 dotenv.config();
 
+const isProd = process.env.NODE_ENV === "production";
+const _log = isProd ? () => {} : (...args) => _log(...args);
+const _warn = isProd ? () => {} : (...args) => _warn(...args);
+const _error = (...args) => _error(...args);
+
 class SteamBot {
     constructor() {
         this.client = new SteamUser();
@@ -28,13 +33,13 @@ class SteamBot {
         if (!this.credentials.accountName || !this.credentials.password ||
             this.credentials.accountName === 'tu_usuario_steam' ||
             this.credentials.password === 'tu_password_steam') {
-            console.warn("[BOT] CONFIGURACIÓN REQUERIDA: Las credenciales de Steam en el archivo .env son valores de ejemplo.");
-            console.warn("[BOT] Por favor, edita el archivo .env con tu usuario y contraseña real para activar los retiros automáticos.");
-            console.warn("[BOT] El sitio funcionará en MODO SIMULACIÓN para los retiros hasta que se configure.");
+            _warn("[BOT] CONFIGURACIÓN REQUERIDA: Las credenciales de Steam en el archivo .env son valores de ejemplo.");
+            _warn("[BOT] Por favor, edita el archivo .env con tu usuario y contraseña real para activar los retiros automáticos.");
+            _warn("[BOT] El sitio funcionará en MODO SIMULACIÓN para los retiros hasta que se configure.");
             return;
         }
 
-        console.log(`[BOT] Intentando iniciar sesión en Steam como ${this.credentials.accountName}...`);
+        _log(`[BOT] Intentando iniciar sesión en Steam como ${this.credentials.accountName}...`);
 
         try {
             this.client.logOn({
@@ -43,26 +48,26 @@ class SteamBot {
                 twoFactorCode: SteamTotp.generateAuthCode(this.credentials.sharedSecret)
             });
         } catch (err) {
-            console.error("[BOT] Error al generar código 2FA o iniciar proceso de login:", err.message);
+            _error("[BOT] Error al generar código 2FA o iniciar proceso de login:", err.message);
         }
 
         this.client.on('loggedOn', (details) => {
-            console.log("[BOT] ¡Sesión iniciada con éxito! Conectado a Steam como:", this.client.steamID.getSteamID64());
+            _log("[BOT] ¡Sesión iniciada con éxito! Conectado a Steam como:", this.client.steamID.getSteamID64());
         });
 
         this.client.on('webSession', (sessionID, cookies) => {
             this.manager.setCookies(cookies);
             this.community.setCookies(cookies);
             this.isLoggedIn = true;
-            console.log("[BOT] WebSession establecida y cookies configuradas.");
+            _log("[BOT] WebSession establecida y cookies configuradas.");
         });
 
         this.client.on('error', (err) => {
-            console.error("[BOT] Error de sesión en Steam:", err.message);
+            _error("[BOT] Error de sesión en Steam:", err.message);
             if (err.eresult === 5) {
-                console.error("[BOT] CONSEJO: El error 'InvalidPassword' indica que la contraseña o el usuario en .env son incorrectos.");
+                _error("[BOT] CONSEJO: El error 'InvalidPassword' indica que la contraseña o el usuario en .env son incorrectos.");
             } else if (err.eresult === 85) {
-                console.error("[BOT] CONSEJO: Se necesita el Shared Secret correcto para el 2FA.");
+                _error("[BOT] CONSEJO: Se necesita el Shared Secret correcto para el 2FA.");
             }
             this.isLoggedIn = false;
         });
@@ -97,17 +102,17 @@ class SteamBot {
                     if (err) return reject(err);
 
                     if (status === 'pending') {
-                        console.log(`[BOT] Oferta #${offer.id} enviada, esperando confirmación 2FA...`);
+                        _log(`[BOT] Oferta #${offer.id} enviada, esperando confirmación 2FA...`);
                         this.community.acceptConfirmationForObject(this.credentials.identitySecret, offer.id, (err) => {
                             if (err) {
-                                console.error(`[BOT] Error al confirmar oferta #${offer.id}:`, err);
+                                _error(`[BOT] Error al confirmar oferta #${offer.id}:`, err);
                                 return reject(err);
                             }
-                            console.log(`[BOT] Oferta #${offer.id} confirmada automáticamente.`);
+                            _log(`[BOT] Oferta #${offer.id} confirmada automáticamente.`);
                             resolve(offer.id);
                         });
                     } else {
-                        console.log(`[BOT] Oferta #${offer.id} enviada directamente.`);
+                        _log(`[BOT] Oferta #${offer.id} enviada directamente.`);
                         resolve(offer.id);
                     }
                 });

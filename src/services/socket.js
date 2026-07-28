@@ -6,6 +6,10 @@
  */
 import { io } from "socket.io-client";
 
+const isProd = typeof process !== "undefined" && process.env && process.env.NODE_ENV === "production";
+const _log = isProd ? () => {} : (...args) => _log(...args);
+const _warn = isProd ? () => {} : (...args) => _warn(...args);
+
 const SOCKET_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
 
 let socket = null;
@@ -40,31 +44,31 @@ export function getSocket() {
     });
 
     socket.on("connect", () => {
-        console.log(`[SOCKET] Conectado: ${socket.id}`);
+        _log(`[SOCKET] Conectado: ${socket.id}`);
     });
 
     socket.on("disconnect", (reason) => {
-        console.log(`[SOCKET] Desconectado: ${reason}`);
+        _log(`[SOCKET] Desconectado: ${reason}`);
     });
 
     socket.on("connect_error", (err) => {
-        console.warn("[SOCKET] Error de conexión:", err.message);
+        _warn("[SOCKET] Error de conexión:", err.message);
     });
 
     socket.on("reconnect_attempt", (attempt) => {
-        console.log(`[SOCKET] Intento de reconexión #${attempt}`);
+        _log(`[SOCKET] Intento de reconexión #${attempt}`);
     });
 
     socket.on("reconnect", (attempt) => {
-        console.log(`[SOCKET] Reconectado en intento #${attempt}`);
+        _log(`[SOCKET] Reconectado en intento #${attempt}`);
     });
 
     socket.on("reconnect_error", (err) => {
-        console.warn("[SOCKET] Error en reconexión:", err.message);
+        _warn("[SOCKET] Error en reconexión:", err.message);
     });
 
     socket.on("reconnect_failed", () => {
-        console.warn("[SOCKET] Todas las reconexiones fallaron.");
+        _warn("[SOCKET] Todas las reconexiones fallaron.");
     });
 
     return socket;

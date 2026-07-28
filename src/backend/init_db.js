@@ -9,16 +9,16 @@ const initDb = async () => {
     try {
       // Test connection first
       await db.query('SELECT 1');
-      console.log(`[DB] Conexión exitosa en intento ${attempt}`);
+      // console.log(`[DB] Conexión exitosa en intento ${attempt}`);
       break;
     } catch (err) {
-      console.error(`[DB] Intento ${attempt}/${maxRetries} falló: ${err.message}`);
+      // console.error(`[DB] Intento ${attempt}/${maxRetries} falló: ${err.message}`);
       if (attempt === maxRetries) {
-        console.error('[DB] No se pudo conectar después de varios intentos.');
+        // console.error('[DB] No se pudo conectar después de varios intentos.');
         process.exit(1);
       }
       const delay = attempt * 2000;
-      console.log(`[DB] Reintentando en ${delay / 1000}s...`);
+      // console.log(`[DB] Reintentando en ${delay / 1000}s...`);
       await sleep(delay);
     }
   }
@@ -51,6 +51,8 @@ const initDb = async () => {
     ALTER TABLE inventario ADD COLUMN IF NOT EXISTS wear VARCHAR(50) DEFAULT 'Field-Tested';
     ALTER TABLE inventario ADD COLUMN IF NOT EXISTS skin_name VARCHAR(255);
     ALTER TABLE inventario ADD COLUMN IF NOT EXISTS weapon VARCHAR(255);
+    ALTER TABLE inventario ADD COLUMN IF NOT EXISTS market_hash_name VARCHAR(255);
+    ALTER TABLE inventario ADD COLUMN IF NOT EXISTS assetid VARCHAR(50);
     ALTER TABLE transacciones ALTER COLUMN monto SET DEFAULT 0.00;
   `;
 
@@ -131,11 +133,11 @@ const initDb = async () => {
     await db.query(pagosPendientesQuery);
     await db.query(settingsQuery);
     await db.query(seedSettingsQuery);
-    console.log("Tablas 'usuarios', 'inventario', 'logs_auditoria', 'transacciones', 'pagos_pendientes' y 'configuracion' verificadas/creadas correctamente.");
+    // console.log("Tablas 'usuarios', 'inventario', 'logs_auditoria', 'transacciones', 'pagos_pendientes' y 'configuracion' verificadas/creadas correctamente.");
 
     process.exit(0);
   } catch (err) {
-    console.error("Error al inicializar la base de datos:", err);
+    // console.error("Error al inicializar la base de datos:", err);
     process.exit(1);
   }
 };

@@ -125,8 +125,60 @@ export default function Inventory() {
   const [tradeUrlModalOpen, setTradeUrlModalOpen] = useState(false);
   const [pendingWithdrawId, setPendingWithdrawId] = useState(null);
 
+  // Steam Inventory Inspector state
+  const [steamInspectorOpen, setSteamInspectorOpen] = useState(false);
+  const [steamInput, setSteamInput] = useState("");
+  const [steamInventory, setSteamInventory] = useState([]);
+  const [steamLoading, setSteamLoading] = useState(false);
+  const [steamError, setSteamError] = useState("");
+
   const inventory = user?.inventory || [];
   const totalValue = inventory.reduce((acc, skin) => acc + (skin.price || 0), 0);
+
+  // Extract SteamID64 from a Trade URL or return as-is if it's already a SteamID64
+  const extractSteamId64 = (input) => {
+    const partnerMatch = input.match(/partner=(\d+)/);
+    if (partnerMatch) {
+      return (BigInt(partnerMatch[1]) + BigInt("76561197960265728")).toString();
+    }
+    // If it's already a SteamID64 (starts with 7656119)
+    if (/^7656119\d+$/.test(input.trim())) {
+      return input.trim();
+    }
+    return null;
+  };
+
+  // Load Steam inventory for inspection
+  const handleLoadSteamInventory = async () => {
+    const steamId64 = extractSteamId64(steamInput);
+    if (!steamId64) {
+      setSteamError("Introduce un SteamID64 válido o un Trade URL.");
+      return;
+    }
+    setSteamLoading(true);
+    setSteamError("");
+    setSteamInventory([]);
+    toast.info("🔄 Cargando inventario de Steam...");
+
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`/api/steam-inventory/${steamId64}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Error al cargar inventario");
+      }
+      const data = await response.json();
+      setSteamInventory(data);
+      toast.success(`✅ ${data.length} objetos cargados de Steam.`);
+    } catch (err) {
+      setSteamError(err.message);
+      toast.error(`❌ ${err.message}`);
+    } finally {
+      setSteamLoading(false);
+    }
+  };
 
   const handleSellSingle = useCallback(
     (skinId) => {
@@ -288,7 +340,7 @@ export default function Inventory() {
                   <img
                     src={getSkinImageUrl(skin.name, skin.image)}
                     alt={skin.name}
-onError={(e) => handleImageError(e, skin)}
+                    onError={(e) => handleImageError(e, skin)}
                     style={{
                       width: "100%",
                       height: "90px",
@@ -372,6 +424,230 @@ onError={(e) => handleImageError(e, skin)}
               );
             })}
           </div>
+        )}
+      </div>
+
+      {/* Steam Inventory Inspector Section */}
+      <div style={{
+        marginTop: "50px",
+        background: "rgba(255,255,255,0.01)",
+        borderRadius: "28px",
+        border: "1px solid rgba(255,255,255,0.05)",
+        padding: "35px",
+        marginBottom: "30px"
+      }}>
+        <div style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "20px",
+          flexWrap: "wrap",
+          gap: "15px"
+        }}>
+          <h2 style={{
+            fontSize: "1.8rem",
+            fontWeight: "900",
+            margin: 0,
+            background: "linear-gradient(180deg, #3b82f6 0%, #0891b2 100%)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent"
+          }}>
+            🔍 INSPECTOR DE INVENTARIO DE STEAM
+          </h2>
+          <button
+            onClick={() => { setSteamInspectorOpen(!steamInspectorOpen); setSteamError(""); }}
+            style={{
+              padding: "12px 28px",
+              background: steamInspectorOpen ? "rgba(59, 130, 246, 0.2)" : "rgba(59, 130, 246, 0.1)",
+              border: "1px solid rgba(59, 130, 246, 0.3)",
+              color: "#3b82f6",
+              borderRadius: "14px",
+              fontWeight: "900",
+              fontSize: "0.9rem",
+              cursor: "pointer",
+              transition: "all 0.2s"
+            }}
+          >
+            {steamInspectorOpen ? "▲ OCULTAR" : "▼ MOSTRAR"}
+          </button>
+        </div>
+
+        <p style={{
+          color: "rgba(255,255,255,0.4)",
+          fontSize: "0.85rem",
+          marginBottom: "20px",
+          lineHeight: "1.5"
+        }}>
+          Introduce tu SteamID64 o Trade URL para cargar y ver tu inventario de CS2 directamente desde Steam.
+          <br />
+          <span style={{ color: "#f5ac3b", fontSize: "0.75rem" }}>
+            Tu inventario de Steam debe ser PÚBLICO para funcionar.
+          </span>
+        </p>
+
+        {steamInspectorOpen && (
+          <>
+            <div style={{ display: "flex", gap: "15px", marginBottom: "20px", flexWrap: "wrap" }}>
+              <input
+                type="text"
+                value={steamInput}
+                onChange={(e) => { setSteamInput(e.target.value); setSteamError(""); }}
+                placeholder="SteamID64 (7656119...) o Trade URL..."
+                style={{
+                  flex: 1, minWidth: "300px",
+                  padding: "14px",
+                  borderRadius: "12px",
+                  background: "rgba(0,0,0,0.3)",
+                  border: `1px solid ${steamError ? "#ef4444" : "rgba(255,255,255,0.1)"}`,
+                  color: "white",
+                  outline: "none",
+                  fontSize: "0.85rem"
+                }}
+              />
+              <button
+                onClick={handleLoadSteamInventory}
+                disabled={steamLoading || !steamInput.trim()}
+                style={{
+                  padding: "14px 32px",
+                  background: steamLoading ? "rgba(59, 130, 246, 0.3)" : "rgba(59, 130, 246, 0.15)",
+                  border: "1px solid rgba(59, 130, 246, 0.3)",
+                  color: "#3b82f6",
+                  borderRadius: "12px",
+                  fontWeight: "900",
+                  fontSize: "0.9rem",
+                  cursor: steamLoading || !steamInput.trim() ? "not-allowed" : "pointer",
+                  opacity: steamLoading || !steamInput.trim() ? 0.5 : 1
+                }}
+              >
+                {steamLoading ? "⏳ CARGANDO..." : "CARGAR INVENTARIO"}
+              </button>
+            </div>
+
+            {steamError && (
+              <div style={{
+                background: "rgba(239, 68, 68, 0.1)",
+                border: "1px solid rgba(239, 68, 68, 0.3)",
+                borderRadius: "12px",
+                padding: "15px",
+                marginBottom: "20px",
+                color: "#ef4444",
+                fontSize: "0.85rem",
+                fontWeight: "bold"
+              }}>
+                ❌ {steamError}
+              </div>
+            )}
+
+            {steamInventory.length > 0 && (
+              <div>
+                <div style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "15px"
+                }}>
+                  <h3 style={{ margin: 0, fontSize: "1.2rem", fontWeight: "900" }}>
+                    Objetos encontrados: {steamInventory.length}
+                  </h3>
+                  <div style={{
+                    fontSize: "1rem",
+                    color: "#f5ac3b",
+                    fontWeight: "900"
+                  }}>
+                    Valor estimado: €{steamInventory.reduce((acc, s) => acc + (s.price || 0), 0).toFixed(2)}
+                  </div>
+                </div>
+
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+                  gap: "15px"
+                }}>
+                  {steamInventory.map((item) => (
+                    <div
+                      key={item.assetid || item.id}
+                      style={{
+                        background: "rgba(255,255,255,0.02)",
+                        border: `1px solid ${getRarityColor(item.rarity)}`,
+                        borderWidth: "1px 1px 3px 1px",
+                        borderRadius: "16px",
+                        padding: "15px",
+                        textAlign: "center"
+                      }}
+                    >
+                      <img
+                        src={getSkinImageUrl(item.name, item.image)}
+                        alt={item.name}
+                        onError={(e) => handleImageError(e, item)}
+                        style={{
+                          width: "100%",
+                          height: "80px",
+                          objectFit: "contain",
+                          marginBottom: "10px"
+                        }}
+                      />
+                      <div style={{
+                        color: getRarityColor(item.rarity),
+                        fontSize: "0.6rem",
+                        fontWeight: "900",
+                        marginBottom: "4px"
+                      }}>
+                        {item.rarity?.toUpperCase() || "MIL-SPEC"}
+                      </div>
+                      <div style={{
+                        fontSize: "0.8rem",
+                        fontWeight: "bold",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        marginBottom: "6px"
+                      }}>
+                        {item.name}
+                      </div>
+                      <div style={{
+                        color: "#f5ac3b",
+                        fontWeight: "900",
+                        fontSize: "1rem"
+                      }}>
+                        €{Number(item.price || 0).toFixed(2)}
+                      </div>
+                      {item.market_hash_name && (
+                        <div style={{
+                          fontSize: "0.6rem",
+                          color: "rgba(255,255,255,0.3)",
+                          marginTop: "4px",
+                          fontFamily: "monospace",
+                          wordBreak: "break-all"
+                        }}>
+                          {item.market_hash_name}
+                        </div>
+                      )}
+                      {item.assetid && (
+                        <div style={{
+                          fontSize: "0.6rem",
+                          color: "rgba(255,255,255,0.25)",
+                          marginTop: "2px"
+                        }}>
+                          AssetID: {item.assetid}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {steamLoading && (
+              <div style={{
+                textAlign: "center",
+                padding: "60px",
+                color: "rgba(255,255,255,0.4)",
+                fontSize: "1.1rem"
+              }}>
+                ⏳ Cargando inventario de Steam...
+              </div>
+            )}
+          </>
         )}
       </div>
 
