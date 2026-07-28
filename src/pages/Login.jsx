@@ -101,7 +101,7 @@ export default function Login() {
             {view === "login" ? "INICIAR SESIÓN" : view === "register" ? "CREAR CUENTA" : "RECUPERAR CLAVE"}
           </h1>
           <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.85rem", margin: 0 }}>
-            Únete y consigue €500 de saldo inicial
+            Únete y empieza desde 0.00€ — deposita para jugar
           </p>
         </div>
 

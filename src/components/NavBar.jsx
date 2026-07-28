@@ -28,20 +28,7 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isMuted, setIsMuted] = useState(() => sound.muted);
 
-  // Activate audio context on first user interaction (click/touch anywhere)
-  useEffect(() => {
-    const handler = () => {
-      sound.init();
-      document.removeEventListener("click", handler);
-      document.removeEventListener("touchstart", handler);
-    };
-    document.addEventListener("click", handler);
-    document.addEventListener("touchstart", handler);
-    return () => {
-      document.removeEventListener("click", handler);
-      document.removeEventListener("touchstart", handler);
-    };
-  }, []);
+  // Audio activation handled globally in main.jsx — no duplicate listeners needed here
 
   const handleLogout = () => {
     logout();

@@ -101,8 +101,17 @@ export function AuthProvider({ children }) {
       return { success: false, error: `Debes esperar ${hours}h para reclamar de nuevo.` };
     }
 
-    const reward = 5.00;
-    const expReward = 100;
+    // KeyDrop-style: reward basado en nivel (máx 2.00€ para cajas diarias)
+    const level = currentUser.nivel || 0;
+    let baseReward = 0.15;
+    if (level >= 5) baseReward = 2.00;
+    else if (level >= 4) baseReward = 1.00;
+    else if (level >= 3) baseReward = 0.50;
+    else if (level >= 2) baseReward = 0.25;
+    else baseReward = 0.15;
+
+    const reward = parseFloat((baseReward + Math.random() * baseReward).toFixed(2));
+    const expReward = Math.max(15, level * 15);
     StorageService.addBalance(reward);
     StorageService.updateUser({
       experiencia: (currentUser.experiencia || 0) + expReward,
@@ -113,7 +122,7 @@ export function AuthProvider({ children }) {
       success: true,
       reward,
       expReward,
-      message: "¡Recompensa diaria de $5.00 reclamada!"
+      message: `🎉 ¡Recompensa diaria de €${reward} reclamada!`
     };
   }, []);
 

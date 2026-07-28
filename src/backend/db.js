@@ -22,7 +22,7 @@ if (databaseUrl && isProduction) {
         // If host doesn't contain a dot, it's a short Render hostname - append full domain
         if (host && !host.includes('.')) {
             databaseUrl = databaseUrl.replace(host, host + '.oregon-postgres.render.com');
-            console.log(`[DB] Fixed hostname: ${host} -> ${host}.oregon-postgres.render.com`);
+            // console.log(`[DB] Fixed hostname: ${host} -> ${host}.oregon-postgres.render.com`);
         }
     }
 }

@@ -18,6 +18,14 @@
 /** Set of URLs that have failed in this session to prevent infinite retries */
 const failedUrls = new Set();
 
+/** Emergency skin manifest cache (loaded lazily from /images/emergency-skins/manifest.json) */
+let emergencyManifest = null;
+let emergencyManifestLoaded = false;
+
+/** Production mode check for log silencing */
+const isProd = typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'production';
+const _log = isProd ? () => { } : (...args) => console.log('[ImageService]', ...args);
+
 /** CSS color array for gradient placeholders */
 const GRADIENT_COLORS = [
   '#6366f1', '#3b82f6', '#0891b2', '#06b6d4',
@@ -397,6 +405,22 @@ export async function handleImageError(event, skin) {
     return;
   }
 
+  // ─── ANTI-BUCLE INFINITO: Máximo 3 reintentos totales ──────────────
+  var tryCount = parseInt(img.getAttribute('data-try-count'), 10) || 0;
+  if (tryCount >= 3) {
+    // Cancelar todos los eventos de error futuros y poner placeholder silencioso
+    img.onerror = null;
+    var fallbackUrl = generatePlaceholderDataUrl(skin && skin.name);
+    img.src = fallbackUrl;
+    img.style.opacity = '0.4';
+    img.style.objectFit = 'contain';
+    img.removeAttribute('data-try-index');
+    img.removeAttribute('data-try-count');
+    return;
+  }
+  img.setAttribute('data-try-count', tryCount + 1);
+  // ───────────────────────────────────────────────────────────────────
+
   // Mark current URL as failed for this session
   failedUrls.add(currentSrc);
 
@@ -434,6 +458,7 @@ export async function handleImageError(event, skin) {
       img.style.opacity = '1';
       img.style.objectFit = 'contain';
       img.removeAttribute('data-try-index');
+      img.removeAttribute('data-try-count');
       return;
     }
 
@@ -453,6 +478,7 @@ export async function handleImageError(event, skin) {
         img.style.opacity = '1';
         img.style.objectFit = 'contain';
         img.removeAttribute('data-try-index');
+        img.removeAttribute('data-try-count');
 
         // Dispatch custom event to notify UI of replacement
         window.dispatchEvent(new CustomEvent('skinReplaced', {
@@ -475,6 +501,7 @@ export async function handleImageError(event, skin) {
 
   // Remove data-try-index since we've exhausted all sources
   img.removeAttribute('data-try-index');
+  img.removeAttribute('data-try-count');
 }
 
 /**

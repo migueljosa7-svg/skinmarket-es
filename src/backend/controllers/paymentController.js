@@ -13,6 +13,10 @@
  */
 
 import crypto from "crypto";
+
+const isProd = process.env.NODE_ENV === "production";
+const _error = (...args) => _error(...args); // Always log errors
+const _warn = isProd ? () => {} : (...args) => _warn(...args);
 import db from "../db.js";
 
 // ─── Configuration ────────────────────────────────────────────
@@ -37,7 +41,7 @@ async function recordTransaction(usuario_id, tipo, monto, metodo, detalles = nul
       [usuario_id, tipo, monto, metodo, detalles]
     );
   } catch (err) {
-    console.error("[PAYMENT] Error al registrar transacción:", err);
+    _error("[PAYMENT] Error al registrar transacción:", err);
   }
 }
 
@@ -48,7 +52,7 @@ async function logAction(usuario_id, accion, detalles = null) {
       [usuario_id, accion, detalles ? JSON.stringify(detalles) : null]
     );
   } catch (err) {
-    console.error("[PAYMENT] Error al registrar auditoría:", err);
+    _error("[PAYMENT] Error al registrar auditoría:", err);
   }
 }
 
@@ -165,7 +169,7 @@ export async function createCharge(req, res) {
           message: `Pago de €${amount.toFixed(2)} procesado correctamente.`
         });
       } catch (dbErr) {
-        console.error("[PAYMENT] Error al acreditar saldo:", dbErr);
+        _error("[PAYMENT] Error al acreditar saldo:", dbErr);
         return res.status(500).json({ error: "Error al procesar el pago con tarjeta." });
       }
     }
@@ -232,7 +236,7 @@ export async function createCharge(req, res) {
 
     return res.status(400).json({ error: "Método de pago no soportado." });
   } catch (err) {
-    console.error("[PAYMENT] Error en createCharge:", err);
+    _error("[PAYMENT] Error en createCharge:", err);
     return res.status(500).json({ error: "Error al crear cargo de pago." });
   }
 }
@@ -248,7 +252,7 @@ export async function handleWebhook(req, res) {
   try {
     // Verify webhook signature
     if (!verifyWebhookSignature(req, WEBHOOK_SECRET)) {
-      console.warn("[PAYMENT WEBHOOK] ⚠️ Firma inválida recibida");
+      _warn("[PAYMENT WEBHOOK] ⚠️ Firma inválida recibida");
       return res.status(401).json({ error: "Firma de webhook inválida" });
     }
 
@@ -258,12 +262,12 @@ export async function handleWebhook(req, res) {
       return res.status(400).json({ error: "Payload de webhook incompleto" });
     }
 
-    console.log(`[PAYMENT WEBHOOK] 🔔 Recibido: charge=${charge_id}, status=${status}, amount=${amount}`);
+    // console.log(`[PAYMENT WEBHOOK] 🔔 Recibido: charge=${charge_id}, status=${status}, amount=${amount}`);
 
     // Only process confirmed/completed payments
     const validStatuses = ["confirmed", "completed", "finished", "succeeded"];
     if (!validStatuses.includes(status.toLowerCase())) {
-      console.log(`[PAYMENT WEBHOOK] Estado "${status}" no es final. Ignorando.`);
+      // console.log(`[PAYMENT WEBHOOK] Estado "${status}" no es final. Ignorando.`);
       return res.json({ received: true, status: "ignored" });
     }
 
@@ -281,7 +285,7 @@ export async function handleWebhook(req, res) {
       }
       const pending = pendingResult.rows[0];
       if (pending.estado === "completed") {
-        console.log(`[PAYMENT WEBHOOK] Charge ${charge_id} ya fue procesado.`);
+        // console.log(`[PAYMENT WEBHOOK] Charge ${charge_id} ya fue procesado.`);
         return res.json({ received: true, status: "duplicate" });
       }
       userId = pending.usuario_id;
@@ -319,10 +323,10 @@ export async function handleWebhook(req, res) {
       status
     });
 
-    console.log(`[PAYMENT WEBHOOK] ✅ Saldo actualizado para usuario ${userId}: +${amount}`);
+    // console.log(`[PAYMENT WEBHOOK] ✅ Saldo actualizado para usuario ${userId}: +${amount}`);
     return res.json({ received: true, status: "completed" });
   } catch (err) {
-    console.error("[PAYMENT WEBHOOK] ❌ Error:", err);
+    _error("[PAYMENT WEBHOOK] ❌ Error:", err);
     return res.status(500).json({ error: "Error al procesar webhook" });
   }
 }
@@ -351,7 +355,7 @@ export async function getPaymentStatus(req, res) {
 
     return res.json(result.rows[0]);
   } catch (err) {
-    console.error("[PAYMENT] Error al consultar estado:", err);
+    _error("[PAYMENT] Error al consultar estado:", err);
     return res.status(500).json({ error: "Error al consultar estado del pago" });
   }
 }

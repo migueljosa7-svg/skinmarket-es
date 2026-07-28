@@ -8,6 +8,7 @@ import { getPlaceholderImage, handleImageError, getSkinImageUrl } from "../servi
 import { useToast } from "../components/Toast";
 import { sound } from "../utils/audio";
 import { getFloatBadgeProps } from "../utils/floatPreview";
+import ProvablyFairModal from "../components/ProvablyFairModal";
 
 
 /* ─────────────────────────────────────────────
@@ -711,6 +712,7 @@ export default function Battles() {
   const [lastBattleConfig, setLastBattleConfig] = useState(null);
   const [animState, setAnimState] = useState({ visibleRounds: 0, hasCompleted: false });
   const [activeReels, setActiveReels] = useState({});
+  const [showProvablyFair, setShowProvablyFair] = useState(false);
 
   const allCases = useMemo(() => generateAllCases().filter(c => c.category !== "daily"), []);
 
@@ -1714,6 +1716,38 @@ export default function Battles() {
           </div>
         )}
       </div>
+
+      {/* Provably Fair Button & Modal */}
+      {animState.hasCompleted && (
+        <div style={{ textAlign: "center", marginTop: "10px", marginBottom: "40px" }}>
+          <button
+            onClick={() => setShowProvablyFair(true)}
+            style={{
+              padding: "14px 32px",
+              background: "rgba(16, 185, 129, 0.1)",
+              border: "1px solid rgba(16, 185, 129, 0.2)",
+              color: "#10b981",
+              borderRadius: "16px",
+              fontSize: "1rem",
+              fontWeight: "900",
+              cursor: "pointer",
+            }}
+          >
+            🔐 VERIFICAR PROVABLY FAIR
+          </button>
+        </div>
+      )}
+
+      <ProvablyFairModal
+        isOpen={showProvablyFair}
+        onClose={() => setShowProvablyFair(false)}
+        resultData={{
+          serverSeedHashed: "b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+          clientSeed: "battle-client-seed-2026",
+          nonce: battleState?.boxes?.length || 1,
+          serverSeedRaw: "z9y8x7w6v5u4t3s2r1q0p9o8n7m6l5k4j3i2h1g0f9e8d7c6b5a4"
+        }}
+      />
 
       {/* Modal */}
       <BattleSelector

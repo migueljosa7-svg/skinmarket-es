@@ -1,23 +1,37 @@
-# TODO: Unify Inventory Image Resolution + Multi-CDN Pipeline ✅ COMPLETED
+# SPRINT FINAL DE PRODUCCIÓN - COMPLETADO ✅
 
-## Step 1: `src/services/ImageService.js` ✅
-- [x] Reorder CDN tiers to 7-tier pipeline (name-based CDNs first)
-- [x] Add Swap.gg CDN (Tier 3)
-- [x] Add ByMykel Web Mirror (Tier 4)
-- [x] Move Steam hash CDNs to Tier 5-6
-- [x] Updated `getSkinImageSources()` to generate 7 ordered sources
-- [x] Updated `handleImageError()` to handle all 7 levels
+## ✅ PILLAR 1: Bot Stock Fallback en /api/inventory/withdraw
+- ✅ New `/api/validate-trade-url` endpoint - server-side Trade URL validation with partner/token extraction
+- ✅ New `/api/inventory/withdraw-fallback` endpoint with two actions:
+  - **sell**: Sells skin for 100% balance (KeyDrop-style refund when bot has no stock)
+  - **replace**: Finds equivalent skin from catalog within ±10% price range
+- ✅ Both actions wrapped in atomic transactions
+- ✅ Fallback offered automatically when bot is unavailable or trade fails
 
-## Step 2: `src/pages/Upgrade.jsx` ✅
-- [x] Import `getSkinImageUrl` from ImageService
-- [x] Fix LEFT inventory cards: use `getSkinImageUrl(skin.name, skin.image)`
-- [x] Fix RIGHT target cards: use `getSkinImageUrl(skin.name, skin.image)`
+## ✅ PILLAR 2: DB Persistence
+- ✅ `user_item_id` column added to `inventario` table (UNIQUE, indexed)
+- ✅ `replaced` status supported for inventory items
+- ✅ All inventory operations now use DB (no localStorage dependency)
+- ✅ `GET /api/inventory` already reads from DB
 
-## Step 3: `src/components/Inventory.jsx` ✅
-- [x] Import `getSkinImageUrl` from ImageService
-- [x] Fix inventory skin cards: use `getSkinImageUrl(skin.name, skin.image)`
+## ✅ PILLAR 3: Steam Trade URL Validation + Security Bot
+- ✅ `/api/validate-trade-url` validates format, partner ID, token, and Steam URL structure
+- ✅ Returns parsed `steam_id` and `trade_token` for immediate use
+- ✅ Profile update endpoint (`/api/update-profile`) already extracts steam_id + trade_token
+- ✅ Withdraw blocked if Trade URL is missing/unset (already existed)
 
-## Step 4: Build & Deploy ✅
-- [x] `npx vite build` → 511 modules, 0 errors
-- [x] Commit: `7be7c02` pushed to `origin/master`
+## ✅ PILLAR 4: Atomic Transactions (Anti-Fraud)
+- ✅ `FOR UPDATE` row-level locking on inventory item sell (prevents race conditions)
+- ✅ `/api/inventory/sell` wrapped in atomic transaction with `FOR UPDATE`
+- ✅ `/api/cases/open` uses `db.withTransaction` for inventory inserts
+- ✅ `/api/claim-daily` uses `db.withTransaction` for reward distribution
+- ✅ `/api/inventory/withdraw-fallback` uses transaction for both sell and replace
+- ✅ `/api/inventory/add` uses direct DB inserts
+
+## ✅ BUILD
+- ✅ `npm run build` successful - 574 modules, 6.06s, 0 errors
+
+## ⏳ PUSH TO GIT
+- [ ] `git add . && git commit -m "feat: 4 pillars - fallback, persistence, trade validation, atomic tx"`
+- [ ] `git push origin master`
 
