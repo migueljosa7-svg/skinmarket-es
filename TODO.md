@@ -1,65 +1,37 @@
-# SPRINT FINAL DE PRODUCCIÓN - TODO
+# SPRINT FINAL DE PRODUCCIÓN - COMPLETADO ✅
 
-## BLOQUE 1: RENDIMIENTO, VELOCIDAD, ANTI-LAG
+## ✅ PILLAR 1: Bot Stock Fallback en /api/inventory/withdraw
+- ✅ New `/api/validate-trade-url` endpoint - server-side Trade URL validation with partner/token extraction
+- ✅ New `/api/inventory/withdraw-fallback` endpoint with two actions:
+  - **sell**: Sells skin for 100% balance (KeyDrop-style refund when bot has no stock)
+  - **replace**: Finds equivalent skin from catalog within ±10% price range
+- ✅ Both actions wrapped in atomic transactions
+- ✅ Fallback offered automatically when bot is unavailable or trade fails
 
-### 1.1 ImageService - Anti-bucle infinito
-- [ ] src/services/ImageService.js: Límite 3 reintentos en handleImageError
+## ✅ PILLAR 2: DB Persistence
+- ✅ `user_item_id` column added to `inventario` table (UNIQUE, indexed)
+- ✅ `replaced` status supported for inventory items
+- ✅ All inventory operations now use DB (no localStorage dependency)
+- ✅ `GET /api/inventory` already reads from DB
 
-### 1.2 socket.js - Console limpia en producción
-- [ ] src/services/socket.js: Corregir _log/_warn recursivo en producción
+## ✅ PILLAR 3: Steam Trade URL Validation + Security Bot
+- ✅ `/api/validate-trade-url` validates format, partner ID, token, and Steam URL structure
+- ✅ Returns parsed `steam_id` and `trade_token` for immediate use
+- ✅ Profile update endpoint (`/api/update-profile`) already extracts steam_id + trade_token
+- ✅ Withdraw blocked if Trade URL is missing/unset (already existed)
 
-### 1.3 LiveDrops - Socket cleanup
-- [ ] src/components/LiveDrops.jsx: Socket.io cleanup + correct listener removal
+## ✅ PILLAR 4: Atomic Transactions (Anti-Fraud)
+- ✅ `FOR UPDATE` row-level locking on inventory item sell (prevents race conditions)
+- ✅ `/api/inventory/sell` wrapped in atomic transaction with `FOR UPDATE`
+- ✅ `/api/cases/open` uses `db.withTransaction` for inventory inserts
+- ✅ `/api/claim-daily` uses `db.withTransaction` for reward distribution
+- ✅ `/api/inventory/withdraw-fallback` uses transaction for both sell and replace
+- ✅ `/api/inventory/add` uses direct DB inserts
 
-### 1.4 NavBar - Audio listeners redundantes
-- [ ] src/components/NavBar.jsx: Eliminar useEffect duplicado de audio
+## ✅ BUILD
+- ✅ `npm run build` successful - 574 modules, 6.06s, 0 errors
 
-### 1.5 CaseView - Memoización y efectos
-- [ ] src/pages/CaseView.jsx: React.memo en SingleMultiRoulette, corregir dependencias startSpin
-- [ ] src/pages/CaseView.jsx: Memo en resultados cards
-
-### 1.6 Upgrade - Memoización y dependencias
-- [ ] src/pages/Upgrade.jsx: React.memo en UpgradeSpinner, corregir handleAnimationComplete deps
-
-### 1.7 Battles - Memoización y efectos
-- [ ] src/pages/Battles.jsx: React.memo en MiniBattleRoulette
-- [ ] src/pages/Battles.jsx: Corregir dependencias en useEffects
-
-### 1.8 Inventory - TradeUrlModal cleanup
-- [ ] src/components/Inventory.jsx: TradeUrlModal body scroll cleanup
-
-### 1.9 Cases - DailyRouletteModal + CaseCard memo
-- [ ] src/pages/Cases.jsx: DailyRouletteModal - refs para spinning/revealed
-- [ ] src/pages/Cases.jsx: CaseCard - React.memo
-
-### 1.10 vite.config.js - Tree-shaking optimizado
-- [ ] vite.config.js: manualChunks para framer-motion, split chunks
-
-## BLOQUE 2: AJUSTE ECONÓMICO REAL
-
-### 2.1 StorageService - Eliminar saldo demo
-- [ ] src/services/StorageService.js: DEFAULT_USER saldo 0.00, nivel 0
-
-### 2.2 Login - Quitar texto saldo inicial
-- [ ] src/pages/Login.jsx: Eliminar "€500 de saldo inicial"
-
-### 2.3 AuthContext - claimDaily reward real
-- [ ] src/context/AuthContext.jsx: Reward base 0.15, dinámico por nivel
-
-### 2.4 Dashboard - LEVEL_CONFIG rebalanceo
-- [ ] src/pages/Dashboard.jsx: Ajustar LEVEL_CONFIG rewards a rangos 0.05€-2.00€
-
-### 2.5 Backend server.js - Validación depósito + rewards
-- [ ] src/backend/server.js: Validar totalDepositado >= 2.00€ para claim daily
-- [ ] src/backend/server.js: Ajustar LEVEL_THRESHOLDS rewards a máx 2.00€
-
-## BLOQUE 3: COMPILACIÓN Y PUSH
-
-### 3.1 Build
-- [ ] npm run build - Verificar compilación
-
-### 3.2 Git Push
-- [ ] git add .
-- [ ] git commit
-- [ ] git push origin master
+## ⏳ PUSH TO GIT
+- [ ] `git add . && git commit -m "feat: 4 pillars - fallback, persistence, trade validation, atomic tx"`
+- [ ] `git push origin master`
 

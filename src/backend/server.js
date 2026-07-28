@@ -21,6 +21,7 @@ import cron from "node-cron";
 import { createCharge, handleWebhook, getPaymentStatus } from "./controllers/paymentController.js";
 import p2pMarketService from "./services/p2pMarketService.js";
 import fs from "fs";
+import crypto from "crypto";
 
 dotenv.config();
 
@@ -659,6 +660,151 @@ app.post("/api/cases/open", authenticateToken, caseOpenLimiter, async (req, res)
   }
 });
 
+// ─── TRADE URL VALIDATION ─────────────────────────
+app.post("/api/validate-trade-url", authenticateToken, async (req, res) => {
+  const { url } = req.body;
+  if (!url) return res.status(400).json({ valid: false, error: "Trade URL no proporcionada" });
+
+  const partnerMatch = url.match(/partner=(\d+)/);
+  const tokenMatch = url.match(/token=([\w-]+)/);
+
+  if (!partnerMatch || !tokenMatch) {
+    return res.json({
+      valid: false,
+      error: "Formato de Trade URL inválido. Debe contener 'partner' y 'token'.",
+      code: "INVALID_TRADE_URL_FORMAT"
+    });
+  }
+
+  const partnerId = partnerMatch[1];
+  const token = tokenMatch[1];
+
+  // Validate partner ID is numeric and reasonable length
+  if (!/^\d+$/.test(partnerId) || partnerId.length < 5) {
+    return res.json({ valid: false, error: "Partner ID inválido en la Trade URL.", code: "INVALID_PARTNER_ID" });
+  }
+
+  // Validate token format (alphanumeric + hyphens)
+  if (!/^[\w-]+$/.test(token) || token.length < 5) {
+    return res.json({ valid: false, error: "Token de intercambio inválido.", code: "INVALID_TOKEN" });
+  }
+
+  // Convert partner to SteamID64
+  const steamId64 = (BigInt(partnerId) + BigInt("76561197960265728")).toString();
+
+  // Also check if URL is a valid steamcommerce offer
+  if (!url.includes("steamcommunity.com/tradeoffer/")) {
+    return res.json({
+      valid: false,
+      error: "La URL debe ser una Trade Offer de Steam (steamcommunity.com/tradeoffer/...)",
+      code: "NOT_STEAM_URL"
+    });
+  }
+
+  res.json({ valid: true, steam_id: steamId64, trade_token: token });
+});
+
+// ─── WITHDRAW FALLBACK: Sell skin for 100% balance ──────────
+app.post("/api/inventory/withdraw-fallback", authenticateToken, async (req, res) => {
+  const { itemId, action } = req.body; // action: 'sell' or 'replace'
+  if (!itemId || !action) return res.status(400).json({ error: "itemId y action requeridos" });
+
+  try {
+    const itemResult = await db.query(
+      "SELECT * FROM inventario WHERE item_id = $1 AND usuario_id = $2 AND status = 'on_site'",
+      [itemId, req.user.id]
+    );
+    if (itemResult.rows.length === 0) {
+      return res.status(404).json({ error: "Objeto no encontrado o ya procesado" });
+    }
+    const item = itemResult.rows[0];
+
+    if (action === 'sell') {
+      // Sell for 100% value (KeyDrop-style: full refund when bot has no stock)
+      await db.withTransaction(async (client) => {
+        await client.query("UPDATE inventario SET status = 'sold' WHERE item_id = $1", [itemId]);
+        await client.query(
+          "UPDATE usuarios SET saldo = saldo + $1 WHERE usuario_id = $2",
+          [item.price, req.user.id]
+        );
+      });
+      await recordTransaction(req.user.id, 'venta_forzada', item.price, 'fallback_saldo',
+        `Venta forzada (bot sin stock): ${item.name}`);
+      await logAction(req.user.id, 'WITHDRAW_FALLBACK_SELL', { itemId, itemName: item.name, price: item.price });
+
+      const balanceResult = await db.query("SELECT saldo FROM usuarios WHERE usuario_id = $1", [req.user.id]);
+      res.json({
+        success: true,
+        action: 'sell',
+        price: item.price,
+        newBalance: balanceResult.rows[0].saldo,
+        message: `✅ Skin vendida por €${item.price} en saldo (100% del valor).`
+      });
+    } else if (action === 'replace') {
+      // Buscar skin de reemplazo del mismo precio en el catálogo
+      const replacementResult = await db.query(
+        `SELECT item_id, name, price, image, rarity, market_hash_name, wear, weapon, skin_name
+         FROM inventario
+         WHERE status = 'on_site' AND usuario_id != $1
+           AND price >= $2 AND price <= $3
+         ORDER BY RANDOM() LIMIT 1`,
+        [req.user.id, item.price * 0.9, item.price * 1.1]
+      );
+
+      if (replacementResult.rows.length === 0) {
+        // No replacement found, offer sell instead
+        return res.json({
+          success: false,
+          error: "No hay skins de reemplazo disponibles en este momento.",
+          code: "NO_REPLACEMENT",
+          alternative: "sell",
+          message: "Puedes vender la skin por €" + parseFloat(item.price).toFixed(2) + " en saldo."
+        });
+      }
+
+      const replacement = replacementResult.rows[0];
+
+      await db.withTransaction(async (client) => {
+        // Mark old item as replaced
+        await client.query("UPDATE inventario SET status = 'replaced' WHERE item_id = $1", [itemId]);
+        // Clone replacement to user
+        await client.query(
+          `INSERT INTO inventario (usuario_id, name, price, image, rarity, marketable, market_hash_name, wear, weapon, skin_name, status)
+           VALUES ($1, $2, $3, $4, $5, true, $6, $7, $8, $9, 'on_site')`,
+          [req.user.id, replacement.name, replacement.price, replacement.image,
+           replacement.rarity, replacement.market_hash_name, replacement.wear,
+           replacement.weapon, replacement.skin_name]
+        );
+      });
+
+      await logAction(req.user.id, 'WITHDRAW_FALLBACK_REPLACE', {
+        originalItemId: itemId,
+        originalName: item.name,
+        replacementId: replacement.item_id,
+        replacementName: replacement.name
+      });
+
+      res.json({
+        success: true,
+        action: 'replace',
+        replacement: {
+          id: replacement.item_id,
+          name: replacement.name,
+          price: replacement.price,
+          image: replacement.image,
+          rarity: replacement.rarity
+        },
+        message: `🔄 Skin reemplazada por: ${replacement.name} (€${replacement.price})`
+      });
+    } else {
+      res.status(400).json({ error: "Acción inválida. Usa 'sell' o 'replace'." });
+    }
+  } catch (err) {
+    log(LOG_LEVELS.ERROR, 'WITHDRAW_FALLBACK', 'Error en fallback', { error: err.message });
+    res.status(500).json({ error: "Error al procesar fallback de retiro" });
+  }
+});
+
 // --- INVENTORY ROUTES ---
 
 app.get("/api/inventory", authenticateToken, async (req, res) => {
@@ -692,15 +838,34 @@ app.post("/api/inventory/add", authenticateToken, async (req, res) => {
 app.post("/api/inventory/sell", authenticateToken, async (req, res) => {
   const { itemId } = req.body;
   try {
-    const itemResult = await db.query("SELECT * FROM inventario WHERE item_id = $1 AND usuario_id = $2 AND status = 'on_site'", [itemId, req.user.id]);
-    if (itemResult.rows.length === 0) return res.status(404).json({ error: "Objeto no encontrado o ya procesado" });
-    const item = itemResult.rows[0];
-    await db.query("UPDATE inventario SET status = 'sold' WHERE item_id = $1", [itemId]);
-    const balanceResult = await db.query("UPDATE usuarios SET saldo = saldo + $1 WHERE usuario_id = $2 RETURNING saldo", [item.price, req.user.id]);
-    await recordTransaction(req.user.id, 'venta', item.price, 'inventario_sitio', `Venta de ${item.name}`);
-    await logAction(req.user.id, 'VENDER_ITEM', { itemId, itemName: item.name, price: item.price });
-    res.json({ success: true, newBalance: balanceResult.rows[0].saldo });
-  } catch (err) { res.status(500).json({ error: "Error al vender objeto" }); }
+    await db.withTransaction(async (client) => {
+      const itemResult = await client.query(
+        "SELECT * FROM inventario WHERE item_id = $1 AND usuario_id = $2 AND status = 'on_site' FOR UPDATE",
+        [itemId, req.user.id]
+      );
+      if (itemResult.rows.length === 0) {
+        throw new Error("Objeto no encontrado o ya procesado");
+      }
+      const item = itemResult.rows[0];
+
+      await client.query("UPDATE inventario SET status = 'sold' WHERE item_id = $1", [itemId]);
+
+      const balanceResult = await client.query(
+        "UPDATE usuarios SET saldo = saldo + $1 WHERE usuario_id = $2 RETURNING saldo",
+        [item.price, req.user.id]
+      );
+
+      await recordTransaction(req.user.id, 'venta', item.price, 'inventario_sitio', `Venta de ${item.name}`);
+      await logAction(req.user.id, 'VENDER_ITEM', { itemId, itemName: item.name, price: item.price });
+
+      res.json({ success: true, newBalance: balanceResult.rows[0].saldo });
+    });
+  } catch (err) {
+    if (err.message === "Objeto no encontrado o ya procesado") {
+      return res.status(404).json({ error: err.message });
+    }
+    res.status(500).json({ error: "Error al vender objeto" });
+  }
 });
 
 // ─── REAL WITHDRAW TO STEAM TRADE OFFER ──────────────────

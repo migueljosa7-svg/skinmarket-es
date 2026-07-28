@@ -48,6 +48,7 @@ const initDb = async () => {
     ALTER TABLE inventario ADD COLUMN IF NOT EXISTS market_hash_name VARCHAR(255);
     ALTER TABLE inventario ADD COLUMN IF NOT EXISTS assetid VARCHAR(50);
     ALTER TABLE inventario ADD COLUMN IF NOT EXISTS icon_url TEXT;
+    ALTER TABLE inventario ADD COLUMN IF NOT EXISTS user_item_id VARCHAR(100) UNIQUE;
     ALTER TABLE transacciones ALTER COLUMN monto SET DEFAULT 0.00;
   `;
 
