@@ -12,7 +12,9 @@ const isProd = typeof process !== "undefined" && process.env && process.env.NODE
 const _log = isProd ? () => {} : () => {};
 const _warn = isProd ? () => {} : () => {};
 
-const SOCKET_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
+// Usar VITE_API_URL (sin trailing slash) para compatibilidad con el backend Socket.IO
+// Fallback a VITE_BACKEND_URL y luego a localhost
+const SOCKET_URL = (import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || "http://localhost:3001").replace(/\/+$/, '');
 
 let socket = null;
 
@@ -34,15 +36,14 @@ export function getSocket() {
     }
 
     socket = io(SOCKET_URL, {
-        transports: ["polling", "websocket"], // polling first for better compatibility
+        transports: ["websocket", "polling"], // websocket first, fallback to polling transparently
         reconnectionAttempts: 10,
         reconnectionDelay: 2000,
         reconnectionDelayMax: 10000,
         timeout: 20000,
         autoConnect: true,
         forceNew: false,
-        // Prevent overwhelming the server with failed requests
-        rejectUnauthorized: false, // Allow self-signed certs in development
+        rejectUnauthorized: false,
     });
 
     socket.on("connect", () => {

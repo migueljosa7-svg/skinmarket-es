@@ -405,17 +405,19 @@ export async function handleImageError(event, skin) {
     return;
   }
 
-  // ─── ANTI-BUCLE INFINITO: Máximo 3 reintentos totales ──────────────
+  // ─── ANTI-BUCLE INFINITO: Máximo 2 reintentos totales ──────────────
   var tryCount = parseInt(img.getAttribute('data-try-count'), 10) || 0;
-  if (tryCount >= 3) {
-    // Cancelar todos los eventos de error futuros y poner placeholder silencioso
+  if (tryCount >= 2) {
+    // Cancelar TODOS los eventos de error futuros y poner placeholder silencioso
     img.onerror = null;
-    var fallbackUrl = generatePlaceholderDataUrl(skin && skin.name);
-    img.src = fallbackUrl;
-    img.style.opacity = '0.4';
-    img.style.objectFit = 'contain';
     img.removeAttribute('data-try-index');
     img.removeAttribute('data-try-count');
+    var fallbackUrl = generatePlaceholderDataUrl(skin && skin.name);
+    if (img.src !== fallbackUrl) {
+      img.src = fallbackUrl;
+    }
+    img.style.opacity = '0.4';
+    img.style.objectFit = 'contain';
     return;
   }
   img.setAttribute('data-try-count', tryCount + 1);
@@ -449,59 +451,19 @@ export async function handleImageError(event, skin) {
     return;
   }
 
-  // All CDNs exhausted: Try emergency skin database (Level 1)
-  if (skin && skin.id) {
-    var emergencyUrl = await loadEmergencySkinImage(skin.id);
-    if (emergencyUrl) {
-      img.onerror = null;
-      img.src = emergencyUrl;
-      img.style.opacity = '1';
-      img.style.objectFit = 'contain';
-      img.removeAttribute('data-try-index');
-      img.removeAttribute('data-try-count');
-      return;
-    }
-
-    // No emergency image: Request backend replacement (Level 2 - Critical)
-    var userId = skin.userId || getCurrentUserId();
-    if (userId) {
-      var replacementSkin = await replaceWithValidSkin(skin.id, userId);
-      if (replacementSkin && replacementSkin.image) {
-        // Update the skin object in place if possible
-        if (skin.image !== replacementSkin.image) {
-          skin.image = replacementSkin.image;
-          skin.name = replacementSkin.name;
-        }
-
-        img.onerror = null;
-        img.src = replacementSkin.image;
-        img.style.opacity = '1';
-        img.style.objectFit = 'contain';
-        img.removeAttribute('data-try-index');
-        img.removeAttribute('data-try-count');
-
-        // Dispatch custom event to notify UI of replacement
-        window.dispatchEvent(new CustomEvent('skinReplaced', {
-          detail: { originalSkin: skin, replacementSkin: replacementSkin }
-        }));
-        return;
-      }
-    }
-  }
-
-  // All fallbacks exhausted: silent SVG placeholder fallback
+  // All CDNs exhausted: silent SVG placeholder fallback
   // Disable further error handling to prevent infinite loops
   img.onerror = null;
-
-  // Assign SVG data URL placeholder silently
-  var placeholderUrl = generatePlaceholderDataUrl(skin && skin.name);
-  img.src = placeholderUrl;
-  img.style.opacity = '0.4';
-  img.style.objectFit = 'contain';
-
-  // Remove data-try-index since we've exhausted all sources
   img.removeAttribute('data-try-index');
   img.removeAttribute('data-try-count');
+
+  // Assign SVG data URL placeholder silently — NO 404 errors
+  var placeholderUrl = generatePlaceholderDataUrl(skin && skin.name);
+  if (img.src !== placeholderUrl) {
+    img.src = placeholderUrl;
+  }
+  img.style.opacity = '0.4';
+  img.style.objectFit = 'contain';
 }
 
 /**

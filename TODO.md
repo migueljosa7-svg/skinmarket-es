@@ -1,37 +1,31 @@
-# SPRINT FINAL DE PRODUCCIÓN - COMPLETADO ✅
+# TODO - CORRECCIÓN INTEGRAL - EN PROGRESO
 
-## ✅ PILLAR 1: Bot Stock Fallback en /api/inventory/withdraw
-- ✅ New `/api/validate-trade-url` endpoint - server-side Trade URL validation with partner/token extraction
-- ✅ New `/api/inventory/withdraw-fallback` endpoint with two actions:
-  - **sell**: Sells skin for 100% balance (KeyDrop-style refund when bot has no stock)
-  - **replace**: Finds equivalent skin from catalog within ±10% price range
-- ✅ Both actions wrapped in atomic transactions
-- ✅ Fallback offered automatically when bot is unavailable or trade fails
+## ✅ = Completo | 🔄 = En Progreso | ⬜ = Pendiente
 
-## ✅ PILLAR 2: DB Persistence
-- ✅ `user_item_id` column added to `inventario` table (UNIQUE, indexed)
-- ✅ `replaced` status supported for inventory items
-- ✅ All inventory operations now use DB (no localStorage dependency)
-- ✅ `GET /api/inventory` already reads from DB
+### BLOQUE 1: Sistema de Cajas Diarias → Ruleta con Skin
+- ✅ `server.js` - `/api/claim-daily`: genera skin real, inserta en inventario con transacción atómica, devuelve datos de skin
+- ⬜ `Dashboard.jsx` - `handleClaimDailyReward`: manejar respuesta con skin del backend
+- ⬜ `AuthContext.jsx` - `claimDaily()`: retornar skin en lugar de dinero directo
 
-## ✅ PILLAR 3: Steam Trade URL Validation + Security Bot
-- ✅ `/api/validate-trade-url` validates format, partner ID, token, and Steam URL structure
-- ✅ Returns parsed `steam_id` and `trade_token` for immediate use
-- ✅ Profile update endpoint (`/api/update-profile`) already extracts steam_id + trade_token
-- ✅ Withdraw blocked if Trade URL is missing/unset (already existed)
+### BLOQUE 1.5: APIs Oficiales + Imágenes CDN + Inventario Cero
+- ✅ Steam CDN URLs limpias con `getSkinImageSources()` ya implementado (4-tier fallback)
+- ✅ Placeholder SVG con gradiente por nombre de skin (estilo SkinRave)
+- ✅ Inventario inicial ELIMINADO (0 skins, INITIAL_INVENTORY = [])
+- ✅ INITIAL_INVENTORY eliminado de StorageService.js
 
-## ✅ PILLAR 4: Atomic Transactions (Anti-Fraud)
-- ✅ `FOR UPDATE` row-level locking on inventory item sell (prevents race conditions)
-- ✅ `/api/inventory/sell` wrapped in atomic transaction with `FOR UPDATE`
-- ✅ `/api/cases/open` uses `db.withTransaction` for inventory inserts
-- ✅ `/api/claim-daily` uses `db.withTransaction` for reward distribution
-- ✅ `/api/inventory/withdraw-fallback` uses transaction for both sell and replace
-- ✅ `/api/inventory/add` uses direct DB inserts
+### BLOQUE 2: Fix DB + Render
+- ✅ `db.js` - Parseo robusto de DATABASE_URL (trim, quitar comillas simples/dobles, quitar espacios)
 
-## ✅ BUILD
-- ✅ `npm run build` successful - 574 modules, 6.06s, 0 errors
+### BLOQUE 3: Consola 0 errores
+- ✅ `ImageService.js` - `onerror = null` en fallback final, max 2 retries, sin localStorage dependency
+- ✅ `socket.js` - transports `['websocket', 'polling']`, VITE_API_URL o VITE_BACKEND_URL
 
-## ⏳ PUSH TO GIT
-- [ ] `git add . && git commit -m "feat: 4 pillars - fallback, persistence, trade validation, atomic tx"`
-- [ ] `git push origin master`
+### BLOQUE 4: Inventario DB + Bot + CaseView
+- ⬜ `CaseView.jsx` - `startSpin()` llama a `POST /api/cases/open` (backend, no localStorage)
+- ✅ Trade URL validation estricta en `/api/inventory/withdraw` (verifica steam_id + trade_token)
+
+### BLOQUE 5: npm audit + build + commit + push
+- ⬜ npm audit fix --force frontend + backend
+- ⬜ npm run build (0 errores)
+- ⬜ git add . && commit && push origin master
 

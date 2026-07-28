@@ -11,8 +11,13 @@ dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 const isProduction = process.env.NODE_ENV === 'production';
 
-// Use DATABASE_URL exactly as provided by environment (no modification)
-let databaseUrl = process.env.DATABASE_URL || '';
+// ─── ROBUST DATABASE_URL PARSING ──────────────────────────────────
+// Elimina comillas simples, dobles, espacios en blanco que Render
+// puede inyectar al pasar DATABASE_URL como variable de entorno.
+let databaseUrl = (process.env.DATABASE_URL || '')
+    .trim()
+    .replace(/^["']|["']$/g, '') // Remove surrounding single/double quotes
+    .replace(/\s+/g, '');        // Remove all whitespace
 
 // Fix DNS resolution: append full domain for Render PostgreSQL hosts without dots
 if (databaseUrl && isProduction) {
@@ -22,7 +27,6 @@ if (databaseUrl && isProduction) {
         // If host doesn't contain a dot, it's a short Render hostname - append full domain
         if (host && !host.includes('.')) {
             databaseUrl = databaseUrl.replace(host, host + '.oregon-postgres.render.com');
-            // console.log(`[DB] Fixed hostname: ${host} -> ${host}.oregon-postgres.render.com`);
         }
     }
 }

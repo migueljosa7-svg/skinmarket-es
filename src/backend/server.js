@@ -381,31 +381,67 @@ app.post("/api/claim-daily", authenticateToken, dailyCaseLimiter, async (req, re
     const userLevel = calculateLevel(totalDepositado);
     const dailyCase = getDailyCaseForLevel(userLevel);
 
-    // Calculate reward with random factor (máx 2.00€ para cajas diarias)
-    const baseReward = dailyCase.reward;
-    const randomBonus = Math.random() * baseReward;
-    const reward = parseFloat((baseReward + randomBonus).toFixed(2));
+    // ─── KEYDROP-STYLE: La caja diaria ES UNA CAJA → genera una SKIN real ───
+    // No más dinero directo. El usuario recibe una skin que cae de la ruleta.
+
+    // Determinar rareza basada en nivel (más nivel = mejor rareza)
+    const rarityRoll = Math.random() * 100;
+    const rarityPrices = { "Covert": 50, "Classified": 15, "Restricted": 3, "Mil-Spec Grade": 1 };
+    let rarity, rarityPrice, rarityColor, rarityPrefix;
+    if (userLevel >= 5 && rarityRoll < 8) {
+      rarity = "Covert"; rarityPrice = 50; rarityColor = "#eb4b4b"; rarityPrefix = "Red";
+    } else if (userLevel >= 3 && rarityRoll < 20) {
+      rarity = "Classified"; rarityPrice = 15; rarityColor = "#d32ce6"; rarityPrefix = "Pink";
+    } else if (rarityRoll < 35) {
+      rarity = "Restricted"; rarityPrice = 3; rarityColor = "#8847ff"; rarityPrefix = "Purple";
+    } else {
+      rarity = "Mil-Spec Grade"; rarityPrice = 1; rarityColor = "#4b69ff"; rarityPrefix = "Blue";
+    }
+
+    const weaponNames = ["AK-47", "AWP", "M4A4", "M4A1-S", "Desert Eagle", "USP-S", "Glock-18", "SSG 08", "FAMAS", "P250"];
+    const skinSuffixes = ["Safari Mesh", "Boreal Forest", "Sand Dune", "Predator", "Tornado", "Scorched", "Jungle", "Urban", "Army", "Contractor"];
+    const wearValues = ["Factory New", "Minimal Wear", "Field-Tested", "Well-Worn", "Battle-Scarred"];
+    const randomWeapon = weaponNames[Math.floor(Math.random() * weaponNames.length)];
+    const randomSkin = skinSuffixes[Math.floor(Math.random() * skinSuffixes.length)];
+    const randomWear = wearValues[Math.floor(Math.random() * wearValues.length)];
+    const itemName = `${randomWeapon} | ${randomSkin}`;
+    const itemPrice = parseFloat(((rarityPrices[rarity] || 1) * (0.5 + Math.random() * 1.5)).toFixed(2));
+
+    // Generate mock icon_url for CDN images
+    const mockIconUrl = `-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw`;
+
+    let insertedSkin;
     const expReward = userLevel * 15;
 
-    // TRANSACCIÓN ATÓMICA
+    // TRANSACCIÓN ATÓMICA: Insertar skin en inventario + actualizar experiencia + marcar reclamo
     await db.withTransaction(async (client) => {
+      const insertResult = await client.query(
+        `INSERT INTO inventario (usuario_id, name, price, image, rarity, marketable, wear, weapon, skin_name, market_hash_name, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'on_site')
+         RETURNING item_id as id, name, price, image, rarity, marketable, status`,
+        [req.user.id, itemName, itemPrice,
+         `https://community.cloudflare.steamstatic.com/economy/image/${mockIconUrl}/360fx360f`,
+         rarity, true, randomWear, randomWeapon, randomSkin, itemName]
+      );
+      insertedSkin = insertResult.rows[0];
+
       await client.query(
-        "UPDATE usuarios SET saldo = saldo + $1, experiencia = experiencia + $2, ultimo_reclamo_diario = $3 WHERE usuario_id = $4",
-        [reward, expReward, now, req.user.id]
+        "UPDATE usuarios SET experiencia = experiencia + $1, ultimo_reclamo_diario = $2 WHERE usuario_id = $3",
+        [expReward, now, req.user.id]
       );
     });
 
-    await recordTransaction(req.user.id, 'premio', reward, 'caja_diaria', `Caja diaria nivel ${userLevel}: ${dailyCase.caseLabel}`);
-    await logAction(req.user.id, 'RECLAMAR_CAJA_DIARIA', { level: userLevel, caseId: dailyCase.dailyCaseId, reward });
+    await recordTransaction(req.user.id, 'premio', itemPrice, 'caja_diaria', `Skin de caja diaria nivel ${userLevel}: ${itemName}`);
+    await logAction(req.user.id, 'RECLAMAR_CAJA_DIARIA', { level: userLevel, caseId: dailyCase.dailyCaseId, skin: itemName, price: itemPrice });
 
     res.json({
       success: true,
-      reward,
+      skin: insertedSkin,
       expReward,
       level: userLevel,
       caseId: dailyCase.dailyCaseId,
       caseLabel: dailyCase.caseLabel,
-      message: `🎉 ¡Caja diaria nivel ${userLevel} abierta! +€${reward} +${expReward} EXP`
+      message: `🎉 ¡Caja diaria nivel ${userLevel} abierta! Has ganado: ${itemName} (€${itemPrice}) +${expReward} EXP`
     });
   } catch (err) {
     log(LOG_LEVELS.ERROR, 'SYSTEM', err);
