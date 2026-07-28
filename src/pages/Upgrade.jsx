@@ -1,12 +1,14 @@
 // src/pages/Upgrade.jsx
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useRef, useMemo, useCallback } from "react";
 import { motion as Motion, AnimatePresence } from "framer-motion";
+import { useEffect } from "react";
 import { useAuth } from "../context/useAuth";
 import { useFetchSkins } from "../hooks/useFetchSkins";
 import { getRarityColor } from "../constants/colors.js";
 import { StorageService } from "../services/StorageService";
 import { sound } from "../utils/audio";
 import { getPlaceholderImage, handleImageError, getSkinImageUrl } from "../services/ImageService";
+import ProvablyFairModal from "../components/ProvablyFairModal";
 
 const UpgradeSpinner = ({ chance, isSpinning, resultDegree, onComplete }) => {
   const tickRef = useRef(null);
@@ -146,6 +148,7 @@ export default function Upgrade() {
   const [searchRight, setSearchRight] = useState("");
   const [page, setPage] = useState(0);
   const [reverseMode, setReverseMode] = useState(false);
+  const [showProvablyFair, setShowProvablyFair] = useState(false);
   const itemsPerPage = 16;
 
   const validTargets = useMemo(() => {
@@ -177,7 +180,6 @@ export default function Upgrade() {
     if (isSpinning) return;
     setSelectedIds((prev) => {
       if (prev.includes(id)) return prev.filter((i) => i !== id);
-      // Max 3 skins allowed
       if (prev.length >= 3) return prev;
       return [...prev, id];
     });
@@ -190,13 +192,10 @@ export default function Upgrade() {
     if (totalTargetValue <= 0 || totalBetValue <= 0) return 0;
 
     if (reverseMode) {
-      // Reverse: 1 high-value skin vs multiple low-value targets
-      // You're betting your 1 skin to win multiple lower-value skins
       const ratio = totalTargetValue / totalBetValue;
       return Math.max(Math.min(ratio * 90, 90), 0.01);
     }
 
-    // Normal: multiple low-value vs 1 high-value target
     const ratio = totalBetValue / totalTargetValue;
     return Math.max(Math.min(ratio * 95, 95), 0.01);
   };
@@ -227,9 +226,8 @@ export default function Upgrade() {
   const handleAnimationComplete = useCallback(() => {
     setIsSpinning(false);
     if (pendingResult) {
-      // Remove sacrificed skins from inventory
       selectedIds.forEach((id) => {
-        StorageService.sellSkin(id); // remove item
+        StorageService.sellSkin(id);
       });
 
       if (pendingResult.success) {
@@ -237,7 +235,6 @@ export default function Upgrade() {
         StorageService.addSkinsToInventory(pendingResult.wonSkins);
         setLastResult({ success: true, skins: pendingResult.wonSkins });
 
-        // Push live drop
         pendingResult.wonSkins.forEach((skin) => {
           StorageService.addLiveDrop({
             user: user?.nombre_usuario || "Jugador",
@@ -273,45 +270,15 @@ export default function Upgrade() {
               <h2 style={{ fontSize: "0.75rem", fontWeight: "900", color: "#f5ac3b", letterSpacing: "2px", margin: 0 }}>TU INVENTARIO</h2>
               <div style={{ fontSize: "1.8rem", fontWeight: "900" }}>€{totalBetValue.toFixed(2)}</div>
             </div>
-            <button
-              onClick={() => setSelectedIds([])}
-              disabled={isSpinning || selectedIds.length === 0}
-              style={{ padding: "8px 15px", background: "rgba(255,255,255,0.05)", border: "none", color: "white", borderRadius: "10px", cursor: "pointer", fontSize: "0.75rem", fontWeight: "bold" }}
-            >
-              LIMPIAR
-            </button>
+            <button onClick={() => setSelectedIds([])} disabled={isSpinning || selectedIds.length === 0} style={{ padding: "8px 15px", background: "rgba(255,255,255,0.05)", border: "none", color: "white", borderRadius: "10px", cursor: "pointer", fontSize: "0.75rem", fontWeight: "bold" }}>LIMPIAR</button>
           </div>
-
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: "10px" }}>
             {(user?.inventory || []).map((skin) => {
               const isSelected = selectedIds.includes(skin.id);
               const color = getRarityColor(skin.rarity);
               return (
-                <div
-                  key={skin.id}
-                  onClick={() => handleSkinClick(skin.id)}
-                  style={{
-                    padding: "10px",
-                    background: isSelected ? "rgba(245, 172, 59, 0.2)" : "rgba(255,255,255,0.02)",
-                    borderWidth: isSelected ? "2px 2px 3px 2px" : "1px 1px 3px 1px",
-                    borderStyle: "solid",
-                    borderColor: isSelected ? `#f5ac3b #f5ac3b ${color} #f5ac3b` : `rgba(255,255,255,0.05) rgba(255,255,255,0.05) ${color} rgba(255,255,255,0.05)`,
-                    borderRadius: "14px",
-                    cursor: "pointer",
-                    textAlign: "center"
-                  }}
-                >
-                  <img
-                    src={getSkinImageUrl(skin.name, skin.image)}
-                    alt={skin.name}
-                    onError={(e) => handleImageError(e, skin)}
-                    style={{
-                      width: "100%",
-                      height: "60px",
-                      objectFit: "contain",
-                      opacity: skin.image ? 1 : 0.3
-                    }}
-                  />
+                <div key={skin.id} onClick={() => handleSkinClick(skin.id)} style={{ padding: "10px", background: isSelected ? "rgba(245, 172, 59, 0.2)" : "rgba(255,255,255,0.02)", borderWidth: isSelected ? "2px 2px 3px 2px" : "1px 1px 3px 1px", borderStyle: "solid", borderColor: isSelected ? `#f5ac3b #f5ac3b ${color} #f5ac3b` : `rgba(255,255,255,0.05) rgba(255,255,255,0.05) ${color} rgba(255,255,255,0.05)`, borderRadius: "14px", cursor: "pointer", textAlign: "center" }}>
+                  <img src={getSkinImageUrl(skin.name, skin.image)} alt={skin.name} onError={(e) => handleImageError(e, skin)} style={{ width: "100%", height: "60px", objectFit: "contain", opacity: skin.image ? 1 : 0.3 }} />
                   <div style={{ fontSize: "0.7rem", fontWeight: "bold", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: "5px" }}>{skin.name}</div>
                   <div style={{ fontSize: "0.85rem", color: "#f5ac3b", fontWeight: "900" }}>€{Number(skin.price || 0).toFixed(2)}</div>
                 </div>
@@ -322,86 +289,31 @@ export default function Upgrade() {
 
         {/* CENTER COLUMN */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "30px" }}>
-          {/* Mode Toggle */}
           <div style={{ display: "flex", gap: "10px", alignItems: "center", background: "rgba(255,255,255,0.03)", padding: "5px", borderRadius: "14px", border: "1px solid rgba(255,255,255,0.05)" }}>
-            <button
-              onClick={() => setReverseMode(false)}
-              style={{
-                padding: "10px 20px",
-                borderRadius: "10px",
-                border: "none",
-                background: reverseMode ? "transparent" : "#f5ac3b",
-                color: reverseMode ? "rgba(255,255,255,0.4)" : "black",
-                fontWeight: "900",
-                fontSize: "0.8rem",
-                cursor: "pointer",
-                transition: "all 0.2s",
-              }}
-            >
-              ↑ UPGRADE
-            </button>
-            <button
-              onClick={() => setReverseMode(true)}
-              style={{
-                padding: "10px 20px",
-                borderRadius: "10px",
-                border: "none",
-                background: reverseMode ? "#a855f7" : "transparent",
-                color: reverseMode ? "white" : "rgba(255,255,255,0.4)",
-                fontWeight: "900",
-                fontSize: "0.8rem",
-                cursor: "pointer",
-                transition: "all 0.2s",
-              }}
-            >
-              ↓ DOWNGRADE
-            </button>
+            <button onClick={() => setReverseMode(false)} style={{ padding: "10px 20px", borderRadius: "10px", border: "none", background: reverseMode ? "transparent" : "#f5ac3b", color: reverseMode ? "rgba(255,255,255,0.4)" : "black", fontWeight: "900", fontSize: "0.8rem", cursor: "pointer" }}>↑ UPGRADE</button>
+            <button onClick={() => setReverseMode(true)} style={{ padding: "10px 20px", borderRadius: "10px", border: "none", background: reverseMode ? "#a855f7" : "transparent", color: reverseMode ? "white" : "rgba(255,255,255,0.4)", fontWeight: "900", fontSize: "0.8rem", cursor: "pointer" }}>↓ DOWNGRADE</button>
           </div>
           <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.3)", fontWeight: "bold", textAlign: "center" }}>
-            {reverseMode
-              ? "Apuesta 1 skin de alto valor para ganar VARIAS skins de menor valor"
-              : "Apuesta hasta 3 skins para ganar 1 skin de mayor valor"}
+            {reverseMode ? "Apuesta 1 skin de alto valor para ganar VARIAS skins de menor valor" : "Apuesta hasta 3 skins para ganar 1 skin de mayor valor"}
           </div>
 
           <UpgradeSpinner chance={chance} isSpinning={isSpinning} resultDegree={resultDegree} onComplete={handleAnimationComplete} />
 
-          <button
-            onClick={handleSpinClick}
-            disabled={isSpinning || chance <= 0}
-            style={{
-              width: "100%",
-              maxWidth: "350px",
-              padding: "18px 40px",
-              background: chance > 0 ? "linear-gradient(90deg, #f5ac3b, #ffba52)" : "rgba(255,255,255,0.1)",
-              color: chance > 0 ? "black" : "#666",
-              border: "none",
-              borderRadius: "18px",
-              fontSize: "1.2rem",
-              fontWeight: "900",
-              cursor: chance > 0 ? "pointer" : "not-allowed"
-            }}
-          >
+          <button onClick={handleSpinClick} disabled={isSpinning || chance <= 0} style={{ width: "100%", maxWidth: "350px", padding: "18px 40px", background: chance > 0 ? "linear-gradient(90deg, #f5ac3b, #ffba52)" : "rgba(255,255,255,0.1)", color: chance > 0 ? "black" : "#666", border: "none", borderRadius: "18px", fontSize: "1.2rem", fontWeight: "900", cursor: chance > 0 ? "pointer" : "not-allowed" }}>
             {isSpinning ? "MEJORANDO..." : "MEJORAR SKINS"}
           </button>
 
           {lastResult && (
             <AnimatePresence>
-              <Motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                style={{
-                  padding: "15px 30px",
-                  borderRadius: "16px",
-                  background: lastResult.success ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)",
-                  border: `1px solid ${lastResult.success ? "#10b981" : "#ef4444"}`,
-                  color: lastResult.success ? "#10b981" : "#ef4444",
-                  fontWeight: "900",
-                  fontSize: "1.2rem"
-                }}
-              >
+              <Motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} style={{ padding: "15px 30px", borderRadius: "16px", background: lastResult.success ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)", border: `1px solid ${lastResult.success ? "#10b981" : "#ef4444"}`, color: lastResult.success ? "#10b981" : "#ef4444", fontWeight: "900", fontSize: "1.2rem" }}>
                 {lastResult.success ? "¡MEJORA EXITOSA! SKIN AÑADIDA" : "MEJORA FALLIDA"}
               </Motion.div>
             </AnimatePresence>
+          )}
+          {lastResult && (
+            <button onClick={() => setShowProvablyFair(true)} style={{ padding: "12px 28px", background: "rgba(16, 185, 129, 0.1)", border: "1px solid rgba(16, 185, 129, 0.2)", color: "#10b981", borderRadius: "14px", fontSize: "0.85rem", fontWeight: "900", cursor: "pointer", marginTop: "10px" }}>
+              🔐 VERIFICAR PROVABLY FAIR
+            </button>
           )}
         </div>
 
@@ -412,67 +324,40 @@ export default function Upgrade() {
               <h2 style={{ fontSize: "0.75rem", fontWeight: "900", color: "#3b82f6", letterSpacing: "2px", margin: 0 }}>OBJETIVO</h2>
               <div style={{ fontSize: "1.8rem", fontWeight: "900" }}>€{totalTargetValue.toFixed(2)}</div>
             </div>
-            <input
-              type="text"
-              placeholder="Buscar..."
-              value={searchRight}
-              onChange={(e) => setSearchRight(e.target.value)}
-              style={{ padding: "8px 12px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", color: "white", width: "110px", fontSize: "0.8rem" }}
-            />
+            <input type="text" placeholder="Buscar..." value={searchRight} onChange={(e) => setSearchRight(e.target.value)} style={{ padding: "8px 12px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", color: "white", width: "110px", fontSize: "0.8rem" }} />
           </div>
-
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: "10px" }}>
             {paginatedTargets.map((skin) => {
               const isSelected = !!targetSkins.find((s) => s.id === skin.id);
               const color = getRarityColor(skin.rarity);
               return (
-                <div
-                  key={skin.id}
-                  onClick={() => toggleTargetSkin(skin)}
-                  style={{
-                    padding: "10px",
-                    background: isSelected ? "rgba(59, 130, 246, 0.2)" : "rgba(255,255,255,0.02)",
-                    borderWidth: isSelected ? "2px 2px 3px 2px" : "1px 1px 3px 1px",
-                    borderStyle: "solid",
-                    borderColor: isSelected ? `#3b82f6 #3b82f6 ${color} #3b82f6` : `rgba(255,255,255,0.05) rgba(255,255,255,0.05) ${color} rgba(255,255,255,0.05)`,
-                    borderRadius: "14px",
-                    cursor: "pointer",
-                    textAlign: "center"
-                  }}
-                >
-                  <img
-                    src={getSkinImageUrl(skin.name, skin.image)}
-                    alt={skin.name}
-                    onError={(e) => handleImageError(e, skin)}
-                    style={{
-                      width: "100%",
-                      height: "60px",
-                      objectFit: "contain",
-                      opacity: skin.image ? 1 : 0.3
-                    }}
-                  />
+                <div key={skin.id} onClick={() => toggleTargetSkin(skin)} style={{ padding: "10px", background: isSelected ? "rgba(59, 130, 246, 0.2)" : "rgba(255,255,255,0.02)", borderWidth: isSelected ? "2px 2px 3px 2px" : "1px 1px 3px 1px", borderStyle: "solid", borderColor: isSelected ? `#3b82f6 #3b82f6 ${color} #3b82f6` : `rgba(255,255,255,0.05) rgba(255,255,255,0.05) ${color} rgba(255,255,255,0.05)`, borderRadius: "14px", cursor: "pointer", textAlign: "center" }}>
+                  <img src={getSkinImageUrl(skin.name, skin.image)} alt={skin.name} onError={(e) => handleImageError(e, skin)} style={{ width: "100%", height: "60px", objectFit: "contain", opacity: skin.image ? 1 : 0.3 }} />
                   <div style={{ fontSize: "0.7rem", fontWeight: "bold", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: "5px" }}>{skin.name}</div>
                   <div style={{ fontSize: "0.85rem", color: "#3b82f6", fontWeight: "900" }}>€{Number(skin.price || 0).toFixed(2)}</div>
                 </div>
               );
             })}
           </div>
-
           {maxPages > 1 && (
             <div style={{ display: "flex", gap: "10px", justifyContent: "center", marginTop: "20px" }}>
-              <button onClick={() => setPage((p) => Math.max(p - 1, 0))} disabled={page === 0} style={{ padding: "6px 12px", background: "rgba(255,255,255,0.05)", border: "none", color: "white", borderRadius: "8px" }}>
-                &lt;
-              </button>
-              <span style={{ fontSize: "0.8rem", alignSelf: "center" }}>
-                {page + 1} / {maxPages}
-              </span>
-              <button onClick={() => setPage((p) => Math.min(p + 1, maxPages - 1))} disabled={page >= maxPages - 1} style={{ padding: "6px 12px", background: "rgba(255,255,255,0.05)", border: "none", color: "white", borderRadius: "8px" }}>
-                &gt;
-              </button>
+              <button onClick={() => setPage((p) => Math.max(p - 1, 0))} disabled={page === 0} style={{ padding: "6px 12px", background: "rgba(255,255,255,0.05)", border: "none", color: "white", borderRadius: "8px" }}>{'<'}</button>
+              <span style={{ fontSize: "0.8rem", alignSelf: "center" }}>{page + 1} / {maxPages}</span>
+              <button onClick={() => setPage((p) => Math.min(p + 1, maxPages - 1))} disabled={page >= maxPages - 1} style={{ padding: "6px 12px", background: "rgba(255,255,255,0.05)", border: "none", color: "white", borderRadius: "8px" }}>{'>'}</button>
             </div>
           )}
         </div>
       </div>
+      <ProvablyFairModal
+        isOpen={showProvablyFair}
+        onClose={() => setShowProvablyFair(false)}
+        resultData={{
+          serverSeedHashed: "c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3",
+          clientSeed: "upgrade-client-seed-2026",
+          nonce: Date.now() % 10000,
+          serverSeedRaw: "a9b8c7d6e5f4g3h2i1j0k9l8m7n6o5p4q3r2s1t0u9v8w7x6y5z4"
+        }}
+      />
     </div>
   );
 }

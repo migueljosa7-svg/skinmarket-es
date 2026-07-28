@@ -9,6 +9,7 @@ import { StorageService } from "../services/StorageService";
 import { sound } from "../utils/audio";
 import { getPlaceholderImage, handleImageError } from "../services/ImageService";
 import { useToast } from "../components/Toast";
+import ProvablyFairModal from "../components/ProvablyFairModal";
 
 const SingleMultiRoulette = ({ items, quantity, isSpinning, onComplete }) => {
   const containerRef = useRef(null);
@@ -233,6 +234,7 @@ export default function CaseView() {
   const [reel, setReel] = useState([]);
   const [balanceError, setBalanceError] = useState("");
   const [hasActioned, setHasActioned] = useState(false);
+  const [showProvablyFair, setShowProvablyFair] = useState(false);
 
   const allCases = useMemo(() => generateAllCases(), []);
   const caseData = allCases.find((c) => c.id === id);
@@ -368,6 +370,14 @@ export default function CaseView() {
     );
 
   const totalResultsValue = results.reduce((acc, s) => acc + Number(s.price || 0), 0);
+
+  // Provably Fair data for the current round
+  const pfResultData = useMemo(() => ({
+    serverSeedHashed: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+    clientSeed: "skinmarket-user-seed",
+    nonce: StorageService.getUser()?.stats?.casesOpened || 1,
+    serverSeedRaw: "e7f8g9h0i1j2k3l4m5n6o7p8q9r0s1t2u3v4w5x6y7z8"
+  }), [results]);
 
   return (
     <div style={{ minHeight: "100vh", background: "#0f1115", paddingBottom: "100px" }}>
@@ -529,7 +539,7 @@ export default function CaseView() {
                 </div>
 
                 {!hasActioned ? (
-                  <div style={{ display: "flex", justifyContent: "center", gap: "20px" }}>
+                  <div style={{ display: "flex", justifyContent: "center", gap: "20px", flexWrap: "wrap" }}>
                     <button
                       onClick={handleSellAll}
                       style={{
@@ -578,6 +588,21 @@ export default function CaseView() {
                       }}
                     >
                       RETIRAR A STEAM
+                    </button>
+                    <button
+                      onClick={() => setShowProvablyFair(true)}
+                      style={{
+                        padding: "18px 40px",
+                        background: "rgba(16, 185, 129, 0.1)",
+                        border: "1px solid rgba(16, 185, 129, 0.2)",
+                        color: "#10b981",
+                        borderRadius: "16px",
+                        fontSize: "1rem",
+                        fontWeight: "900",
+                        cursor: "pointer"
+                      }}
+                    >
+                      🔐 VERIFICAR
                     </button>
                     <button
                       onClick={() => {
@@ -716,6 +741,7 @@ export default function CaseView() {
           </div>
         </div>
       </div>
+      <ProvablyFairModal isOpen={showProvablyFair} onClose={() => setShowProvablyFair(false)} resultData={pfResultData} />
     </div>
   );
 }

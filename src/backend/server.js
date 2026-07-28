@@ -1082,3 +1082,131 @@ app.post("/api/admin/refresh-prices", authenticateToken, isAdmin, async (req, re
     res.json({ success: true, message: "Caché de precios actualizada correctamente." });
   } catch (err) { res.status(500).json({ error: "Error al refrescar precios" }); }
 });
+
+// ─── CS2 PRICE SYNC ENGINE ──────────────────────────────
+// Endpoint público para sincronizar precios de skins desde CSGO-API / PriceEmpire
+// Se ejecuta también como tarea periódica vía node-cron
+app.get("/api/skins/sync-market-prices", async (req, res) => {
+  try {
+    log(LOG_LEVELS.INFO, 'PRICE_SYNC', 'Iniciando sincronización de precios CS2...');
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    // Intentar obtener precios desde la API pública de CSGO-API (sin key)
+    const response = await fetch(
+      'https://csgo-api.vercel.app/api/skins/prices',
+      {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Accept": "application/json"
+        },
+        signal: controller.signal
+      }
+    );
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      // Fallback: intentar con PriceEmpire API
+      log(LOG_LEVELS.WARN, 'PRICE_SYNC', 'CSGO-API falló, intentando PriceEmpire...');
+      const fallbackController = new AbortController();
+      const fallbackTimeout = setTimeout(() => fallbackController.abort(), 30000);
+
+      const fallbackResponse = await fetch(
+        'https://api.priceempire.com/v1/skins/prices?appid=730',
+        {
+          headers: {
+            "User-Agent": "Mozilla/5.0",
+            "Accept": "application/json"
+          },
+          signal: fallbackController.signal
+        }
+      );
+
+      clearTimeout(fallbackTimeout);
+
+      if (!fallbackResponse.ok) {
+        return res.status(502).json({
+          success: false,
+          error: "No se pudieron obtener precios de mercado. Las APIs externas no responden.",
+          code: "PRICE_API_UNAVAILABLE"
+        });
+      }
+
+      const fallbackData = await fallbackResponse.json();
+      log(LOG_LEVELS.INFO, 'PRICE_SYNC', `PriceEmpire respondió con ${fallbackData?.length || 0} precios`);
+
+      // Actualizar precios en la base de datos
+      if (Array.isArray(fallbackData) && fallbackData.length > 0) {
+        let updated = 0;
+        for (const item of fallbackData.slice(0, 500)) {
+          if (item.market_hash_name && item.price) {
+            try {
+              await db.query(
+                "UPDATE inventario SET price = $1 WHERE market_hash_name = $2 AND status = 'on_site'",
+                [parseFloat(item.price), item.market_hash_name]
+              );
+              updated++;
+            } catch (dbErr) {
+              // Ignorar errores individuales
+            }
+          }
+        }
+        log(LOG_LEVELS.INFO, 'PRICE_SYNC', `Precios actualizados: ${updated} skins`);
+        return res.json({ success: true, updated, source: "priceempire", total: fallbackData.length });
+      }
+
+      return res.json({ success: true, updated: 0, source: "priceempire", message: "Sin datos de precios disponibles" });
+    }
+
+    const data = await response.json();
+    log(LOG_LEVELS.INFO, 'PRICE_SYNC', `CSGO-API respondió con ${data?.length || 0} precios`);
+
+    // Actualizar precios en la base de datos
+    if (Array.isArray(data) && data.length > 0) {
+      let updated = 0;
+      for (const item of data.slice(0, 500)) {
+        if (item.market_hash_name && item.price) {
+          try {
+            await db.query(
+              "UPDATE inventario SET price = $1 WHERE market_hash_name = $2 AND status = 'on_site'",
+              [parseFloat(item.price), item.market_hash_name]
+            );
+            updated++;
+          } catch (dbErr) {
+            // Ignorar errores individuales
+          }
+        }
+      }
+      log(LOG_LEVELS.INFO, 'PRICE_SYNC', `Precios actualizados: ${updated} skins`);
+      return res.json({ success: true, updated, source: "csgo-api", total: data.length });
+    }
+
+    res.json({ success: true, updated: 0, source: "csgo-api", message: "Sin datos de precios disponibles" });
+  } catch (err) {
+    log(LOG_LEVELS.ERROR, 'PRICE_SYNC', 'Error en sincronización de precios', { error: err.message });
+    if (err.name === 'AbortError') {
+      return res.status(504).json({ error: "Timeout al consultar APIs de precios", code: "TIMEOUT" });
+    }
+    res.status(500).json({ error: "Error al sincronizar precios", details: err.message });
+  }
+});
+
+// Tarea periódica: sincronizar precios cada 6 horas
+cron.schedule("0 */6 * * *", async () => {
+  log(LOG_LEVELS.INFO, 'PRICE_SYNC', 'Ejecutando tarea programada de sincronización de precios...');
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const response = await fetch(
+      `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/skins/sync-market-prices`,
+      { signal: controller.signal }
+    );
+    clearTimeout(timeoutId);
+    const result = await response.json();
+    log(LOG_LEVELS.INFO, 'PRICE_SYNC', `Sincronización programada completada: ${JSON.stringify(result)}`);
+  } catch (err) {
+    log(LOG_LEVELS.ERROR, 'PRICE_SYNC', 'Error en tarea programada de precios', { error: err.message });
+  }
+});
