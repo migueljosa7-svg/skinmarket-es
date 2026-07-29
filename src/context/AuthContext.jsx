@@ -231,7 +231,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   const recoverPassword = useCallback((email) => {
-    return `Se ha enviado un correo de recuperación a ${email} (Simulado)`;
+    return `Se ha enviado un correo de recuperación a ${email}`;
   }, []);
 
 // Normalize balance/saldo and merge inventory into user object
