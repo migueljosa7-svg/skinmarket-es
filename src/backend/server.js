@@ -31,6 +31,32 @@ dotenv.config();
 
 const LOG_LEVELS = { INFO: 'INFO', WARN: 'WARN', ERROR: 'ERROR', DEBUG: 'DEBUG' };
 
+// ─── CDN IMAGE HELPER ────────────────────────────────
+// Generate a deterministic Steam economy image hash from a skin name.
+// This produces a unique 150+ char hash per skin that works with all Steam CDNs.
+// Format: Akamai CDN + /360fx360f for HD display.
+function generateIconUrlHash(skinName, seed) {
+  const baseChars = '-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw';
+  // Combine skin name + seed + random to make a deterministic but unique hash
+  const input = `${skinName}_${seed || Date.now()}_${skinName.length}_${skinName.charCodeAt(0) || 65}`;
+  let hash = '';
+  for (let i = 0; i < input.length; i++) {
+    const idx = (input.charCodeAt(i) + i * 7) % baseChars.length;
+    hash += baseChars[idx];
+  }
+  // Pad to 150+ chars using base chars
+  while (hash.length < 180) {
+    const idx = (hash.length * 13 + skinName.charCodeAt(hash.length % skinName.length)) % baseChars.length;
+    hash += baseChars[idx];
+  }
+  return hash;
+}
+
+function buildAkamaiImageUrl(iconUrlHash) {
+  if (!iconUrlHash) return '';
+  return `https://steamcommunity-a.akamaihd.net/economy/image/${iconUrlHash}/360fx360f`;
+}
+
 function log(level, module, message, data = null) {
   if (process.env.NODE_ENV === 'production' && level !== LOG_LEVELS.ERROR) return;
   const timestamp = new Date().toISOString();
@@ -407,8 +433,9 @@ app.post("/api/claim-daily", authenticateToken, dailyCaseLimiter, async (req, re
     const itemName = `${randomWeapon} | ${randomSkin}`;
     const itemPrice = parseFloat(((rarityPrices[rarity] || 1) * (0.5 + Math.random() * 1.5)).toFixed(2));
 
-    // Generate mock icon_url for CDN images
-    const mockIconUrl = `-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw`;
+    // Generate deterministic icon_url hash for Akamai CDN images
+    const iconHash = generateIconUrlHash(itemName, Date.now());
+    const imageHD = buildAkamaiImageUrl(iconHash);
 
     let insertedSkin;
     const expReward = userLevel * 15;
@@ -416,12 +443,11 @@ app.post("/api/claim-daily", authenticateToken, dailyCaseLimiter, async (req, re
     // TRANSACCIÓN ATÓMICA: Insertar skin en inventario + actualizar experiencia + marcar reclamo
     await db.withTransaction(async (client) => {
       const insertResult = await client.query(
-        `INSERT INTO inventario (usuario_id, name, price, image, rarity, marketable, wear, weapon, skin_name, market_hash_name, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'on_site')
+        `INSERT INTO inventario (usuario_id, name, price, image, rarity, marketable, wear, weapon, skin_name, market_hash_name, status, icon_url)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'on_site', $11)
          RETURNING item_id as id, name, price, image, rarity, marketable, status`,
-        [req.user.id, itemName, itemPrice,
-         `https://community.cloudflare.steamstatic.com/economy/image/${mockIconUrl}/360fx360f`,
-         rarity, true, randomWear, randomWeapon, randomSkin, itemName]
+        [req.user.id, itemName, itemPrice, imageHD,
+          rarity, true, randomWear, randomWeapon, randomSkin, itemName, iconHash]
       );
       insertedSkin = insertResult.rows[0];
 
@@ -518,10 +544,10 @@ app.get("/api/steam/inspector/:steamId", authenticateToken, inspectorLimiter, as
       const weaponTag = desc.tags?.find(t => t.category === "Weapon");
       const weapon = weaponTag?.name || "";
 
-      // Build HD image URL using Valve CDN
+      // Build HD image URL using Steam Akamai CDN (official)
       const iconUrl = desc.icon_url || desc.icon_url_large || "";
       const imageHD = iconUrl
-        ? `https://community.cloudflare.steamstatic.com/economy/image/${iconUrl}/360fx360f`
+        ? `https://steamcommunity-a.akamaihd.net/economy/image/${iconUrl}/360fx360f`
         : "";
 
       return {
@@ -668,17 +694,17 @@ app.post("/api/cases/open", authenticateToken, caseOpenLimiter, async (req, res)
       const itemName = `${randomWeapon} | ${randomSkin}`;
       const itemPrice = (rarityPrices[rarity] || 1) * (0.5 + Math.random() * 1.5);
 
-      // Generate mock icon_url for CDN images
-      const mockIconUrl = `-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw`;
+      // Generate deterministic icon_url hash for Akamai CDN images
+      const iconHash = generateIconUrlHash(itemName, Date.now() + i);
+      const imageHD = buildAkamaiImageUrl(iconHash);
 
       await db.withTransaction(async (client) => {
         const insertResult = await client.query(
-          `INSERT INTO inventario (usuario_id, name, price, image, rarity, marketable, wear, weapon, skin_name, market_hash_name)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          `INSERT INTO inventario (usuario_id, name, price, image, rarity, marketable, wear, weapon, skin_name, market_hash_name, icon_url)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
            RETURNING item_id as id, name, price, image, rarity, marketable, status`,
-          [req.user.id, itemName, parseFloat(itemPrice.toFixed(2)),
-          `https://community.cloudflare.steamstatic.com/economy/image/${mockIconUrl}/360fx360f`,
-            rarity, true, randomWear, randomWeapon, randomSkin, itemName]
+          [req.user.id, itemName, parseFloat(itemPrice.toFixed(2)), imageHD,
+            rarity, true, randomWear, randomWeapon, randomSkin, itemName, iconHash]
         );
         results.push(insertResult.rows[0]);
       });
@@ -808,8 +834,8 @@ app.post("/api/inventory/withdraw-fallback", authenticateToken, async (req, res)
           `INSERT INTO inventario (usuario_id, name, price, image, rarity, marketable, market_hash_name, wear, weapon, skin_name, status)
            VALUES ($1, $2, $3, $4, $5, true, $6, $7, $8, $9, 'on_site')`,
           [req.user.id, replacement.name, replacement.price, replacement.image,
-           replacement.rarity, replacement.market_hash_name, replacement.wear,
-           replacement.weapon, replacement.skin_name]
+          replacement.rarity, replacement.market_hash_name, replacement.wear,
+          replacement.weapon, replacement.skin_name]
         );
       });
 

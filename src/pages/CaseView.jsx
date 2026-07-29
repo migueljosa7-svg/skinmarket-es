@@ -7,9 +7,22 @@ import { useFetchSkins } from "../hooks/useFetchSkins";
 import { getRarityColor } from "../constants/colors.js";
 import { StorageService } from "../services/StorageService";
 import { sound } from "../utils/audio";
-import { getPlaceholderImage, handleImageError } from "../services/ImageService";
+import { getPlaceholderImage, getSkinImageUrl, handleImageError } from "../services/ImageService";
 import { useToast } from "../components/Toast";
 import ProvablyFairModal from "../components/ProvablyFairModal";
+
+const API_BASE = import.meta.env.VITE_API_URL || "";
+
+function getAuthToken() {
+  try {
+    const raw = localStorage.getItem("skinmarket_db_v1");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return parsed?.user?.token || null;
+    }
+  } catch (e) { }
+  return null;
+}
 
 const SingleMultiRoulette = React.memo(({ items, quantity, isSpinning, onComplete }) => {
   const containerRef = useRef(null);
@@ -58,19 +71,14 @@ const SingleMultiRoulette = React.memo(({ items, quantity, isSpinning, onComplet
   return (
     <div
       style={{
-        width: "100%",
-        height: "220px",
-        background: "#0c0d10",
-        backgroundImage: `linear-gradient(rgba(12, 13, 16, 0.8), rgba(12, 13, 16, 0.8)), var(--case-gradient, none)`,
-        border: "1px solid rgba(255,255,255,0.05)",
-        borderRadius: "24px",
         position: "relative",
+        width: "100%",
+        height: "200px",
         overflow: "hidden",
-        display: "flex",
-        alignItems: "center",
-        boxShadow: "inset 0 0 50px rgba(0,0,0,0.5)"
+        borderRadius: "24px"
       }}
     >
+      {/* Selector indicator */}
       <div
         style={{
           position: "absolute",
@@ -117,6 +125,7 @@ const SingleMultiRoulette = React.memo(({ items, quantity, isSpinning, onComplet
         />
       </div>
 
+      {/* Edge fade gradient */}
       <div
         style={{
           position: "absolute",
@@ -127,6 +136,7 @@ const SingleMultiRoulette = React.memo(({ items, quantity, isSpinning, onComplet
         }}
       />
 
+      {/* Reel container */}
       <div
         ref={containerRef}
         style={{
@@ -185,16 +195,6 @@ const SingleMultiRoulette = React.memo(({ items, quantity, isSpinning, onComplet
                 }}
               />
               <div
-                style={{
-                  color: "rgba(255,255,255,0.5)",
-                  fontSize: "0.6rem",
-                  textAlign: "center",
-                  width: "100%",
-                  overflow: "hidden",
-                  whiteSpace: "nowrap",
-                  textOverflow: "ellipsis",
-                  textTransform: "uppercase"
-                }}
               >
                 {skin.name ? skin.name.split(" | ")[0] : "SKIN"}
               </div>

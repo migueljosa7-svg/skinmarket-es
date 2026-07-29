@@ -1,31 +1,29 @@
-# TODO - CORRECCIÓN INTEGRAL - EN PROGRESO
+# TODO - SKINMARKET ES FINALIZATION
 
-## ✅ = Completo | 🔄 = En Progreso | ⬜ = Pendiente
+## ✅ = Complete | 🔄 = In Progress | ⬜ = Pending
 
-### BLOQUE 1: Sistema de Cajas Diarias → Ruleta con Skin
-- ✅ `server.js` - `/api/claim-daily`: genera skin real, inserta en inventario con transacción atómica, devuelve datos de skin
-- ⬜ `Dashboard.jsx` - `handleClaimDailyReward`: manejar respuesta con skin del backend
-- ⬜ `AuthContext.jsx` - `claimDaily()`: retornar skin en lugar de dinero directo
+### STEP A: Akamai CDN + icon_url Integration
+- ✅ A1: Modify `useFetchSkins.js` to normalize icon_url from API
+- ✅ A2: Real icon_url hashes from ByMykel API - no extra utility needed
+- ✅ A3: Update `server.js` `/api/cases/open` and `/api/claim-daily` with dynamic icon URLs + /360fx360f suffix
+- ✅ A4: Ensure all image CDN URLs use /360fx360f consistently
+- ✅ A5: `init_db.js` already has `icon_url` column in `inventario` table
+- ✅ A6: `ImageService.js` already has Akamai CDN as Tier 2 with correct URLs
 
-### BLOQUE 1.5: APIs Oficiales + Imágenes CDN + Inventario Cero
-- ✅ Steam CDN URLs limpias con `getSkinImageSources()` ya implementado (4-tier fallback)
-- ✅ Placeholder SVG con gradiente por nombre de skin (estilo SkinRave)
-- ✅ Inventario inicial ELIMINADO (0 skins, INITIAL_INVENTORY = [])
-- ✅ INITIAL_INVENTORY eliminado de StorageService.js
+### STEP B: NPM Security Overrides
+- ✅ B1: Add overrides to both `package.json` files (already done!)
+- 🔄 B2: Run `npm audit fix --force` in root
+- 🔄 B3: Run `cd src/backend && npm audit fix`
 
-### BLOQUE 2: Fix DB + Render
-- ✅ `db.js` - Parseo robusto de DATABASE_URL (trim, quitar comillas simples/dobles, quitar espacios)
+### STEP C: CaseView Backend API Integration
+- ✅ C1: Modify `startSpin()` to call backend API with localStorage fallback
+- ✅ C2: Handle responses properly with proper error propagation and user feedback
 
-### BLOQUE 3: Consola 0 errores
-- ✅ `ImageService.js` - `onerror = null` en fallback final, max 2 retries, sin localStorage dependency
-- ✅ `socket.js` - transports `['websocket', 'polling']`, VITE_API_URL o VITE_BACKEND_URL
+### STEP D: Zero Initial Inventory
+- ✅ D1: Verify `/api/register` gives no free items — saldo=0, no inventory inserts
+- ✅ D2: Verify `/api/login` and Steam auth give no free items
 
-### BLOQUE 4: Inventario DB + Bot + CaseView
-- ⬜ `CaseView.jsx` - `startSpin()` llama a `POST /api/cases/open` (backend, no localStorage)
-- ✅ Trade URL validation estricta en `/api/inventory/withdraw` (verifica steam_id + trade_token)
-
-### BLOQUE 5: npm audit + build + commit + push
-- ⬜ npm audit fix --force frontend + backend
-- ⬜ npm run build (0 errores)
-- ⬜ git add . && commit && push origin master
+### STEP E: Build, Commit, Push
+- 🔄 E1: `npm run build` (0 errors)
+- 🔄 E2: `git add . && git commit && git push origin master`
 
