@@ -28,7 +28,6 @@ export default defineConfig({
           vendor: ['react', 'react-dom', 'react-router-dom'],
           animation: ['framer-motion'],
           icons: ['react-icons'],
-          ui: ['react-circular-progressbar', 'react-slick', 'slick-carousel'],
           socket: ['socket.io-client'],
         },
       },
