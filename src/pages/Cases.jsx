@@ -5,7 +5,7 @@ import { generateAllCases } from "../constants/cases.js";
 import { useFetchSkins } from "../hooks/useFetchSkins";
 import { getRarityColor } from "../constants/colors";
 import { StorageService } from "../services/StorageService";
-import { getPlaceholderImage, handleImageError } from "../services/ImageService";
+import { handleImageError, getSkinImageUrl } from "../services/ImageService";
 import { useAuth } from "../context/useAuth";
 import { useToast } from "../components/Toast";
 
@@ -220,6 +220,7 @@ const CaseCard = ({ c, skinsPool, onClick }) => {
         <div style={{ display: "flex", gap: "5px", justifyContent: "center" }}>
           {skins.map((skin, i) => (
             <img
+              key={`casecard-${skin.id || skin._id || i}`}
               src={getSkinImageUrl(skin.name, skin.image)}
               alt={skin.name}
               onError={(e) => handleImageError(e, skin)}
@@ -246,7 +247,7 @@ const CaseCard = ({ c, skinsPool, onClick }) => {
 export default function Cases() {
   const navigate = useNavigate();
   const toast = useToast();
-  const { user, claimDaily, addToBalance } = useAuth();
+  const { user, claimDaily } = useAuth();
   const { skins: allSkins } = useFetchSkins(2000, true);
   const [filterCategory, setFilterCategory] = useState("todos");
   const [searchTerm, setSearchTerm] = useState("");

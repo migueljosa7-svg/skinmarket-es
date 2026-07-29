@@ -96,7 +96,7 @@ const MiniBattleRoulette = ({ items, accentColor }) => {
           const rc = getRarityColor(skin.rarity);
           return (
             <div
-              key={skin.id || `minibattle-${idx}`}
+              key={`minibattle-${skin.id || skin._id || idx}`}
               style={{
                 minWidth: "110px",
                 height: "110px",

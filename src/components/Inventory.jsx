@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useAuth } from "../context/useAuth";
 import { getRarityColor } from "../constants/colors.js";
-import { getPlaceholderImage, handleImageError, getSkinImageUrl } from "../services/ImageService";
+import { handleImageError, getSkinImageUrl } from "../services/ImageService";
 import { useToast } from "./Toast";
 import { motion as Motion, AnimatePresence } from "framer-motion";
 
@@ -305,12 +305,12 @@ export default function Inventory() {
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "20px" }}>
-            {inventory.map((skin) => {
+            {inventory.map((skin, index) => {
               const color = getRarityColor(skin.rarity);
               const isPending = skin.status === "pending_withdraw" || skin.status === "withdrawing" || skin.status === "withdrawn";
               return (
                 <div
-                  key={skin.id}
+                  key={`skin-${skin.id || skin._id}-${index}`}
                   style={{
                     background: "rgba(255,255,255,0.02)",
                     borderWidth: "1px 1px 4px 1px",

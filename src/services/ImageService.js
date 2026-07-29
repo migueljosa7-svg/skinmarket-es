@@ -18,9 +18,6 @@
 /** Set of URLs that have failed in this session to prevent infinite retries */
 const failedUrls = new Set();
 
-/** Emergency skin manifest cache (loaded lazily from /images/emergency-skins/manifest.json) */
-let emergencyManifest = null;
-let emergencyManifestLoaded = false;
 
 /** Production mode check for log silencing */
 const isProd = typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'production';
@@ -331,61 +328,26 @@ export function getSkinImageUrlSilent(skinName, originalImage) {
 // ---------------------------------------------------------------------------
 
 /**
- * Try to load emergency skin from local database
+ * Try to load emergency skin from local directory
  * @param {string} skinId - The skin ID to look up
  * @returns {Promise<string|null>} Emergency image URL or null
  */
 async function loadEmergencySkinImage(skinId) {
   try {
-    // Try to load from local emergency skins directory
     const response = await fetch(`/images/emergency-skins/${skinId}.png`);
     if (response.ok) {
       return `/images/emergency-skins/${skinId}.png`;
     }
-
-    // Try webp format
     const responseWebp = await fetch(`/images/emergency-skins/${skinId}.webp`);
     if (responseWebp.ok) {
       return `/images/emergency-skins/${skinId}.webp`;
     }
-
-    // Try jpg format
     const responseJpg = await fetch(`/images/emergency-skins/${skinId}.jpg`);
     if (responseJpg.ok) {
       return `/images/emergency-skins/${skinId}.jpg`;
     }
-  } catch (err) {
+  } catch (_err) {
     // Silent fail - emergency images are optional
-  }
-  return null;
-}
-
-/**
- * Request backend to replace corrupted skin with valid one
- * @param {string} skinId - The corrupted skin ID
- * @param {number} userId - The user ID requesting replacement
- * @returns {Promise<Object|null>} Replacement skin object or null
- */
-async function replaceWithValidSkin(skinId, userId) {
-  try {
-    const token = localStorage.getItem('token');
-    if (!token) return null;
-
-    const response = await fetch('/api/skins/replace-corrupted', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({ skinId, userId })
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      return data.replacementSkin;
-    }
-  } catch (err) {
-    // Silent fail
   }
   return null;
 }

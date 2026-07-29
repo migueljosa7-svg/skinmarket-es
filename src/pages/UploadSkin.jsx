@@ -3,7 +3,7 @@ import { useState, useCallback } from "react";
 import { useAuth } from "../context/useAuth";
 import { getRarityColor } from "../constants/colors.js";
 import { StorageService } from "../services/StorageService";
-import { getPlaceholderImage, handleImageError, getSkinImageUrl } from "../services/ImageService";
+import { handleImageError, getSkinImageUrl } from "../services/ImageService";
 import { useToast } from "../components/Toast";
 
 const MOCK_STEAM_INVENTORY = [
@@ -96,12 +96,12 @@ export default function UploadSkin() {
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "20px" }}>
-              {steamInventory.map((skin) => {
+              {steamInventory.map((skin, index) => {
                 const isSelected = !!selectedSkins.find((s) => s.id === skin.id);
                 const color = getRarityColor(skin.rarity);
                 return (
                   <div
-                    key={skin.id}
+                    key={`skin-${skin.id || skin._id}-${index}`}
                     onClick={() => toggleSelectSkin(skin)}
                     style={{
                       background: isSelected ? "rgba(245, 172, 59, 0.2)" : "rgba(255,255,255,0.02)",

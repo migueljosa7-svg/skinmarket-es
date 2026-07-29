@@ -1,6 +1,5 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { getPlaceholderImage } from "../services/ImageService";
 
 const footerLinkStyle = {
   color: 'rgba(255,255,255,0.5)',

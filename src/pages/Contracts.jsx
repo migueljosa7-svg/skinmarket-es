@@ -394,12 +394,12 @@ export default function Contracts() {
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "12px", maxHeight: "55vh", overflowY: "auto" }}>
-              {filteredInventory.map((skin) => {
+              {filteredInventory.map((skin, index) => {
                 const isSelected = selectedIds.includes(skin.id);
                 const color = getRarityColor(skin.rarity);
                 return (
                   <div
-                    key={skin.id}
+                    key={`skin-${skin.id || skin._id}-${index}`}
                     onClick={() => handleToggleSkin(skin.id)}
                     style={{
                       padding: "12px",
@@ -473,11 +473,11 @@ export default function Contracts() {
                   SKINS SELECCIONADAS ({selectedSkins.length})
                 </div>
                 <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                  {selectedSkins.map((skin) => {
+                  {selectedSkins.map((skin, index) => {
                     const color = getRarityColor(skin.rarity);
                     return (
                       <div
-                        key={skin.id}
+                        key={`skin-${skin.id || skin._id}-${index}`}
                         style={{
                           background: "rgba(255,255,255,0.03)",
                           borderRadius: "10px",

@@ -151,7 +151,7 @@ const SingleMultiRoulette = React.memo(({ items, quantity, isSpinning, onComplet
           const color = getRarityColor(skin.rarity);
           return (
             <div
-              key={skin.id || `reel-${idx}`}
+              key={`reel-${skin.id || skin._id || idx}`}
               style={{
                 minWidth: "150px",
                 height: "160px",
@@ -439,14 +439,6 @@ export default function CaseView() {
 
   const totalResultsValue = results.reduce((acc, s) => acc + Number(s.price || 0), 0);
 
-  // Provably Fair data for the current round
-  const pfResultData = useMemo(() => ({
-    serverSeedHashed: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
-    clientSeed: "skinmarket-user-seed",
-    nonce: StorageService.getUser()?.stats?.casesOpened || 1,
-    serverSeedRaw: "e7f8g9h0i1j2k3l4m5n6o7p8q9r0s1t2u3v4w5x6y7z8"
-  }), [results]);
-
   return (
     <div style={{ minHeight: "100vh", background: "#0f1115", paddingBottom: "100px" }}>
       {/* Header */}
@@ -565,7 +557,7 @@ export default function CaseView() {
                     const color = getRarityColor(skin.rarity);
                     return (
                       <div
-                        key={skin.id || `result-${idx}`}
+                        key={`result-${skin.id || skin._id || idx}`}
                         style={{
                           width: "220px",
                           background: "rgba(255,255,255,0.03)",
@@ -775,7 +767,7 @@ export default function CaseView() {
               const color = getRarityColor(skin.rarity);
               return (
                 <div
-                  key={skin.id || `skin-${idx}`}
+                  key={`skin-${skin.id || skin._id || idx}`}
                   style={{
                     background: "rgba(255,255,255,0.02)",
                     borderRadius: "20px",
@@ -809,7 +801,12 @@ export default function CaseView() {
           </div>
         </div>
       </div>
-      <ProvablyFairModal isOpen={showProvablyFair} onClose={() => setShowProvablyFair(false)} resultData={pfResultData} />
+      <ProvablyFairModal isOpen={showProvablyFair} onClose={() => setShowProvablyFair(false)} resultData={{
+        serverSeedHashed: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+        clientSeed: "skinmarket-user-seed",
+        nonce: StorageService.getUser()?.stats?.casesOpened || 1,
+        serverSeedRaw: "e7f8g9h0i1j2k3l4m5n6o7p8q9r0s1t2u3v4w5x6y7z8"
+      }} />
     </div>
   );
 }
