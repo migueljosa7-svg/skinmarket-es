@@ -239,25 +239,13 @@ class StorageServiceClass {
   }
 
   withdrawSkin(skinId) {
+    // This is now a LOCAL-ONLY fallback. Real withdraw is handled via API in AuthContext.
+    // Only marks the skin locally after a successful API call.
     const skinIndex = this.data.inventory.findIndex((s) => s.id === skinId);
     if (skinIndex === -1) return { success: false, error: "Skin no encontrada" };
-
-    // Check if user has trade URL configured
-    const user = this.getUser();
-    if (!user.link_intercambio || !user.link_intercambio.includes('steamcommunity.com')) {
-      return {
-        success: false,
-        error: "trade_url_missing",
-        message: "Configura tu Trade URL de Steam en los ajustes de tu perfil antes de retirar."
-      };
-    }
-
     this.data.inventory[skinIndex].status = "withdrawn";
     this.persistAndNotify();
-    return {
-      success: true,
-      message: "✅ Propuesta de intercambio enviada a tu Trade URL. Revisa tu Steam."
-    };
+    return { success: true, message: "Skin marcada como retirada en almacenamiento local." };
   }
 
   /** Exchange a skin for balance (alternative to withdraw) */

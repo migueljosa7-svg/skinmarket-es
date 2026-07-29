@@ -61,16 +61,120 @@ export function AuthProvider({ children }) {
     setInventory(StorageService.getInventory());
   }, []);
 
-  const sellSkin = useCallback((skinId) => {
-    return StorageService.sellSkin(skinId);
+  const sellSkin = useCallback(async (skinId) => {
+    // Try backend API first
+    const token = localStorage.getItem("token");
+    if (token) {
+      try {
+        const API = import.meta.env.VITE_API_URL || "";
+        const response = await fetch(`${API}/api/inventory/sell`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ itemId: skinId })
+        });
+        if (response.ok) {
+          const data = await response.json();
+          // Sync local state after successful API sell
+          StorageService.sellSkin(skinId);
+          return { success: true, newBalance: data.newBalance };
+        }
+        const errData = await response.json().catch(() => ({}));
+        return { success: false, error: errData.error || "Error al vender en servidor" };
+      } catch (err) {
+        console.warn("[SELL] API call failed, falling back to local:", err.message);
+      }
+    }
+    // Fallback to local
+    StorageService.sellSkin(skinId);
+    return { success: true };
   }, []);
 
   const sellAllSkins = useCallback(() => {
-    return StorageService.sellAllSkins();
+    const total = StorageService.sellAllSkins();
+    // Attempt backend sync if token exists
+    const token = localStorage.getItem("token");
+    if (token) {
+      StorageService.getInventory().forEach(skin => {
+        if (skin.status === 'in_inventory') {
+          const API = import.meta.env.VITE_API_URL || "";
+          fetch(`${API}/api/inventory/sell`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ itemId: skin.id })
+          }).catch(() => {});
+        }
+      });
+    }
+    return total;
   }, []);
 
-  const withdrawSkin = useCallback((skinId) => {
-    return StorageService.withdrawSkin(skinId);
+  const withdrawSkin = useCallback(async (skinId) => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      try {
+        const API = import.meta.env.VITE_API_URL || "";
+        const response = await fetch(`${API}/api/inventory/withdraw`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ itemId: skinId })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          // Sync local state after successful API withdraw
+          StorageService.withdrawSkin(skinId);
+          return { success: true, offerId: data.offerId, message: data.message || "Oferta enviada a Steam." };
+        }
+
+        // Handle specific error codes from backend
+        const errorCode = data.code || 'UNKNOWN_ERROR';
+        const errorMessage = data.error || "Error al procesar el retiro.";
+
+        // Map backend error codes to user-friendly messages
+        const errorMessages = {
+          'TRADE_URL_MISSING': 'Debes configurar tu Steam Trade URL en tu perfil antes de solicitar un retiro.',
+          'ITEM_OUT_OF_STOCK': 'El bot no tiene esta skin en stock actualmente. Intenta más tarde o usa la opción de venta.',
+          'RATE_LIMIT_EXCEEDED': 'Steam está limitando las solicitudes. Espera 5 minutos e intenta de nuevo.',
+          'RATE_LIMIT_WITHDRAW': 'Has excedido el límite de retiros. Espera 1 minuto e intenta de nuevo.',
+          'BOT_UNAVAILABLE': 'El bot de intercambios no está disponible en este momento. Inténtalo más tarde.',
+          'CONFIG_MISSING': 'El bot no está configurado correctamente. Contacta al administrador.',
+          'BOT_ERROR': 'Error del bot al procesar el retiro. Intenta de nuevo.',
+          'TRADE_ERROR': 'Error en la oferta de intercambio. La skin puede no ser intercambiable.',
+          'CONNECTION_ERROR': 'Error de conexión con Steam. Verifica tu conexión e intenta de nuevo.',
+          'TRADE_OFFER_FAILED': 'No se pudo enviar la oferta de intercambio. Intenta de nuevo.'
+        };
+
+        return {
+          success: false,
+          error: errorCode,
+          message: errorMessages[errorCode] || errorMessage,
+          code: errorCode
+        };
+      } catch (err) {
+        console.error('[WITHDRAW] API call error:', err.message);
+        return {
+          success: false,
+          error: 'NETWORK_ERROR',
+          message: 'Error de conexión con el servidor. Verifica tu conexión e intenta de nuevo.',
+          code: 'NETWORK_ERROR'
+        };
+      }
+    }
+
+    // No token - user not logged in to backend
+    return {
+      success: false,
+      error: 'NOT_LOGGED_IN',
+      message: 'Debes iniciar sesión para retirar skins.',
+      code: 'NOT_LOGGED_IN'
+    };
   }, []);
 
   const depositSkins = useCallback((skins) => {

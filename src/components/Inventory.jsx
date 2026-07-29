@@ -195,7 +195,7 @@ export default function Inventory() {
   }, [inventory.length, sellAllSkins]);
 
   // 3-Way Withdraw: Check trade URL, then offer withdraw/exchange/pending options
-  const handleWithdrawOrExchange = useCallback((skinId, action) => {
+  const handleWithdrawOrExchange = useCallback(async (skinId, action) => {
     const skin = inventory.find(s => s.id === skinId);
     if (!skin) return;
 
@@ -207,33 +207,60 @@ export default function Inventory() {
         return;
       }
 
-      // Attempt withdraw
-      const res = withdrawSkin(skinId);
+      // Attempt withdraw via real API
+      toast.info("🔄 Enviando oferta de retiro a Steam...");
+      const res = await withdrawSkin(skinId);
       if (res.success) {
-        toast.success(res.message);
+        toast.success(res.message || `✅ Oferta #${res.offerId} enviada a Steam. Revisa tu inventario de ofertas.`);
       } else {
-        toast.error(res.message || "Error al retirar. Puedes usar 'Intercambiar' para cambiar por saldo.");
+        // Show specific error based on code
+        const errorMessages = {
+          'TRADE_URL_MISSING': '❌ Debes configurar tu Trade URL de Steam en tu perfil.',
+          'ITEM_OUT_OF_STOCK': '❌ El bot no tiene esta skin en stock. Puedes venderla o intercambiarla por saldo.',
+          'RATE_LIMIT_EXCEEDED': '⏳ Steam está limitando solicitudes. Espera 5 minutos.',
+          'RATE_LIMIT_WITHDRAW': '⏳ Has excedido el límite de retiros. Espera 1 minuto.',
+          'BOT_UNAVAILABLE': '❌ El bot no está disponible. Intenta más tarde o usa "Intercambiar".',
+          'CONFIG_MISSING': '❌ El bot no está configurado. Contacta al administrador.',
+          'BOT_ERROR': '❌ Error del bot. Intenta de nuevo o usa "Intercambiar".',
+          'TRADE_ERROR': '❌ Error en la oferta. La skin puede no ser intercambiable.',
+          'CONNECTION_ERROR': '❌ Error de conexión con Steam. Verifica e intenta de nuevo.',
+          'NETWORK_ERROR': '❌ Error de conexión con el servidor. Verifica tu internet.',
+          'NOT_LOGGED_IN': '❌ Debes iniciar sesión para retirar skins.'
+        };
+        const displayError = errorMessages[res.code] || res.message || 'Error al retirar.';
+        toast.error(displayError);
+        
+        // If trade URL is missing, open modal
+        if (res.code === 'TRADE_URL_MISSING') {
+          setPendingWithdrawId(skinId);
+          setTradeUrlModalOpen(true);
+        }
       }
     } else if (action === "exchange") {
       // Exchange: convert skin to balance at 85% value
       const exchangeValue = Number((skin.price * 0.85).toFixed(2));
-      sellSkin(skinId); // removes skin
+      await sellSkin(skinId); // removes skin
       toast.success(`🔄 Skin intercambiada por €${exchangeValue} en saldo (85% de valor).`);
     }
   }, [inventory, user, withdrawSkin, sellSkin]);
 
   // Save trade URL from modal
-  const handleSaveTradeUrl = useCallback((url) => {
+  const handleSaveTradeUrl = useCallback(async (url) => {
     updateProfile(url, user?.steam_id || "");
     toast.success("✅ Trade URL guardada correctamente. Puedes retirar ahora.");
 
     // If there was a pending withdraw, retry it
     if (pendingWithdrawId) {
-      const res = withdrawSkin(pendingWithdrawId);
+      const res = await withdrawSkin(pendingWithdrawId);
       if (res.success) {
-        toast.success(res.message);
+        toast.success(res.message || "Oferta enviada a Steam.");
       } else {
-        toast.error(res.message || "Error al retirar. Intenta de nuevo.");
+        const errorMessages = {
+          'ITEM_OUT_OF_STOCK': '❌ El bot no tiene esta skin. Intenta venderla o intercambiarla.',
+          'RATE_LIMIT_EXCEEDED': '⏳ Steam limitando. Espera 5 min.',
+          'BOT_UNAVAILABLE': '❌ Bot no disponible. Usa "Intercambiar".'
+        };
+        toast.error(errorMessages[res.code] || res.message || "Error al retirar.");
       }
       setPendingWithdrawId(null);
     }
