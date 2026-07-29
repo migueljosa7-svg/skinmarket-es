@@ -144,8 +144,12 @@ app.use(express.json());
 // Rate Limiting - General
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: "Demasiadas peticiones desde esta IP, por favor intenta de nuevo más tarde."
+  max: 200,
+  message: "Demasiadas peticiones desde esta IP, por favor intenta de nuevo más tarde.",
+  handler: (req, res) => {
+    console.error('[EXPRESS RATE LIMIT EXCEEDED] General - IP:', req.ip, 'URL:', req.originalUrl);
+    res.status(429).json({ error: "Demasiadas peticiones desde esta IP, por favor intenta de nuevo más tarde.", code: "RATE_LIMIT_GENERAL" });
+  }
 });
 app.use("/api/", limiter);
 
@@ -183,10 +187,13 @@ const dailyCaseLimiter = rateLimit({
 
 const inspectorLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 20,
+  max: 30,
   message: "Demasiadas consultas de inventario. Espera un momento.",
   keyGenerator: (req) => req.user?.id || req.ip,
-  handler: (req, res) => res.status(429).json({ error: "Límite de consultas excedido.", code: "RATE_LIMIT_INSPECTOR" })
+  handler: (req, res) => {
+    console.error('[EXPRESS RATE LIMIT EXCEEDED] Inspector - IP:', req.ip, 'URL:', req.originalUrl);
+    res.status(429).json({ error: "Límite de consultas excedido.", code: "RATE_LIMIT_INSPECTOR" });
+  }
 });
 
 // Configurar Sesiones
@@ -986,6 +993,7 @@ app.post("/api/inventory/withdraw", authenticateToken, withdrawLimiter, async (r
     }
 
     // [TRADE] Log del estado del bot (ON-DEMAND: bot se conecta solo cuando se solicita un retiro)
+    console.log('[WITHDRAW REAL] Iniciando oferta real para SteamID:', user.steam_id, '- Item:', item.name, '- ItemID:', itemId);
     const botStatus = botEngine.isLoggedIn ? 'Conectado' : 'Desconectado (bajo demanda)';
     log(LOG_LEVELS.INFO, 'TRADE', `[TRADE] Estado del Bot: ${botStatus} | Solicitando retiro on-demand: ${item.name} (${item.market_hash_name || item.name}) para SteamID: ${user.steam_id}`);
 

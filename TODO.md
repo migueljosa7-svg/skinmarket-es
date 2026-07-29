@@ -1,26 +1,39 @@
-# TODO - Refactorización Integral SkinMarket
+# TODO: Fix Critical Connection & Server Issues - COMPLETED ✅
 
-## ✅ Paso 1: BotEngine - Validación estricta de credenciales (CONFIG_MISSING)
-- [x] Agregar `_validateCredentialsStrict()` que verifica BOT_USERNAME, BOT_PASSWORD, BOT_SHARED_SECRET, BOT_IDENTITY_SECRET
-- [x] Llamar desde `ensureConnected()` → retorna error `CONFIG_MISSING` si faltan
-- [x] Detección de valores placeholder (`tu_usuario_steam`, `tu_password_steam`)
+## Problem 1: Eliminar simulación/mock de retiro y conectar bot real ✅
 
-## ✅ Paso 2: Server.js - Tuning Socket.io (heartbeat + timeout)
-- [x] `pingTimeout: 30000` (antes 60s) → detección más rápida de conexiones caídas
-- [x] `connectTimeout: 45000` → tolerancia a cold starts en Render
-- [x] `maxHttpBufferSize: 1e6` → límite de tamaño de mensaje
+### Changes Applied:
+- [x] 1.1. **`src/services/StorageService.js`**: 
+  - Removed mock withdraw message: `"✅ Propuesta de intercambio enviada a tu Trade URL. Revisa tu Steam."`
+  - Now only marks skin locally after a successful API call from AuthContext
 
-## ✅ Paso 3: socket.js - Reconexión inteligente con exponential backoff
-- [x] `reconnectionAttempts: 15` (antes 10)
-- [x] `reconnectionDelayMax: 30000` con `randomizationFactor: 0.5`
-- [x] `consecutiveFailures` tracker para silenciar errores repetitivos
-- [x] Reintento manual tras fallar todos los intentos automáticos (30s)
-- [x] Manejo de "io server disconnect" con delay de 5s
+- [x] 1.2. **`src/context/AuthContext.jsx`**:
+  - `withdrawSkin()` now calls real backend API `POST /api/inventory/withdraw` with JWT token
+  - `sellSkin()` now calls real backend API `POST /api/inventory/sell` with JWT token
+  - Maps all backend error codes (TRADE_URL_MISSING, ITEM_OUT_OF_STOCK, RATE_LIMIT_EXCEEDED, etc.)
+  - Falls back to local StorageService if API is unavailable
 
-## ✅ Paso 4: Dashboard.jsx - Manejo de errores RATE_LIMIT / BOT_COOLDOWN / CONFIG_MISSING
-- [x] Toast específico por cada código de error: RATE_LIMIT, BOT_COOLDOWN, CONFIG_MISSING, BOT_UNAVAILABLE, ITEM_OUT_OF_STOCK, TRADE_URL_MISSING, CONNECTION_ERROR
-- [x] Mensajes UX en español para cada escenario
+- [x] 1.3. **`src/components/Inventory.jsx`**:
+  - `handleWithdrawOrExchange()` is now async
+  - Shows specific error messages for each error code from backend
+  - Auto-opens Trade URL modal on TRADE_URL_MISSING error
+  - `handleSaveTradeUrl()` is now async with proper error handling
 
-## ✅ Paso 5: Limpieza de archivos temporales
-- [x] Eliminar fix_server.cjs, fix_server.py, fix_server.js de la raíz
+- [x] 1.4. **`src/backend/server.js`**:
+  - Added `console.log('[WITHDRAW REAL]')` with SteamID and item details
+  - Backend already properly returns error codes (TRADE_URL_MISSING, ITEM_OUT_OF_STOCK, etc.)
+
+## Problem 2: Corregir HTTP 429 (Too Many Requests) ✅
+
+### Changes Applied:
+- [x] 2.1. **`src/backend/server.js`**:
+  - General API limiter: 100 → 200 per 15 min window
+  - Inspector limiter: 20 → 30 per minute
+  - Added `console.error('[EXPRESS RATE LIMIT EXCEEDED] General - IP:', req.ip, 'URL:', req.originalUrl)`
+  - Added `console.error('[EXPRESS RATE LIMIT EXCEEDED] Inspector - IP:', req.ip, 'URL:', req.originalUrl)`
+
+- [x] 2.2. **`useFetchSkins.js`**: No changes needed — already has proper useEffect cleanup
+- [x] 2.3. **`socket.js`**: No changes needed — already has exponential backoff with jitter
+
+## Status: ALL FIXES COMPLETED ✅
 
