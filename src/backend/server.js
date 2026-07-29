@@ -26,44 +26,7 @@ import crypto from "crypto";
 dotenv.config();
 
 // ─────────────────────────────────────────────────
-// ENVIRONMENT VALIDATION
-// ─────────────────────────────────────────────────
-
-const requiredEnvVars = {
-  'STEAM_API_KEY': 'Steam Web API Key',
-  'DATABASE_URL': 'PostgreSQL Database URL',
-  'JWT_SECRET': 'JWT Secret Key',
-  'BOT_USERNAME': 'Bot Steam Username',
-  'BOT_PASSWORD': 'Bot Steam Password',
-  'BOT_SHARED_SECRET': 'Bot 2FA Shared Secret',
-  'BOT_IDENTITY_SECRET': 'Bot Identity Secret (for confirmations)',
-  'REDIS_URL': 'Redis URL (optional but recommended)',
-  'BACKEND_URL': 'Backend URL',
-  'FRONTEND_URL': 'Frontend URL'
-};
-
-const missingEnvVars = [];
-for (const [key, description] of Object.entries(requiredEnvVars)) {
-  if (!process.env[key] && key !== 'REDIS_URL') {
-    missingEnvVars.push(`${key} (${description})`);
-  }
-}
-
-if (missingEnvVars.length > 0) {
-  log(LOG_LEVELS.ERROR, 'SYSTEM', '╔════════════════════════════════════════════════════════════╗');
-  log(LOG_LEVELS.ERROR, 'SYSTEM', '║  VARIABLES DE ENTORNO CRÍTICAS FALTANTES                  ║');
-  log(LOG_LEVELS.ERROR, 'SYSTEM', '╚════════════════════════════════════════════════════════════╝');
-  missingEnvVars.forEach((missing, index) => {
-    log(LOG_LEVELS.ERROR, 'SYSTEM', `  ${index + 1}. ${missing}`);
-  });
-  log(LOG_LEVELS.ERROR, 'SYSTEM', '  El servidor continuará, pero algunas funciones pueden fallar.');
-  log(LOG_LEVELS.ERROR, 'SYSTEM', '  Configura estas variables en Render o en tu archivo .env');
-} else {
-  log(LOG_LEVELS.INFO, 'SYSTEM', '✅ Todas las variables de entorno críticas están configuradas');
-}
-
-// ─────────────────────────────────────────────────
-// LOGGING SYSTEM
+// LOGGING SYSTEM (MUST BE FIRST - BEFORE ANY USAGE)
 // ─────────────────────────────────────────────────
 
 const LOG_LEVELS = { INFO: 'INFO', WARN: 'WARN', ERROR: 'ERROR', DEBUG: 'DEBUG' };
@@ -99,6 +62,44 @@ function log(level, module, message, data = null) {
 }
 
 log(LOG_LEVELS.INFO, 'SYSTEM', 'Iniciando servidor...');
+
+// ─────────────────────────────────────────────────
+// ENVIRONMENT VALIDATION (AFTER LOGGER IS READY)
+// ─────────────────────────────────────────────────
+
+const requiredEnvVars = {
+  'STEAM_API_KEY': 'Steam Web API Key',
+  'DATABASE_URL': 'PostgreSQL Database URL',
+  'JWT_SECRET': 'JWT Secret Key',
+  'BOT_USERNAME': 'Bot Steam Username',
+  'BOT_PASSWORD': 'Bot Steam Password',
+  'BOT_SHARED_SECRET': 'Bot 2FA Shared Secret',
+  'BOT_IDENTITY_SECRET': 'Bot Identity Secret (for confirmations)',
+  'REDIS_URL': 'Redis URL (optional but recommended)',
+  'BACKEND_URL': 'Backend URL',
+  'FRONTEND_URL': 'Frontend URL'
+};
+
+const missingEnvVars = [];
+for (const [key, description] of Object.entries(requiredEnvVars)) {
+  if (!process.env[key] && key !== 'REDIS_URL') {
+    missingEnvVars.push(`${key} (${description})`);
+  }
+}
+
+if (missingEnvVars.length > 0) {
+  log(LOG_LEVELS.ERROR, 'SYSTEM', '╔════════════════════════════════════════════════════════════╗');
+  log(LOG_LEVELS.ERROR, 'SYSTEM', '║  VARIABLES DE ENTORNO CRÍTICAS FALTANTES                  ║');
+  log(LOG_LEVELS.ERROR, 'SYSTEM', '╚════════════════════════════════════════════════════════════╝');
+  missingEnvVars.forEach((missing, index) => {
+    log(LOG_LEVELS.ERROR, 'SYSTEM', `  ${index + 1}. ${missing}`);
+  });
+  log(LOG_LEVELS.ERROR, 'SYSTEM', '  El servidor continuará, pero algunas funciones pueden fallar.');
+  log(LOG_LEVELS.ERROR, 'SYSTEM', '  Configura estas variables en Render o en tu archivo .env');
+} else {
+  log(LOG_LEVELS.INFO, 'SYSTEM', '✅ Todas las variables de entorno críticas están configuradas');
+}
+
 
 const app = express();
 const PORT = process.env.PORT || 3001;

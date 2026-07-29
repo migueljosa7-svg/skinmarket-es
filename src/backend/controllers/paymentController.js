@@ -15,8 +15,8 @@
 import crypto from "crypto";
 
 const isProd = process.env.NODE_ENV === "production";
-const _error = (...args) => _error(...args); // Always log errors
-const _warn = isProd ? () => { } : (...args) => _warn(...args);
+const _error = (...args) => console.error(...args); // Always log errors
+const _warn = isProd ? () => { } : (...args) => console.warn(...args);
 import db from "../db.js";
 
 // ─── Configuration ────────────────────────────────────────────
