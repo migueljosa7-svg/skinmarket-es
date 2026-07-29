@@ -22,9 +22,9 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const isProd = process.env.NODE_ENV === "production";
-const _log = isProd ? () => {} : (...args) => _log(...args);
-const _warn = isProd ? () => {} : (...args) => _warn(...args);
-const _error = (...args) => _error(...args);
+const _log = isProd ? () => { } : (...args) => console.log(...args);
+const _warn = isProd ? () => { } : (...args) => console.warn(...args);
+const _error = (...args) => console.error(...args);
 
 class P2PMarketService {
   constructor() {
@@ -61,7 +61,7 @@ class P2PMarketService {
     this.searchCache = new Map();
     this.cacheTTL = 30000; // 30 seconds
 
-    _log(`[P2P] Servicio de mercado inicializado. Proveedor: ${this.provider || "ninguno (simulación)"}`);
+    _log(`[P2P] Servicio de mercado inicializado. Proveedor: ${this.provider || "ninguno"}`);
   }
 
   // ─── Public API ─────────────────────────────────────────────
@@ -70,7 +70,7 @@ class P2PMarketService {
    * Check if the P2P service is configured and available.
    */
   isAvailable() {
-    return !!(this.apiKey && this.apiKey !== "tu_api_key_aqui");
+    return !!(this.apiKey && this.apiKey.length > 0);
   }
 
   /**
@@ -108,11 +108,10 @@ class P2PMarketService {
             results = await this._searchShadowPay(marketHashName, options);
             break;
           default:
-            results = this._simulateSearch(marketHashName, options);
+            throw new Error(`Proveedor P2P no soportado: ${this.provider}`);
         }
       } else {
-        _log(`[P2P] API no configurada. Usando datos simulados para "${marketHashName}".`);
-        results = this._simulateSearch(marketHashName, options);
+        throw new Error("P2P Market API no configurada. Configura P2P_MARKET_API_KEY en .env");
       }
 
       // Sort by price ascending (cheapest first)
@@ -128,10 +127,7 @@ class P2PMarketService {
       return results;
     } catch (err) {
       _error(`[P2P] Error en búsqueda de "${marketHashName}":`, err.message);
-      // Fallback to simulated data on API error
-      const fallback = this._simulateSearch(marketHashName, options);
-      _log(`[P2P] Usando datos de respaldo (simulados) para "${marketHashName}"`);
-      return fallback;
+      throw err;
     }
   }
 
@@ -171,10 +167,10 @@ class P2PMarketService {
               result = await this._buyShadowPay(listingId, partnerSteamID64, tradeToken);
               break;
             default:
-              result = this._simulatePurchase(listingId, marketHashName, partnerSteamID64, tradeToken, maxPrice);
+              throw new Error(`Proveedor P2P no soportado: ${this.provider}`);
           }
         } else {
-          result = this._simulatePurchase(listingId, marketHashName, partnerSteamID64, tradeToken, maxPrice);
+          throw new Error("P2P Market API no configurada");
         }
 
         if (result.success) {
@@ -215,10 +211,10 @@ class P2PMarketService {
             return parseFloat(response.data?.balance || 0);
           }
           default:
-            return 5000.00; // Simulated balance
+            throw new Error(`Proveedor P2P no soportado: ${this.provider}`);
         }
       }
-      return 5000.00; // Simulated balance for demo
+      throw new Error("P2P Market API no configurada");
     } catch (err) {
       _error("[P2P] Error al obtener balance:", err.message);
       return 0;
@@ -232,7 +228,6 @@ class P2PMarketService {
     return {
       provider: this.provider,
       configured: this.isAvailable(),
-      simulated: !this.isAvailable(),
       balance: "Consultar vía getBalance()",
       cacheSize: this.searchCache.size,
     };
@@ -390,97 +385,18 @@ class P2PMarketService {
     return await response.json();
   }
 
-  // ─── Simulation Methods (Fallback) ──────────────────────────
+  // ─── Simulation Methods (REMOVED FOR PRODUCTION) ──────────────────────────
 
   _simulateSearch(marketHashName, options) {
-    // Generate realistic simulated listings based on skin name rarity
-    const basePrice = this._estimatePrice(marketHashName);
-    const count = Math.floor(Math.random() * 8) + 3; // 3-10 listings
-    const results = [];
-
-    const wears = ["Factory New", "Minimal Wear", "Field-Tested", "Well-Worn", "Battle-Scarred"];
-    const wearMultipliers = { "Factory New": 1.0, "Minimal Wear": 0.85, "Field-Tested": 0.7, "Well-Worn": 0.55, "Battle-Scarred": 0.4 };
-
-    for (let i = 0; i < count; i++) {
-      const wear = wears[Math.floor(Math.random() * wears.length)];
-      const wearMult = wearMultipliers[wear] || 0.7;
-      const priceVariance = 0.9 + Math.random() * 0.3; // 0.9x - 1.2x
-      const price = parseFloat((basePrice * wearMult * priceVariance).toFixed(2));
-
-      if (options.minPrice && price < options.minPrice) continue;
-      if (options.maxPrice && price > options.maxPrice) continue;
-
-      results.push({
-        id: `sim_listing_${i}_${Date.now()}`,
-        marketplaceId: `sim_${i}_${Date.now()}`,
-        name: marketHashName,
-        price,
-        seller: `Seller_${Math.random().toString(36).substr(2, 8)}`,
-        wear,
-        float: parseFloat((Math.random() * 0.5 + 0.01).toFixed(4)),
-        instant: Math.random() > 0.3, // 70% chance of instant trade
-        simulated: true,
-      });
-    }
-
-    return results;
+    throw new Error("P2P simulation no disponible en producción. Configura P2P_MARKET_API_KEY.");
   }
 
   _simulatePurchase(listingId, marketHashName, partnerSteamID64, tradeToken, maxPrice) {
-    const price = parseFloat((maxPrice * (0.85 + Math.random() * 0.15)).toFixed(2));
-    const delay = Math.floor(Math.random() * 3000) + 1000; // 1-4 seconds
-
-    // Simulate async processing
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          success: true,
-          offerId: `sim_p2p_offer_${Date.now()}`,
-          price,
-          simulated: true,
-          message: `Skin adquirida en mercado P2P (simulado) por €${price.toFixed(2)}. Oferta enviada a tu Steam.`,
-        });
-      }, delay);
-    });
+    throw new Error("P2P simulation no disponible en producción. Configura P2P_MARKET_API_KEY.");
   }
 
-  /**
-   * Estimate a market price based on the skin name keywords.
-   */
   _estimatePrice(marketHashName) {
-    const name = marketHashName || "";
-    const lower = name.toLowerCase();
-
-    // Price estimation based on keywords
-    if (lower.includes("★") || lower.includes("knife") || lower.includes("gloves") || lower.includes("★ ")) {
-      if (lower.includes("doppler") || lower.includes("fade") || lower.includes("marble")) return 350 + Math.random() * 800;
-      if (lower.includes("crimson") || lower.includes("tiger") || lower.includes("slaughter")) return 200 + Math.random() * 400;
-      return 100 + Math.random() * 200;
-    }
-    if (lower.includes("ak-47") || lower.includes("ak47")) {
-      if (lower.includes("redline") || lower.includes("vulcan") || lower.includes("fire serpent")) return 40 + Math.random() * 200;
-      if (lower.includes("asiimov") || lower.includes("frontside")) return 15 + Math.random() * 30;
-      return 5 + Math.random() * 20;
-    }
-    if (lower.includes("awp")) {
-      if (lower.includes("dragon lore") || lower.includes("gungnir")) return 500 + Math.random() * 1500;
-      if (lower.includes("asiimov") || lower.includes("therus") || lower.includes("wildfire")) return 30 + Math.random() * 100;
-      return 10 + Math.random() * 30;
-    }
-    if (lower.includes("m4a1") || lower.includes("m4a4")) {
-      if (lower.includes("howl") || lower.includes("hot rod") || lower.includes("neo-noir")) return 30 + Math.random() * 80;
-      return 5 + Math.random() * 25;
-    }
-    if (lower.includes("desert") || lower.includes("deagle")) {
-      if (lower.includes("blaze") || lower.includes("hand cannon")) return 15 + Math.random() * 40;
-      return 2 + Math.random() * 15;
-    }
-    if (lower.includes("usp") || lower.includes("glock")) {
-      return 2 + Math.random() * 20;
-    }
-
-    // Default: common skin
-    return 1 + Math.random() * 10;
+    throw new Error("P2P price estimation no disponible en producción.");
   }
 
   // ─── Utility ────────────────────────────────────────────────

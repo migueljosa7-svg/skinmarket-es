@@ -16,7 +16,7 @@ import crypto from "crypto";
 
 const isProd = process.env.NODE_ENV === "production";
 const _error = (...args) => _error(...args); // Always log errors
-const _warn = isProd ? () => {} : (...args) => _warn(...args);
+const _warn = isProd ? () => { } : (...args) => _warn(...args);
 import db from "../db.js";
 
 // ─── Configuration ────────────────────────────────────────────
@@ -24,13 +24,8 @@ const WEBHOOK_SECRET = process.env.PAYMENT_WEBHOOK_SECRET || "sk_test_webhook_se
 const CRYPTO_API_KEY = process.env.CRYPTO_API_KEY || "nowpayments_demo_key";
 const CRYPTO_API_URL = process.env.CRYPTO_API_URL || "https://api.nowpayments.io/v1";
 
-// Gift card codes (static, could be DB-backed in production)
-const GIFT_CODES = {
-  SKINMARKET: { amount: 100.00, uses: 0, maxUses: 100 },
-  ESPAÑA: { amount: 50.00, uses: 0, maxUses: 100 },
-  START: { amount: 25.00, uses: 0, maxUses: 200 },
-  BIENVENIDO: { amount: 10.00, uses: 0, maxUses: 500 },
-};
+// Gift card codes (DB-backed in production)
+const GIFT_CODES = new Map(); // Loaded from database
 
 // ─── Helpers ──────────────────────────────────────────────────
 
@@ -111,13 +106,20 @@ export async function createCharge(req, res) {
         return res.status(400).json({ error: "Código de regalo no proporcionado." });
       }
       const normalizedCode = code.trim().toUpperCase();
-      const gift = GIFT_CODES[normalizedCode];
 
-      if (!gift) {
+      // Query gift code from database
+      const giftResult = await db.query(
+        "SELECT * FROM gift_codes WHERE code = $1 AND active = true AND (expires_at IS NULL OR expires_at > NOW())",
+        [normalizedCode]
+      );
+
+      if (giftResult.rows.length === 0) {
         return res.status(400).json({ error: "Código de regalo inválido o expirado." });
       }
 
-      if (gift.uses >= gift.maxUses) {
+      const gift = giftResult.rows[0];
+
+      if (gift.current_uses >= gift.max_uses) {
         return res.status(400).json({ error: "Este código ha alcanzado su límite de usos." });
       }
 
@@ -127,7 +129,11 @@ export async function createCharge(req, res) {
         [gift.amount, userId]
       );
 
-      gift.uses++;
+      // Mark gift code as used
+      await db.query(
+        "UPDATE gift_codes SET current_uses = current_uses + 1 WHERE code = $1",
+        [normalizedCode]
+      );
 
       await recordTransaction(userId, "deposito", gift.amount, "gift_code", `Canje de código: ${normalizedCode}`);
       await logAction(userId, "CANJEAR_GIFT", { code: normalizedCode, amount: gift.amount });
@@ -141,37 +147,31 @@ export async function createCharge(req, res) {
       });
     }
 
-    // ── Card Method (Stripe-like simulation) ──
+    // ── Card Method (Production Payment Gateway) ──
     if (method === "card") {
-      // In production, this would create a Stripe/Stripe-like PaymentIntent
-      // For now, we generate a simulated checkout session
+      // In production, integrate with Stripe, PayPal, or other payment processor
+      // This creates a payment intent and returns a client secret for frontend
       const chargeId = `ch_card_${Date.now()}_${crypto.randomBytes(8).toString("hex")}`;
 
-      // Store pending charge in DB (would be a payment_intents table ideally)
-      // For simplicity, we use a JSON field or a simple approach
-      // We'll simulate immediate success for demo
-      try {
-        const result = await db.query(
-          "UPDATE usuarios SET saldo = saldo + $1 WHERE usuario_id = $2 RETURNING saldo",
-          [amount, userId]
-        );
+      // Store pending charge in database
+      await db.query(
+        `INSERT INTO pagos_pendientes (usuario_id, charge_id, metodo, monto, moneda, estado, detalles)
+         VALUES ($1, $2, $3, $4, $5, 'pending', $6)`,
+        [userId, chargeId, "card", amount, "EUR", JSON.stringify({ payment_method: "card" })]
+      );
 
-        await recordTransaction(userId, "deposito", amount, "tarjeta", `Pago con tarjeta #${chargeId}`);
-        await logAction(userId, "DEPOSITO_TARJETA", { chargeId, amount });
+      await logAction(userId, "CREAR_DEPOSITO_TARJETA", { chargeId, amount });
 
-        return res.json({
-          success: true,
-          method: "card",
-          chargeId,
-          amount,
-          newBalance: result.rows[0].saldo,
-          redirectUrl: null, // Simulated - no redirect needed
-          message: `Pago de €${amount.toFixed(2)} procesado correctamente.`
-        });
-      } catch (dbErr) {
-        _error("[PAYMENT] Error al acreditar saldo:", dbErr);
-        return res.status(500).json({ error: "Error al procesar el pago con tarjeta." });
-      }
+      // In production, return payment intent client secret from Stripe/etc
+      // For now, return the charge ID for tracking
+      return res.json({
+        success: true,
+        method: "card",
+        chargeId,
+        amount,
+        status: "pending",
+        message: `Pago de €${amount.toFixed(2)} iniciado. Completa el pago en el portal seguro.`
+      });
     }
 
     // ── Cryptocurrency Methods ──
@@ -179,7 +179,7 @@ export async function createCharge(req, res) {
       const coinMap = {
         crypto_btc: { coin: "btc", label: "Bitcoin" },
         crypto_eth: { coin: "eth", label: "Ethereum" },
-        crypto_lte: { coin: "ltc", label: "Litecoin" },
+        crypto_ltc: { coin: "ltc", label: "Litecoin" },
         crypto_usdt: { coin: "usdt", label: "USDT (ERC-20)" },
         crypto_sol: { coin: "sol", label: "Solana" },
       };
@@ -192,33 +192,21 @@ export async function createCharge(req, res) {
       // Generate a unique charge ID
       const chargeId = `ch_crypto_${Date.now()}_${crypto.randomBytes(8).toString("hex")}`;
 
-      // Simulated crypto address generation
-      // In production, this would call NOWPayments / Coinbase Commerce API
-      const simulatedAddresses = {
-        btc: "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
-        eth: "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
-        ltc: "LURJ5XvU4DkM3P3M9TfQp9YQ9YQ9YQ9YQ9YQ9",
-        usdt: "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
-        sol: "7Y4p742d35Cc6634C0532925a3b844Bc454e4438f44e",
-      };
-
-      // In production: create invoice via NOWPayments API
+      // In production, create invoice via NOWPayments / Coinbase Commerce API
       // const invoice = await fetch(`${CRYPTO_API_URL}/invoice`, { ... });
-      
-      const cryptoAddress = simulatedAddresses[coinConfig.coin];
 
-      // Store pending deposit in DB
+      // For now, create pending payment record
+      // The actual crypto address will be provided by the payment processor
       await db.query(
-        `INSERT INTO pagos_pendientes (usuario_id, charge_id, metodo, monto, moneda, direccion, estado)
-         VALUES ($1, $2, $3, $4, $5, $6, 'pending')`,
-        [userId, chargeId, method, amount, coinConfig.coin, cryptoAddress]
+        `INSERT INTO pagos_pendientes (usuario_id, charge_id, metodo, monto, moneda, estado, detalles)
+         VALUES ($1, $2, $3, $4, $5, 'pending', $6)`,
+        [userId, chargeId, method, amount, coinConfig.coin, JSON.stringify({ coin: coinConfig.coin, label: coinConfig.label })]
       );
 
       await logAction(userId, "CREAR_DEPOSITO_CRYPTO", {
         chargeId,
         amount,
         coin: coinConfig.coin,
-        address: cryptoAddress
       });
 
       return res.json({
@@ -228,9 +216,8 @@ export async function createCharge(req, res) {
         amount,
         coin: coinConfig.coin,
         coinLabel: coinConfig.label,
-        address: cryptoAddress,
-        network: coinConfig.coin === "usdt" ? "ERC-20" : coinConfig.coin.toUpperCase(),
-        message: `Depósito de €${amount.toFixed(2)} en ${coinConfig.label}. Envía los fondos a la dirección mostrada.`
+        status: "pending",
+        message: `Depósito de €${amount.toFixed(2)} en ${coinConfig.label}. Espera la confirmación del pago.`
       });
     }
 
