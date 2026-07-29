@@ -11,7 +11,6 @@ import { RedisStore } from "connect-redis";
 import helmet from "helmet";
 import hpp from "hpp";
 import rateLimit from "express-rate-limit";
-import { ipKeyGenerator } from "express-rate-limit";
 import passport from "passport";
 import { Strategy as SteamStrategy } from "@dessly/passport-steam";
 import { Server as SocketIOServer } from "socket.io";
@@ -154,7 +153,7 @@ const withdrawLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
   message: "Demasiados retiros. Por favor, espera antes de intentar otro retiro.",
-  keyGenerator: (req) => req.user?.id || ipKeyGenerator(req),
+  keyGenerator: (req) => req.user?.id || req.ip,
   handler: (req, res) => res.status(429).json({ error: "Límite de retiros excedido. Intenta de nuevo en 1 minuto.", code: "RATE_LIMIT_WITHDRAW" })
 });
 
@@ -162,7 +161,7 @@ const depositLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
   message: "Demasiados depósitos. Por favor, espera antes de intentar otro depósito.",
-  keyGenerator: (req) => req.user?.id || ipKeyGenerator(req),
+  keyGenerator: (req) => req.user?.id || req.ip,
   handler: (req, res) => res.status(429).json({ error: "Límite de depósitos excedido. Intenta de nuevo en 1 minuto.", code: "RATE_LIMIT_DEPOSIT" })
 });
 
@@ -170,7 +169,7 @@ const caseOpenLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 30,
   message: "Demasiadas aperturas de caja. Por favor, espera antes de intentar otra.",
-  keyGenerator: (req) => req.user?.id || ipKeyGenerator(req),
+  keyGenerator: (req) => req.user?.id || req.ip,
   handler: (req, res) => res.status(429).json({ error: "Límite de aperturas excedido. Intenta de nuevo en 1 minuto.", code: "RATE_LIMIT_CASE_OPEN" })
 });
 
@@ -178,7 +177,7 @@ const dailyCaseLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 5,
   message: "Demasiados intentos. Por favor, espera antes de intentar de nuevo.",
-  keyGenerator: (req) => req.user?.id || ipKeyGenerator(req),
+  keyGenerator: (req) => req.user?.id || req.ip,
   handler: (req, res) => res.status(429).json({ error: "Límite de reclamos excedido.", code: "RATE_LIMIT_DAILY" })
 });
 
@@ -186,7 +185,7 @@ const inspectorLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 20,
   message: "Demasiadas consultas de inventario. Espera un momento.",
-  keyGenerator: (req) => req.user?.id || ipKeyGenerator(req),
+  keyGenerator: (req) => req.user?.id || req.ip,
   handler: (req, res) => res.status(429).json({ error: "Límite de consultas excedido.", code: "RATE_LIMIT_INSPECTOR" })
 });
 

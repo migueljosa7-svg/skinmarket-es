@@ -25,10 +25,13 @@ export default function LiveDrops() {
   const socketRef = useRef(null);
 
   useEffect(() => {
-// Conectar a Socket.io para drops en tiempo real
+    // Conectar a Socket.io para drops en tiempo real - con reconexión automática
     const serverUrl = import.meta.env.VITE_WS_URL || window.location.origin;
     const socket = SocketIOClient(serverUrl, {
-      transports: ["websocket", "polling"]
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 2000,
     });
     socketRef.current = socket;
 
@@ -172,7 +175,7 @@ export default function LiveDrops() {
                 <img
                   src={drop.image || getPlaceholderImage(drop.name)}
                   alt={drop.name}
-onError={(e) => handleImageError(e, drop)}
+                  onError={(e) => handleImageError(e, drop)}
                   style={{
                     width: "40px",
                     height: "40px",

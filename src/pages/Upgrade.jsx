@@ -273,11 +273,11 @@ export default function Upgrade() {
             <button onClick={() => setSelectedIds([])} disabled={isSpinning || selectedIds.length === 0} style={{ padding: "8px 15px", background: "rgba(255,255,255,0.05)", border: "none", color: "white", borderRadius: "10px", cursor: "pointer", fontSize: "0.75rem", fontWeight: "bold" }}>LIMPIAR</button>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: "10px" }}>
-            {(user?.inventory || []).map((skin) => {
+            {(user?.inventory || []).map((skin, index) => {
               const isSelected = selectedIds.includes(skin.id);
               const color = getRarityColor(skin.rarity);
               return (
-                <div key={skin.id} onClick={() => handleSkinClick(skin.id)} style={{ padding: "10px", background: isSelected ? "rgba(245, 172, 59, 0.2)" : "rgba(255,255,255,0.02)", borderWidth: isSelected ? "2px 2px 3px 2px" : "1px 1px 3px 1px", borderStyle: "solid", borderColor: isSelected ? `#f5ac3b #f5ac3b ${color} #f5ac3b` : `rgba(255,255,255,0.05) rgba(255,255,255,0.05) ${color} rgba(255,255,255,0.05)`, borderRadius: "14px", cursor: "pointer", textAlign: "center" }}>
+                <div key={`skin-${skin.id || skin._id}-${index}`} onClick={() => handleSkinClick(skin.id)} style={{ padding: "10px", background: isSelected ? "rgba(245, 172, 59, 0.2)" : "rgba(255,255,255,0.02)", borderWidth: isSelected ? "2px 2px 3px 2px" : "1px 1px 3px 1px", borderStyle: "solid", borderColor: isSelected ? `#f5ac3b #f5ac3b ${color} #f5ac3b` : `rgba(255,255,255,0.05) rgba(255,255,255,0.05) ${color} rgba(255,255,255,0.05)`, borderRadius: "14px", cursor: "pointer", textAlign: "center" }}>
                   <img src={getSkinImageUrl(skin.name, skin.image)} alt={skin.name} onError={(e) => handleImageError(e, skin)} style={{ width: "100%", height: "60px", objectFit: "contain", opacity: skin.image ? 1 : 0.3 }} />
                   <div style={{ fontSize: "0.7rem", fontWeight: "bold", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: "5px" }}>{skin.name}</div>
                   <div style={{ fontSize: "0.85rem", color: "#f5ac3b", fontWeight: "900" }}>€{Number(skin.price || 0).toFixed(2)}</div>
@@ -327,11 +327,11 @@ export default function Upgrade() {
             <input type="text" placeholder="Buscar..." value={searchRight} onChange={(e) => setSearchRight(e.target.value)} style={{ padding: "8px 12px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", color: "white", width: "110px", fontSize: "0.8rem" }} />
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: "10px" }}>
-            {paginatedTargets.map((skin) => {
+            {paginatedTargets.map((skin, index) => {
               const isSelected = !!targetSkins.find((s) => s.id === skin.id);
               const color = getRarityColor(skin.rarity);
               return (
-                <div key={skin.id} onClick={() => toggleTargetSkin(skin)} style={{ padding: "10px", background: isSelected ? "rgba(59, 130, 246, 0.2)" : "rgba(255,255,255,0.02)", borderWidth: isSelected ? "2px 2px 3px 2px" : "1px 1px 3px 1px", borderStyle: "solid", borderColor: isSelected ? `#3b82f6 #3b82f6 ${color} #3b82f6` : `rgba(255,255,255,0.05) rgba(255,255,255,0.05) ${color} rgba(255,255,255,0.05)`, borderRadius: "14px", cursor: "pointer", textAlign: "center" }}>
+                <div key={`skin-${skin.id || skin._id}-${index}`} onClick={() => toggleTargetSkin(skin)} style={{ padding: "10px", background: isSelected ? "rgba(59, 130, 246, 0.2)" : "rgba(255,255,255,0.02)", borderWidth: isSelected ? "2px 2px 3px 2px" : "1px 1px 3px 1px", borderStyle: "solid", borderColor: isSelected ? `#3b82f6 #3b82f6 ${color} #3b82f6` : `rgba(255,255,255,0.05) rgba(255,255,255,0.05) ${color} rgba(255,255,255,0.05)`, borderRadius: "14px", cursor: "pointer", textAlign: "center" }}>
                   <img src={getSkinImageUrl(skin.name, skin.image)} alt={skin.name} onError={(e) => handleImageError(e, skin)} style={{ width: "100%", height: "60px", objectFit: "contain", opacity: skin.image ? 1 : 0.3 }} />
                   <div style={{ fontSize: "0.7rem", fontWeight: "bold", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: "5px" }}>{skin.name}</div>
                   <div style={{ fontSize: "0.85rem", color: "#3b82f6", fontWeight: "900" }}>€{Number(skin.price || 0).toFixed(2)}</div>
