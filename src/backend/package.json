@@ -16,7 +16,7 @@
     "request": "^2.88.2",
     "tough-cookie": "4.1.4",
     "qs": "^6.15.0",
-    "uuid": "^11.1.1",
+    "uuid": "11.1.1",
     "form-data": "^4.0.5",
     "adm-zip": "^0.6.0",
     "cheerio": "1.0.0-rc.12",
@@ -48,7 +48,7 @@
   },
   "resolutions": {
     "request": "^2.88.2",
-    "uuid": "^11.1.1",
+    "uuid": "11.1.1",
     "tough-cookie": "4.1.4"
   }
 }
