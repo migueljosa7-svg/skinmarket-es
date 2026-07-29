@@ -207,9 +207,14 @@ const __dirname = path.dirname(__filename);
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3001';
 
+// [ON-DEMAND] Bot NO se conecta al arrancar. Solo se conecta cuando 
+// un usuario solicita un retiro (withdraw). No hay polling a Steam.
 if (process.env.BOT_USERNAME && process.env.BOT_USERNAME !== 'tu_usuario_steam') {
-  botEngine.logIn();
-  app.get("/api/bot/status", (req, res) => { res.json(botEngine.getStatus()); });
+  // NO llamar a botEngine.logIn() aquí - solo registrar endpoint de estado
+  app.get("/api/bot/status", (req, res) => {
+    const status = botEngine.getStatus();
+    res.json(status);
+  });
 } else {
   log(LOG_LEVELS.INFO, 'BOT', 'Bot no configurado. Iniciando en modo espera.');
   app.get("/api/bot/status", (req, res) => {
@@ -980,12 +985,12 @@ app.post("/api/inventory/withdraw", authenticateToken, withdrawLimiter, async (r
       });
     }
 
-    // [TRADE] Log del estado del bot
-    const botStatus = botEngine.isLoggedIn ? 'Conectado' : 'Desconectado';
-    log(LOG_LEVELS.INFO, 'TRADE', `[TRADE] Estado del Bot: ${botStatus} | Intentando retirar: ${item.name} (${item.market_hash_name || item.name}) para SteamID: ${user.steam_id}`);
+    // [TRADE] Log del estado del bot (ON-DEMAND: bot se conecta solo cuando se solicita un retiro)
+    const botStatus = botEngine.isLoggedIn ? 'Conectado' : 'Desconectado (bajo demanda)';
+    log(LOG_LEVELS.INFO, 'TRADE', `[TRADE] Estado del Bot: ${botStatus} | Solicitando retiro on-demand: ${item.name} (${item.market_hash_name || item.name}) para SteamID: ${user.steam_id}`);
 
-    if (botEngine.isLoggedIn) {
-      try {
+    // ON-DEMAND: sendWithdrawOffer handles login internally via ensureConnected()
+    try {
         log(LOG_LEVELS.INFO, 'TRADE', `[TRADE] Solicitando retiro de item: ${item.market_hash_name || item.name} para SteamID: ${user.steam_id}`);
 
         const result = await botEngine.sendWithdrawOffer(
@@ -1015,7 +1020,7 @@ app.post("/api/inventory/withdraw", authenticateToken, withdrawLimiter, async (r
           return res.status(400).json({
             success: false,
             error: result.error || "No se pudo enviar la oferta real. Inténtalo más tarde.",
-            code: 'TRADE_OFFER_FAILED',
+            code: result.code || 'TRADE_OFFER_FAILED',
             itemId
           });
         }
@@ -1048,14 +1053,6 @@ app.post("/api/inventory/withdraw", authenticateToken, withdrawLimiter, async (r
           details: botErr.message
         });
       }
-    } else {
-      log(LOG_LEVELS.WARN, 'TRADE', `[TRADE] Bot no disponible - Usuario: ${req.user.id} intentó retirar: ${item.name}`);
-      return res.status(503).json({
-        success: false,
-        error: 'Servicio de intercambio de Steam está reconectándose. Inténtalo en unos instantes.',
-        code: 'BOT_NOT_AVAILABLE'
-      });
-    }
   } catch (err) {
     log(LOG_LEVELS.ERROR, 'TRADE', `[TRADE] Error fatal en retiro - ${err.message} | ItemID: ${itemId}`);
     res.status(500).json({ error: "Error al procesar el retiro", details: err.message });
@@ -1363,11 +1360,6 @@ if (fs.existsSync(distPath)) {
   log(LOG_LEVELS.WARN, 'SYSTEM', 'Directorio dist/ no encontrado. Sirviendo solo API.');
 }
 
-app.use((err, req, res, next) => {
-  log(LOG_LEVELS.ERROR, 'GLOBAL', 'Error en middleware global', { error: err.message, stack: err.stack });
-  res.status(500).json({ error: "Error interno del servidor" });
-});
-
 // ─── SOCKET.IO ────────────────────────────────────
 const server = app.listen(PORT, "0.0.0.0", () => log(LOG_LEVELS.INFO, 'SYSTEM', `Servidor corriendo en puerto ${PORT}`));
 server.on('error', (err) => {
@@ -1377,9 +1369,12 @@ server.on('error', (err) => {
 
 const io = new SocketIOServer(server, {
   cors: { origin: corsOrigin, methods: ["GET", "POST"], credentials: true },
-  transports: ['websocket', 'polling'],
-  pingTimeout: 60000,
-  pingInterval: 25000
+  transports: ['polling', 'websocket'],
+  pingTimeout: 30000,     // Render idle timeout protection (was 60s, now 30s for faster detection)
+  pingInterval: 25000,    // Heartbeat every 25s to keep connection alive
+  allowEIO3: true,
+  connectTimeout: 45000,  // Allow extra time for cold starts on Render
+  maxHttpBufferSize: 1e6  // 1MB max message size
 });
 
 io.on("connection", (socket) => {

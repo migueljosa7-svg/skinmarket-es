@@ -4,7 +4,7 @@ import { motion as Motion, AnimatePresence } from "framer-motion";
 import { getRarityColor } from "../constants/colors";
 import { StorageService } from "../services/StorageService";
 import { getPlaceholderImage, handleImageError } from "../services/ImageService";
-import { getSocket, onSocketEvent } from "../services/socket";
+import { getSocket } from "../services/socket";
 
 const MAX_DROPS = 15;
 
@@ -15,25 +15,33 @@ const BOT_NAMES = [
 
 export default function LiveDrops() {
   const [drops, setDrops] = useState([]);
-  const unsubscribeRef = useRef(null);
-  const intervalRef = useRef(null);
+  const socketRef = useRef(null);
 
   useEffect(() => {
-    // 1. Subscribe to socket.io "live-drop" events using the shared socket service
-    const unsubSocket = onSocketEvent("live-drop", (dropData) => {
+    // Usar el servicio compartido de Socket.io (singleton) para evitar conexiones múltiples
+    // y fugas de memoria en React 18 Strict Mode.
+    const socket = getSocket();
+    socketRef.current = socket;
+
+    const onLiveDrop = (dropData) => {
       const formatted = {
-        id: dropData.id || `drop_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+        id: dropData.id,
         name: dropData.item?.name || "Skin",
         price: dropData.item?.price || 10,
         rarity: dropData.item?.rarity || "Mil-Spec",
         user: dropData.user || "Jugador",
         image: dropData.item?.image || ""
       };
-      setDrops((prev) => [formatted, ...prev].slice(0, MAX_DROPS));
-    });
+      setDrops((prev) => {
+        const next = [formatted, ...prev].slice(0, MAX_DROPS);
+        return next;
+      });
+    };
 
-    // 2. Subscribe to StorageService live drops (local fallback)
-    const unsubStorage = StorageService.subscribe((data) => {
+    socket.on("live-drop", onLiveDrop);
+
+    // Subscribe to StorageService live drops (respaldo local)
+    const unsubscribe = StorageService.subscribe((data) => {
       const formatted = (data.liveDrops || []).map((d) => ({
         id: d.id,
         name: d.item?.name || "Skin",
@@ -51,8 +59,8 @@ export default function LiveDrops() {
       }
     });
 
-    // 3. Background community drop generator (simulated for demo)
-    intervalRef.current = setInterval(() => {
+    // Background community drop generator interval (respaldo simulado)
+    const interval = setInterval(() => {
       const randomUser = BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)];
       const sampleSkins = [
         { name: "M4A1-S | Printstream", price: 145.00, rarity: "Covert" },
@@ -71,13 +79,13 @@ export default function LiveDrops() {
     }, 8000);
 
     return () => {
-      // Cleanup: unsubscribe from socket event, storage subscription, clear interval
-      unsubSocket();
-      unsubStorage();
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
+      // Cleanup: remove only our listener (shared socket stays alive for other components)
+      if (socketRef.current) {
+        socketRef.current.off("live-drop", onLiveDrop);
+        socketRef.current = null;
       }
+      unsubscribe();
+      clearInterval(interval);
     };
   }, []);
 

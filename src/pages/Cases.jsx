@@ -113,34 +113,37 @@ const DailyRouletteModal = ({ isOpen, onClose, rewardAmount, skinsPool }) => {
           />
 
           <div ref={containerRef} style={{ display: "flex", gap: "10px", paddingLeft: "50%", transition: "none" }}>
-            {reel.map((skin, i) => (
-              <div
-                key={skin?.id || `daily-${i}`}
-                style={{
-                  minWidth: "150px",
-                  height: "150px",
-                  background: "rgba(255,255,255,0.03)",
-                  borderRadius: "16px",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "10px",
-                  borderWidth: "0 0 4px 0",
-                  borderStyle: "solid",
-                  borderColor: getRarityColor(skin?.rarity || "Common")
-                }}
-              >
-                <img
-                  src={getSkinImageUrl(skin?.name, skin?.image)}
-                  alt={skin?.name}
-                  onError={(e) => handleImageError(e, skin)}
-                  style={{ width: "80px", height: "auto", marginBottom: "8px", opacity: skin?.image ? 1 : 0.3 }} />
-                <div style={{ fontSize: "0.65rem", color: "rgba(255,255,255,0.5)", fontWeight: "bold", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {skin?.name}
+            {reel.map((skin, i) => {
+              const dailyCardKey = `daily-${skin?.id || skin?.name || 'unknown'}-${i}-${Date.now()}`;
+              return (
+                <div
+                  key={dailyCardKey}
+                  style={{
+                    minWidth: "150px",
+                    height: "150px",
+                    background: "rgba(255,255,255,0.03)",
+                    borderRadius: "16px",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "10px",
+                    borderWidth: "0 0 4px 0",
+                    borderStyle: "solid",
+                    borderColor: getRarityColor(skin?.rarity || "Common")
+                  }}
+                >
+                  <img
+                    src={getSkinImageUrl(skin?.name, skin?.image)}
+                    alt={skin?.name}
+                    onError={(e) => handleImageError(e, skin)}
+                    style={{ width: "80px", height: "auto", marginBottom: "8px", opacity: skin?.image ? 1 : 0.3 }} />
+                  <div style={{ fontSize: "0.65rem", color: "rgba(255,255,255,0.5)", fontWeight: "bold", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {skin?.name}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 

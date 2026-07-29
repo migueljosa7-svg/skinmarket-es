@@ -472,15 +472,32 @@ export default function Dashboard() {
                             if (data.success) {
                               toast.success(data.message || "Oferta enviada a Steam!");
                             } else {
-                              toast.error(data.error || "Error al retirar");
+                              // Handle specific error codes with user-friendly messages
+                              if (data.code === "RATE_LIMIT_WITHDRAW" || data.code === "RATE_LIMIT_EXCEEDED") {
+                                toast.warning("⏳ Demasiados retiros seguidos. Espera 1 minuto e intenta de nuevo.");
+                              } else if (data.code === "BOT_COOLDOWN" || data.code === "RATE_LIMIT_EXCEEDED" || data.code?.includes("RATE_LIMIT")) {
+                                toast.warning("🔄 Steam está procesando muchas solicitudes. Espera 5 minutos.");
+                              } else if (data.code === "CONFIG_MISSING") {
+                                toast.error("🔧 El sistema de retiros no está configurado. Contacta a soporte.");
+                              } else if (data.code === "BOT_UNAVAILABLE") {
+                                toast.warning("🤖 El bot de intercambios no está disponible ahora. Intenta en unos minutos.");
+                              } else if (data.code === "ITEM_OUT_OF_STOCK") {
+                                toast.error("📦 Esta skin no está disponible en el inventario del bot. Puedes venderla por saldo.");
+                              } else if (data.code === "TRADE_URL_MISSING") {
+                                toast.error("🔗 Configura tu Trade URL de Steam en Ajustes de Perfil antes de retirar.");
+                              } else if (data.code === "CONNECTION_ERROR") {
+                                toast.error("🌐 Error de conexión con Steam. Verifica tu conexión a internet.");
+                              } else {
+                                toast.error(data.error || "Error al retirar. Si el problema persiste, vende la skin por saldo.");
+                              }
                             }
                           } else {
                             const res = withdrawSkin(item.id);
                             toast.success(res?.message || "Retiro simulado con éxito.");
                           }
                         } catch (err) {
-                          const res = withdrawSkin(item.id);
-                          toast.success(res?.message || "Retiro procesado.");
+                          toast.error("Error de conexión al retirar. Verifica tu internet o intenta más tarde.");
+                          console.warn("[WITHDRAW ERROR]", err);
                         }
                       }}
                       style={{ flex: 1, padding: "8px", background: "rgba(59, 130, 246, 0.15)", border: "none", color: "#3b82f6", borderRadius: "8px", fontWeight: "bold", fontSize: "0.75rem", cursor: "pointer" }}

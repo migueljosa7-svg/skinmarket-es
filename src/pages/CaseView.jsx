@@ -149,9 +149,12 @@ const SingleMultiRoulette = React.memo(({ items, quantity, isSpinning, onComplet
       >
         {items.map((skin, idx) => {
           const color = getRarityColor(skin.rarity);
+          // Stable + unique key: index guarantees uniqueness since skins repeat in the reel.
+          // Avoid Date.now() which forces React to remount every item on each render.
+          const uniqueKey = `reel-${idx}-${skin.id || skin._id || "skin"}`;
           return (
             <div
-              key={`reel-${skin.id || skin._id || idx}`}
+              key={uniqueKey}
               style={{
                 minWidth: "150px",
                 height: "160px",
@@ -557,7 +560,7 @@ export default function CaseView() {
                     const color = getRarityColor(skin.rarity);
                     return (
                       <div
-                        key={`result-${skin.id || skin._id || idx}`}
+                        key={`result-${idx}-${skin.id || skin._id || "skin"}`}
                         style={{
                           width: "220px",
                           background: "rgba(255,255,255,0.03)",
@@ -767,7 +770,7 @@ export default function CaseView() {
               const color = getRarityColor(skin.rarity);
               return (
                 <div
-                  key={`skin-${skin.id || skin._id || idx}`}
+                  key={`skin-${idx}-${skin.id || skin._id || "skin"}`}
                   style={{
                     background: "rgba(255,255,255,0.02)",
                     borderRadius: "20px",
