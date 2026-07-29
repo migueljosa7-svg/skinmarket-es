@@ -6,8 +6,8 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const isProd = process.env.NODE_ENV === "production";
-const _log = isProd ? () => {} : (...args) => _log(...args);
-const _warn = isProd ? () => {} : (...args) => _warn(...args);
+const _log = isProd ? () => { } : (...args) => _log(...args);
+const _warn = isProd ? () => { } : (...args) => _warn(...args);
 const _error = (...args) => _error(...args);
 
 class SteamBot {
@@ -45,7 +45,7 @@ class SteamBot {
             this.client.logOn({
                 accountName: this.credentials.accountName,
                 password: this.credentials.password,
-                twoFactorCode: SteamTotp.generateAuthCode(this.credentials.sharedSecret)
+                twoFactorCode: SteamTotp.getAuthCode(this.credentials.sharedSecret)
             });
         } catch (err) {
             _error("[BOT] Error al generar código 2FA o iniciar proceso de login:", err.message);
@@ -103,7 +103,7 @@ class SteamBot {
 
                     if (status === 'pending') {
                         _log(`[BOT] Oferta #${offer.id} enviada, esperando confirmación 2FA...`);
-                        this.community.acceptConfirmationForObject(this.credentials.identitySecret, offer.id, (err) => {
+                        this.community.acceptConfirmationGroup(this.credentials.identitySecret, offer.id, (err) => {
                             if (err) {
                                 _error(`[BOT] Error al confirmar oferta #${offer.id}:`, err);
                                 return reject(err);

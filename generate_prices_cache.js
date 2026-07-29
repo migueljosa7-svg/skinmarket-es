@@ -39,7 +39,9 @@ async function main() {
   // Get the directory where the script is located
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
-  const publicDir = path.join(__dirname, 'public');
+
+  // Use process.cwd() to ensure we're writing to the project root /public directory
+  const publicDir = path.join(process.cwd(), 'public');
   const outputPath = path.join(publicDir, 'skin_prices.json');
 
   // Ensure public directory exists

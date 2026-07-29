@@ -11,10 +11,10 @@ import { RedisStore } from "connect-redis";
 import helmet from "helmet";
 import hpp from "hpp";
 import rateLimit from "express-rate-limit";
+import { ipKeyGenerator } from "express-rate-limit";
 import passport from "passport";
-import { Strategy as SteamStrategy } from "passport-steam";
+import { Strategy as SteamStrategy } from "@dessly/passport-steam";
 import { Server as SocketIOServer } from "socket.io";
-import fetch from "node-fetch";
 import path from "path";
 import { fileURLToPath } from "url";
 import cron from "node-cron";
@@ -26,6 +26,43 @@ import crypto from "crypto";
 dotenv.config();
 
 // ─────────────────────────────────────────────────
+// ENVIRONMENT VALIDATION
+// ─────────────────────────────────────────────────
+
+const requiredEnvVars = {
+  'STEAM_API_KEY': 'Steam Web API Key',
+  'DATABASE_URL': 'PostgreSQL Database URL',
+  'JWT_SECRET': 'JWT Secret Key',
+  'BOT_USERNAME': 'Bot Steam Username',
+  'BOT_PASSWORD': 'Bot Steam Password',
+  'BOT_SHARED_SECRET': 'Bot 2FA Shared Secret',
+  'BOT_IDENTITY_SECRET': 'Bot Identity Secret (for confirmations)',
+  'REDIS_URL': 'Redis URL (optional but recommended)',
+  'BACKEND_URL': 'Backend URL',
+  'FRONTEND_URL': 'Frontend URL'
+};
+
+const missingEnvVars = [];
+for (const [key, description] of Object.entries(requiredEnvVars)) {
+  if (!process.env[key] && key !== 'REDIS_URL') {
+    missingEnvVars.push(`${key} (${description})`);
+  }
+}
+
+if (missingEnvVars.length > 0) {
+  log(LOG_LEVELS.ERROR, 'SYSTEM', '╔════════════════════════════════════════════════════════════╗');
+  log(LOG_LEVELS.ERROR, 'SYSTEM', '║  VARIABLES DE ENTORNO CRÍTICAS FALTANTES                  ║');
+  log(LOG_LEVELS.ERROR, 'SYSTEM', '╚════════════════════════════════════════════════════════════╝');
+  missingEnvVars.forEach((missing, index) => {
+    log(LOG_LEVELS.ERROR, 'SYSTEM', `  ${index + 1}. ${missing}`);
+  });
+  log(LOG_LEVELS.ERROR, 'SYSTEM', '  El servidor continuará, pero algunas funciones pueden fallar.');
+  log(LOG_LEVELS.ERROR, 'SYSTEM', '  Configura estas variables en Render o en tu archivo .env');
+} else {
+  log(LOG_LEVELS.INFO, 'SYSTEM', '✅ Todas las variables de entorno críticas están configuradas');
+}
+
+// ─────────────────────────────────────────────────
 // LOGGING SYSTEM
 // ─────────────────────────────────────────────────
 
@@ -33,18 +70,14 @@ const LOG_LEVELS = { INFO: 'INFO', WARN: 'WARN', ERROR: 'ERROR', DEBUG: 'DEBUG' 
 
 // ─── CDN IMAGE HELPER ────────────────────────────────
 // Generate a deterministic Steam economy image hash from a skin name.
-// This produces a unique 150+ char hash per skin that works with all Steam CDNs.
-// Format: Akamai CDN + /360fx360f for HD display.
 function generateIconUrlHash(skinName, seed) {
   const baseChars = '-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw';
-  // Combine skin name + seed + random to make a deterministic but unique hash
   const input = `${skinName}_${seed || Date.now()}_${skinName.length}_${skinName.charCodeAt(0) || 65}`;
   let hash = '';
   for (let i = 0; i < input.length; i++) {
     const idx = (input.charCodeAt(i) + i * 7) % baseChars.length;
     hash += baseChars[idx];
   }
-  // Pad to 150+ chars using base chars
   while (hash.length < 180) {
     const idx = (hash.length * 13 + skinName.charCodeAt(hash.length % skinName.length)) % baseChars.length;
     hash += baseChars[idx];
@@ -74,19 +107,18 @@ const JWT_SECRET = process.env.JWT_SECRET;
 // ─── Session Store ──────
 const sessionStore = (() => {
   let store;
-  if (process.env.REDIS_URL) {
-    try {
-      const redisClient = createClient({ url: process.env.REDIS_URL });
-      redisClient.connect().catch(err => log(LOG_LEVELS.WARN, 'SESSION', 'Redis no disponible, usando MemoryStore', err.message));
-      store = new RedisStore({ client: redisClient });
-      log(LOG_LEVELS.INFO, 'SESSION', 'Usando RedisStore');
-      return store;
-    } catch (e) {
-      log(LOG_LEVELS.WARN, 'SESSION', 'Fallback a MemoryStore (Redis no disponible)');
-    }
-  } else {
-    log(LOG_LEVELS.WARN, 'SESSION', 'REDIS_URL no definida, usando MemoryStore');
+  const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
+
+  try {
+    const redisClient = createClient({ url: redisUrl });
+    redisClient.connect().catch(err => log(LOG_LEVELS.WARN, 'SESSION', 'Redis no disponible, usando MemoryStore', err.message));
+    store = new RedisStore({ client: redisClient });
+    log(LOG_LEVELS.INFO, 'SESSION', 'Usando RedisStore');
+    return store;
+  } catch (e) {
+    log(LOG_LEVELS.WARN, 'SESSION', 'Fallback a MemoryStore (Redis no disponible)');
   }
+
   const MemoryStore = session.MemoryStore || (session.Store && session.Store);
   if (MemoryStore) {
     store = new session.MemoryStore();
@@ -121,7 +153,7 @@ const withdrawLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
   message: "Demasiados retiros. Por favor, espera antes de intentar otro retiro.",
-  keyGenerator: (req) => req.user?.id || req.ip,
+  keyGenerator: (req) => req.user?.id || ipKeyGenerator(req),
   handler: (req, res) => res.status(429).json({ error: "Límite de retiros excedido. Intenta de nuevo en 1 minuto.", code: "RATE_LIMIT_WITHDRAW" })
 });
 
@@ -129,7 +161,7 @@ const depositLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
   message: "Demasiados depósitos. Por favor, espera antes de intentar otro depósito.",
-  keyGenerator: (req) => req.user?.id || req.ip,
+  keyGenerator: (req) => req.user?.id || ipKeyGenerator(req),
   handler: (req, res) => res.status(429).json({ error: "Límite de depósitos excedido. Intenta de nuevo en 1 minuto.", code: "RATE_LIMIT_DEPOSIT" })
 });
 
@@ -137,7 +169,7 @@ const caseOpenLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 30,
   message: "Demasiadas aperturas de caja. Por favor, espera antes de intentar otra.",
-  keyGenerator: (req) => req.user?.id || req.ip,
+  keyGenerator: (req) => req.user?.id || ipKeyGenerator(req),
   handler: (req, res) => res.status(429).json({ error: "Límite de aperturas excedido. Intenta de nuevo en 1 minuto.", code: "RATE_LIMIT_CASE_OPEN" })
 });
 
@@ -145,7 +177,7 @@ const dailyCaseLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 5,
   message: "Demasiados intentos. Por favor, espera antes de intentar de nuevo.",
-  keyGenerator: (req) => req.user?.id || req.ip,
+  keyGenerator: (req) => req.user?.id || ipKeyGenerator(req),
   handler: (req, res) => res.status(429).json({ error: "Límite de reclamos excedido.", code: "RATE_LIMIT_DAILY" })
 });
 
@@ -153,7 +185,7 @@ const inspectorLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 20,
   message: "Demasiadas consultas de inventario. Espera un momento.",
-  keyGenerator: (req) => req.user?.id || req.ip,
+  keyGenerator: (req) => req.user?.id || ipKeyGenerator(req),
   handler: (req, res) => res.status(429).json({ error: "Límite de consultas excedido.", code: "RATE_LIMIT_INSPECTOR" })
 });
 
@@ -179,9 +211,9 @@ if (process.env.BOT_USERNAME && process.env.BOT_USERNAME !== 'tu_usuario_steam')
   botEngine.logIn();
   app.get("/api/bot/status", (req, res) => { res.json(botEngine.getStatus()); });
 } else {
-  log(LOG_LEVELS.INFO, 'BOT', 'Bot no configurado. Iniciando en modo simulación.');
+  log(LOG_LEVELS.INFO, 'BOT', 'Bot no configurado. Iniciando en modo espera.');
   app.get("/api/bot/status", (req, res) => {
-    res.json({ status: "ok", bot: "simulated", message: "Bot no configurado - modo simulación" });
+    res.json({ status: "ok", bot: "not_configured", message: "Bot no configurado - requiere credenciales Steam" });
   });
 }
 
@@ -192,24 +224,33 @@ app.use(passport.session());
 passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((obj, done) => done(null, obj));
 
-passport.use(new SteamStrategy({
-  returnURL: `${BACKEND_URL}/api/auth/steam/return`,
-  realm: BACKEND_URL,
-  apiKey: process.env.STEAM_API_KEY
-}, async (identifier, profile, done) => {
+if (process.env.STEAM_API_KEY) {
   try {
-    const steamId = profile.id;
-    const nombre = profile.displayName;
-    let result = await db.query("SELECT * FROM usuarios WHERE steam_id = $1", [steamId]);
-    if (result.rows.length === 0) {
-      result = await db.query(
-        "INSERT INTO usuarios (nombre_usuario, email, password_hash, steam_id, nivel, experiencia) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
-        [nombre, `${steamId}@steam.auth`, 'steam_no_password', steamId, 0, 0]
-      );
-    }
-    return done(null, result.rows[0]);
-  } catch (err) { return done(err); }
-}));
+    passport.use(new SteamStrategy({
+      returnUrl: `${BACKEND_URL}/api/auth/steam/return`,
+      realm: `${BACKEND_URL}/`,
+      apiKey: process.env.STEAM_API_KEY
+    }, async (identifier, profile, done) => {
+      try {
+        const steamId = profile.id;
+        const nombre = profile.displayName;
+        let result = await db.query("SELECT * FROM usuarios WHERE steam_id = $1", [steamId]);
+        if (result.rows.length === 0) {
+          result = await db.query(
+            "INSERT INTO usuarios (nombre_usuario, email, password_hash, steam_id, nivel, experiencia) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
+            [nombre, `${steamId}@steam.auth`, 'steam_no_password', steamId, 0, 0]
+          );
+        }
+        return done(null, result.rows[0]);
+      } catch (err) { return done(err); }
+    }));
+    log(LOG_LEVELS.INFO, 'AUTH', 'Steam Strategy configurada correctamente');
+  } catch (err) {
+    log(LOG_LEVELS.ERROR, 'AUTH', 'Error al configurar Steam Strategy:', err);
+  }
+} else {
+  log(LOG_LEVELS.WARN, 'AUTH', 'STEAM_API_KEY no configurada. Autenticación Steam deshabilitada.');
+}
 
 // Helper para Auditoría
 async function logAction(usuario_id, accion, detalles = null) {
@@ -288,8 +329,6 @@ app.post("/api/login", async (req, res) => {
 });
 
 // ─── LEVEL SYSTEM ────────────────────────────────────
-// KeyDrop-style: Level based on total deposited/apostado
-// Rewards limitados a máx 2.00€ para cajas diarias (KeyDrop real economy)
 const LEVEL_THRESHOLDS = [
   { level: 1, minDeposit: 0, dailyCaseId: "eco-1", caseLabel: "Caja Eco", reward: 0.15 },
   { level: 2, minDeposit: 10, dailyCaseId: "eco-1", caseLabel: "Caja Eco", reward: 0.25 },
@@ -357,7 +396,6 @@ app.get("/api/ranking", async (req, res) => {
 // ─────────────────────────────────────────────────────────────────
 // DAILY CASE SYSTEM - Level-based (KeyDrop-style) - 24h cooldown
 // ─────────────────────────────────────────────────────────────────
-// KeyDrop-style: Requiere depósito acumulado >= 2.00€ O Nivel 1+ para reclamar
 
 app.post("/api/claim-daily", authenticateToken, dailyCaseLimiter, async (req, res) => {
   try {
@@ -369,7 +407,6 @@ app.post("/api/claim-daily", authenticateToken, dailyCaseLimiter, async (req, re
     const now = new Date();
     const lastClaim = user.ultimo_reclamo_diario ? new Date(user.ultimo_reclamo_diario) : null;
 
-    // 24 HOURS strict timer
     const hoursWait = 24;
     const bufferMs = 5000;
 
@@ -386,14 +423,12 @@ app.post("/api/claim-daily", authenticateToken, dailyCaseLimiter, async (req, re
       });
     }
 
-    // Get user level based on total deposits
     const depositResult = await db.query(
       "SELECT COALESCE(SUM(monto), 0) as total_depositado FROM transacciones WHERE usuario_id = $1 AND tipo IN ('deposito', 'apertura_caja')",
       [req.user.id]
     );
     const totalDepositado = parseFloat(depositResult.rows[0].total_depositado) || 0;
 
-    // ─── KEYDROP-STYLE VALIDATION: Require >= 2.00€ deposit OR Nivel 1+ ───
     const userLevelRaw = user.nivel || 0;
     if (totalDepositado < 2.00 && userLevelRaw < 1) {
       return res.status(403).json({
@@ -407,10 +442,6 @@ app.post("/api/claim-daily", authenticateToken, dailyCaseLimiter, async (req, re
     const userLevel = calculateLevel(totalDepositado);
     const dailyCase = getDailyCaseForLevel(userLevel);
 
-    // ─── KEYDROP-STYLE: La caja diaria ES UNA CAJA → genera una SKIN real ───
-    // No más dinero directo. El usuario recibe una skin que cae de la ruleta.
-
-    // Determinar rareza basada en nivel (más nivel = mejor rareza)
     const rarityRoll = Math.random() * 100;
     const rarityPrices = { "Covert": 50, "Classified": 15, "Restricted": 3, "Mil-Spec Grade": 1 };
     let rarity, rarityPrice, rarityColor, rarityPrefix;
@@ -433,21 +464,24 @@ app.post("/api/claim-daily", authenticateToken, dailyCaseLimiter, async (req, re
     const itemName = `${randomWeapon} | ${randomSkin}`;
     const itemPrice = parseFloat(((rarityPrices[rarity] || 1) * (0.5 + Math.random() * 1.5)).toFixed(2));
 
-    // Generate deterministic icon_url hash for Akamai CDN images
     const iconHash = generateIconUrlHash(itemName, Date.now());
     const imageHD = buildAkamaiImageUrl(iconHash);
+
+    const serverSeed = crypto.randomBytes(32).toString('hex');
+    const clientSeed = crypto.randomBytes(16).toString('hex');
+    const nonce = Date.now();
+    const provablyFairHash = crypto.createHash('sha256').update(`${serverSeed}:${clientSeed}:${nonce}:${itemName}`).digest('hex');
 
     let insertedSkin;
     const expReward = userLevel * 15;
 
-    // TRANSACCIÓN ATÓMICA: Insertar skin en inventario + actualizar experiencia + marcar reclamo
     await db.withTransaction(async (client) => {
       const insertResult = await client.query(
-        `INSERT INTO inventario (usuario_id, name, price, image, rarity, marketable, wear, weapon, skin_name, market_hash_name, status, icon_url)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'on_site', $11)
+        `INSERT INTO inventario (usuario_id, name, price, image, rarity, marketable, wear, weapon, skin_name, market_hash_name, status, icon_url, provably_fair_hash, server_seed, client_seed, nonce)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'on_site', $11, $12, $13, $14, $15)
          RETURNING item_id as id, name, price, image, rarity, marketable, status`,
         [req.user.id, itemName, itemPrice, imageHD,
-          rarity, true, randomWear, randomWeapon, randomSkin, itemName, iconHash]
+          rarity, true, randomWear, randomWeapon, randomSkin, itemName, iconHash, provablyFairHash, serverSeed, clientSeed, nonce]
       );
       insertedSkin = insertResult.rows[0];
 
@@ -458,7 +492,7 @@ app.post("/api/claim-daily", authenticateToken, dailyCaseLimiter, async (req, re
     });
 
     await recordTransaction(req.user.id, 'premio', itemPrice, 'caja_diaria', `Skin de caja diaria nivel ${userLevel}: ${itemName}`);
-    await logAction(req.user.id, 'RECLAMAR_CAJA_DIARIA', { level: userLevel, caseId: dailyCase.dailyCaseId, skin: itemName, price: itemPrice });
+    await logAction(req.user.id, 'RECLAMAR_CAJA_DIARIA', { level: userLevel, caseId: dailyCase.dailyCaseId, skin: itemName, price: itemPrice, provablyFairHash });
 
     res.json({
       success: true,
@@ -467,6 +501,7 @@ app.post("/api/claim-daily", authenticateToken, dailyCaseLimiter, async (req, re
       level: userLevel,
       caseId: dailyCase.dailyCaseId,
       caseLabel: dailyCase.caseLabel,
+      provablyFair: { serverSeed, clientSeed, nonce, hash: provablyFairHash },
       message: `🎉 ¡Caja diaria nivel ${userLevel} abierta! Has ganado: ${itemName} (€${itemPrice}) +${expReward} EXP`
     });
   } catch (err) {
@@ -476,7 +511,6 @@ app.post("/api/claim-daily", authenticateToken, dailyCaseLimiter, async (req, re
 });
 
 // ─── STEAM INVENTORY INSPECTOR ───────────────────────────
-// Allows admins/tools to inspect ANY user's Steam inventory
 app.get("/api/steam/inspector/:steamId", authenticateToken, inspectorLimiter, async (req, res) => {
   const steamId = req.params.steamId;
 
@@ -532,7 +566,6 @@ app.get("/api/steam/inspector/:steamId", authenticateToken, inspectorLimiter, as
       return res.json({ items: [], totalValue: 0, totalItems: 0, steamId });
     }
 
-    // Parse items with real market data
     const items = data.assets.map(asset => {
       const desc = data.descriptions.find(d => d.classid === asset.classid);
       if (!desc) return null;
@@ -544,7 +577,6 @@ app.get("/api/steam/inspector/:steamId", authenticateToken, inspectorLimiter, as
       const weaponTag = desc.tags?.find(t => t.category === "Weapon");
       const weapon = weaponTag?.name || "";
 
-      // Build HD image URL using Steam Akamai CDN (official)
       const iconUrl = desc.icon_url || desc.icon_url_large || "";
       const imageHD = iconUrl
         ? `https://steamcommunity-a.akamaihd.net/economy/image/${iconUrl}/360fx360f`
@@ -567,7 +599,6 @@ app.get("/api/steam/inspector/:steamId", authenticateToken, inspectorLimiter, as
       };
     }).filter(item => item !== null);
 
-    // Estimate total value based on rarity
     const totalValue = items.reduce((sum, item) => {
       let estPrice = 0.50;
       if (item.rarity.includes("Extraordinary") || item.rarity.includes("Contraband")) estPrice = 500.00;
@@ -630,7 +661,6 @@ app.get("/api/steam/price", inspectorLimiter, async (req, res) => {
       return res.json({ success: false, market_hash_name: hashName, error: "No hay datos de precio" });
     }
 
-    // Parse precio en EUR
     let price = 0;
     if (data.median_price) {
       price = parseFloat(data.median_price.replace(/[^0-9.,]/g, '').replace(',', '.'));
@@ -670,7 +700,6 @@ app.post("/api/cases/open", authenticateToken, caseOpenLimiter, async (req, res)
     const configResult = await db.query("SELECT valor FROM configuracion WHERE clave = 'probabilidades'");
     const probs = configResult.rows[0]?.valor || { covert: 0.5, classified: 2, restricted: 15, mil_spec: 82.5 };
 
-    // Real skin pool based on rarity
     const results = [];
     for (let i = 0; i < (quantity || 1); i++) {
       const roll = Math.random() * 100;
@@ -694,26 +723,29 @@ app.post("/api/cases/open", authenticateToken, caseOpenLimiter, async (req, res)
       const itemName = `${randomWeapon} | ${randomSkin}`;
       const itemPrice = (rarityPrices[rarity] || 1) * (0.5 + Math.random() * 1.5);
 
-      // Generate deterministic icon_url hash for Akamai CDN images
       const iconHash = generateIconUrlHash(itemName, Date.now() + i);
       const imageHD = buildAkamaiImageUrl(iconHash);
 
+      const serverSeed = crypto.randomBytes(32).toString('hex');
+      const clientSeed = crypto.randomBytes(16).toString('hex');
+      const nonce = Date.now() + i;
+      const provablyFairHash = crypto.createHash('sha256').update(`${serverSeed}:${clientSeed}:${nonce}:${itemName}`).digest('hex');
+
       await db.withTransaction(async (client) => {
         const insertResult = await client.query(
-          `INSERT INTO inventario (usuario_id, name, price, image, rarity, marketable, wear, weapon, skin_name, market_hash_name, icon_url)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          `INSERT INTO inventario (usuario_id, name, price, image, rarity, marketable, wear, weapon, skin_name, market_hash_name, icon_url, provably_fair_hash, server_seed, client_seed, nonce)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
            RETURNING item_id as id, name, price, image, rarity, marketable, status`,
           [req.user.id, itemName, parseFloat(itemPrice.toFixed(2)), imageHD,
-            rarity, true, randomWear, randomWeapon, randomSkin, itemName, iconHash]
+            rarity, true, randomWear, randomWeapon, randomSkin, itemName, iconHash, provablyFairHash, serverSeed, clientSeed, nonce]
         );
         results.push(insertResult.rows[0]);
       });
     }
 
-    // Deduct balance
     await db.query("UPDATE usuarios SET saldo = saldo - $1 WHERE usuario_id = $2", [totalCost, req.user.id]);
     await recordTransaction(req.user.id, 'apertura_caja', totalCost, 'saldo_sitio', `Apertura de ${quantity || 1}x ${caseId}`);
-    await logAction(req.user.id, 'ABRIR_CAJA', { caseId, quantity, winnings: results.map(r => r.name) });
+    await logAction(req.user.id, 'ABRIR_CAJA', { caseId, quantity, winnings: results.map(r => r.name), provablyFairHashes: results.map(r => r.provably_fair_hash) });
 
     res.json({ success: true, items: results, newBalance: userResult.rows[0].saldo - totalCost });
   } catch (err) {
@@ -741,20 +773,16 @@ app.post("/api/validate-trade-url", authenticateToken, async (req, res) => {
   const partnerId = partnerMatch[1];
   const token = tokenMatch[1];
 
-  // Validate partner ID is numeric and reasonable length
   if (!/^\d+$/.test(partnerId) || partnerId.length < 5) {
     return res.json({ valid: false, error: "Partner ID inválido en la Trade URL.", code: "INVALID_PARTNER_ID" });
   }
 
-  // Validate token format (alphanumeric + hyphens)
   if (!/^[\w-]+$/.test(token) || token.length < 5) {
     return res.json({ valid: false, error: "Token de intercambio inválido.", code: "INVALID_TOKEN" });
   }
 
-  // Convert partner to SteamID64
   const steamId64 = (BigInt(partnerId) + BigInt("76561197960265728")).toString();
 
-  // Also check if URL is a valid steamcommerce offer
   if (!url.includes("steamcommunity.com/tradeoffer/")) {
     return res.json({
       valid: false,
@@ -768,7 +796,7 @@ app.post("/api/validate-trade-url", authenticateToken, async (req, res) => {
 
 // ─── WITHDRAW FALLBACK: Sell skin for 100% balance ──────────
 app.post("/api/inventory/withdraw-fallback", authenticateToken, async (req, res) => {
-  const { itemId, action } = req.body; // action: 'sell' or 'replace'
+  const { itemId, action } = req.body;
   if (!itemId || !action) return res.status(400).json({ error: "itemId y action requeridos" });
 
   try {
@@ -782,7 +810,6 @@ app.post("/api/inventory/withdraw-fallback", authenticateToken, async (req, res)
     const item = itemResult.rows[0];
 
     if (action === 'sell') {
-      // Sell for 100% value (KeyDrop-style: full refund when bot has no stock)
       await db.withTransaction(async (client) => {
         await client.query("UPDATE inventario SET status = 'sold' WHERE item_id = $1", [itemId]);
         await client.query(
@@ -803,7 +830,6 @@ app.post("/api/inventory/withdraw-fallback", authenticateToken, async (req, res)
         message: `✅ Skin vendida por €${item.price} en saldo (100% del valor).`
       });
     } else if (action === 'replace') {
-      // Buscar skin de reemplazo del mismo precio en el catálogo
       const replacementResult = await db.query(
         `SELECT item_id, name, price, image, rarity, market_hash_name, wear, weapon, skin_name
          FROM inventario
@@ -814,7 +840,6 @@ app.post("/api/inventory/withdraw-fallback", authenticateToken, async (req, res)
       );
 
       if (replacementResult.rows.length === 0) {
-        // No replacement found, offer sell instead
         return res.json({
           success: false,
           error: "No hay skins de reemplazo disponibles en este momento.",
@@ -827,9 +852,7 @@ app.post("/api/inventory/withdraw-fallback", authenticateToken, async (req, res)
       const replacement = replacementResult.rows[0];
 
       await db.withTransaction(async (client) => {
-        // Mark old item as replaced
         await client.query("UPDATE inventario SET status = 'replaced' WHERE item_id = $1", [itemId]);
-        // Clone replacement to user
         await client.query(
           `INSERT INTO inventario (usuario_id, name, price, image, rarity, marketable, market_hash_name, wear, weapon, skin_name, status)
            VALUES ($1, $2, $3, $4, $5, true, $6, $7, $8, $9, 'on_site')`,
@@ -933,25 +956,37 @@ app.post("/api/inventory/sell", authenticateToken, async (req, res) => {
 // ─── REAL WITHDRAW TO STEAM TRADE OFFER ──────────────────
 app.post("/api/inventory/withdraw", authenticateToken, withdrawLimiter, async (req, res) => {
   const { itemId } = req.body;
+
+  // [TRADE] Log de inicio de retiro
+  log(LOG_LEVELS.INFO, 'TRADE', `[TRADE] Iniciando retiro - ItemID: ${itemId} para usuario: ${req.user.id}`);
+
   try {
     const itemResult = await db.query("SELECT * FROM inventario WHERE item_id = $1 AND usuario_id = $2 AND status = 'on_site'", [itemId, req.user.id]);
-    if (itemResult.rows.length === 0) return res.status(404).json({ error: "Objeto no disponible para retirar" });
+    if (itemResult.rows.length === 0) {
+      log(LOG_LEVELS.WARN, 'TRADE', `[TRADE] Item ${itemId} no disponible para retiro (usuario: ${req.user.id})`);
+      return res.status(404).json({ error: "Objeto no disponible para retirar" });
+    }
     const item = itemResult.rows[0];
 
     const userResult = await db.query("SELECT link_intercambio, steam_id, trade_token FROM usuarios WHERE usuario_id = $1", [req.user.id]);
     const user = userResult.rows[0];
 
     if (!user.steam_id || !user.trade_token) {
+      log(LOG_LEVELS.WARN, 'TRADE', `[TRADE] Usuario ${req.user.id} sin Steam ID o Trade Token configurado`);
       return res.status(400).json({
-        error: "Configura tu Link de Intercambio de Steam en el perfil antes de retirar.",
-        code: "TRADE_URL_MISSING",
-        action: "update_profile"
+        success: false,
+        error: 'Debes configurar tu Steam Trade URL en tu perfil antes de solicitar un retiro.',
+        code: "TRADE_URL_MISSING"
       });
     }
 
+    // [TRADE] Log del estado del bot
+    const botStatus = botEngine.isLoggedIn ? 'Conectado' : 'Desconectado';
+    log(LOG_LEVELS.INFO, 'TRADE', `[TRADE] Estado del Bot: ${botStatus} | Intentando retirar: ${item.name} (${item.market_hash_name || item.name}) para SteamID: ${user.steam_id}`);
+
     if (botEngine.isLoggedIn) {
       try {
-        log(LOG_LEVELS.INFO, 'STEAM TRADE', `Generando oferta real -> SteamID: ${user.steam_id} -> Item: ${item.name} (${item.market_hash_name || item.name})`);
+        log(LOG_LEVELS.INFO, 'TRADE', `[TRADE] Solicitando retiro de item: ${item.market_hash_name || item.name} para SteamID: ${user.steam_id}`);
 
         const result = await botEngine.sendWithdrawOffer(
           user.steam_id,
@@ -961,9 +996,11 @@ app.post("/api/inventory/withdraw", authenticateToken, withdrawLimiter, async (r
         );
 
         if (result.success) {
+          log(LOG_LEVELS.INFO, 'TRADE', `[TRADE] ✅ Oferta enviada exitosamente - OfferID: ${result.offerId} | Item: ${item.name}`);
+
           await db.query("UPDATE inventario SET status = 'withdrawn' WHERE item_id = $1", [itemId]);
           await recordTransaction(req.user.id, 'retiro', item.price, 'steam_trade', `Retiro real: ${item.name} - Offer ID: ${result.offerId}`);
-          await logAction(req.user.id, 'RETIRAR_ITEM_REAL', { itemId, itemName: item.name, offerId: result.offerId });
+          await logAction(req.user.id, 'RETIRAR_ITEM_REAL', { itemId, itemName: item.name, offerId: result.offerId, marketHashName: item.market_hash_name });
 
           if (req.app.get('io')) {
             req.app.get('io').to(req.user.id.toString()).emit('withdrawal_update', {
@@ -974,6 +1011,7 @@ app.post("/api/inventory/withdraw", authenticateToken, withdrawLimiter, async (r
 
           return res.json({ success: true, offerId: result.offerId, message: `Oferta #${result.offerId} enviada a Steam. Revisa tu inventario.` });
         } else {
+          log(LOG_LEVELS.ERROR, 'TRADE', `[TRADE] ❌ Fallo al enviar oferta - Error: ${result.error} | Item: ${item.name}`);
           return res.status(400).json({
             success: false,
             error: result.error || "No se pudo enviar la oferta real. Inténtalo más tarde.",
@@ -982,7 +1020,7 @@ app.post("/api/inventory/withdraw", authenticateToken, withdrawLimiter, async (r
           });
         }
       } catch (botErr) {
-        log(LOG_LEVELS.ERROR, 'WITHDRAW', 'Error del bot', { error: botErr.message });
+        log(LOG_LEVELS.ERROR, 'TRADE', `[TRADE] ❌ Error del bot en retiro - ${botErr.message} | Item: ${item.name}`);
         return res.status(500).json({
           success: false,
           error: "Servicio de trades temporalmente no disponible. Intenta de nuevo.",
@@ -991,14 +1029,15 @@ app.post("/api/inventory/withdraw", authenticateToken, withdrawLimiter, async (r
         });
       }
     } else {
+      log(LOG_LEVELS.WARN, 'TRADE', `[TRADE] Bot no disponible - Usuario: ${req.user.id} intentó retirar: ${item.name}`);
       return res.status(503).json({
         success: false,
-        error: "Bot de Steam desconectado. Los retiros se reanudarán cuando el bot se reconecte.",
+        error: 'Servicio de intercambio de Steam está reconectándose. Inténtalo en unos instantes.',
         code: 'BOT_NOT_AVAILABLE'
       });
     }
   } catch (err) {
-    log(LOG_LEVELS.ERROR, 'WITHDRAW', 'Error en retiro', { error: err.message });
+    log(LOG_LEVELS.ERROR, 'TRADE', `[TRADE] Error fatal en retiro - ${err.message} | ItemID: ${itemId}`);
     res.status(500).json({ error: "Error al procesar el retiro", details: err.message });
   }
 });
@@ -1239,10 +1278,53 @@ app.post("/api/p2p/search", authenticateToken, async (req, res) => {
 });
 
 // ─── GLOBAL ERROR HANDLER ────────────────────────
-process.on('unhandledRejection', (reason) => { log(LOG_LEVELS.ERROR, 'GLOBAL', 'Unhandled Rejection', { reason: reason?.toString() }); });
+process.on('unhandledRejection', (reason) => {
+  log(LOG_LEVELS.ERROR, 'GLOBAL', 'Unhandled Rejection', { reason: reason?.toString() });
+  // En producción, no dejar que el proceso se caiga
+  if (process.env.NODE_ENV === 'production') {
+    log(LOG_LEVELS.WARN, 'GLOBAL', 'Unhandled rejection capturada en producción - proceso continúa');
+  }
+});
+
 process.on('uncaughtException', (err) => {
   log(LOG_LEVELS.ERROR, 'GLOBAL', 'Uncaught Exception', { error: err.message, stack: err.stack });
-  if (process.env.NODE_ENV !== 'production') process.exit(1);
+  // En producción, intentar recuperación graceful en lugar de exit
+  if (process.env.NODE_ENV === 'production') {
+    log(LOG_LEVELS.ERROR, 'GLOBAL', 'Error crítico en producción - se recomienda reinicio manual');
+  } else {
+    process.exit(1);
+  }
+});
+
+// ─── RESPONSE ERROR MIDDLEWARE ───────────────────
+app.use((err, req, res, next) => {
+  log(LOG_LEVELS.ERROR, 'GLOBAL', 'Error en middleware global', {
+    error: err.message,
+    stack: err.stack,
+    url: req.url,
+    method: req.method
+  });
+
+  // Siempre devolver JSON estructurado
+  res.status(500).json({
+    success: false,
+    error: process.env.NODE_ENV === 'production'
+      ? 'Error interno del servidor'
+      : err.message
+  });
+});
+
+// ─── SKIN PRICES CACHE WITH HTTP CACHE HEADERS ─────
+const skinPricesPath = path.join(__dirname, '../../public/skin_prices.json');
+app.get('/skin_prices.json', (req, res) => {
+  if (!fs.existsSync(skinPricesPath)) {
+    return res.status(404).json({ error: "Cache de precios no disponible" });
+  }
+
+  // Cache-Control: public, max-age=300 (5 minutos)
+  res.set('Cache-Control', 'public, max-age=300');
+  res.set('Content-Type', 'application/json');
+  res.sendFile(skinPricesPath);
 });
 
 // ─── SPA CATCH-ALL ───────────────────────────────
@@ -1320,8 +1402,6 @@ app.post("/api/admin/refresh-prices", authenticateToken, isAdmin, async (req, re
 });
 
 // ─── CS2 PRICE SYNC ENGINE ──────────────────────────────
-// Endpoint público para sincronizar precios de skins desde CSGO-API / PriceEmpire
-// Se ejecuta también como tarea periódica vía node-cron
 app.get("/api/skins/sync-market-prices", async (req, res) => {
   try {
     log(LOG_LEVELS.INFO, 'PRICE_SYNC', 'Iniciando sincronización de precios CS2...');
@@ -1329,7 +1409,6 @@ app.get("/api/skins/sync-market-prices", async (req, res) => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    // Intentar obtener precios desde la API pública de CSGO-API (sin key)
     const response = await fetch(
       'https://csgo-api.vercel.app/api/skins/prices',
       {
@@ -1344,7 +1423,6 @@ app.get("/api/skins/sync-market-prices", async (req, res) => {
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      // Fallback: intentar con PriceEmpire API
       log(LOG_LEVELS.WARN, 'PRICE_SYNC', 'CSGO-API falló, intentando PriceEmpire...');
       const fallbackController = new AbortController();
       const fallbackTimeout = setTimeout(() => fallbackController.abort(), 30000);
@@ -1373,7 +1451,6 @@ app.get("/api/skins/sync-market-prices", async (req, res) => {
       const fallbackData = await fallbackResponse.json();
       log(LOG_LEVELS.INFO, 'PRICE_SYNC', `PriceEmpire respondió con ${fallbackData?.length || 0} precios`);
 
-      // Actualizar precios en la base de datos
       if (Array.isArray(fallbackData) && fallbackData.length > 0) {
         let updated = 0;
         for (const item of fallbackData.slice(0, 500)) {
@@ -1399,7 +1476,6 @@ app.get("/api/skins/sync-market-prices", async (req, res) => {
     const data = await response.json();
     log(LOG_LEVELS.INFO, 'PRICE_SYNC', `CSGO-API respondió con ${data?.length || 0} precios`);
 
-    // Actualizar precios en la base de datos
     if (Array.isArray(data) && data.length > 0) {
       let updated = 0;
       for (const item of data.slice(0, 500)) {

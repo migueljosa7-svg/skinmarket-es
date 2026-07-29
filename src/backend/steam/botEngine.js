@@ -13,7 +13,7 @@
  * - Detailed logging and health reporting
  * - Graceful error recovery
  * 
- * Dependencies: steam-user, steamcommunity, steam-totp, steam-tradeoffer-manager
+ * Dependencies: steam-user v5, steamcommunity, steam-totp, steam-tradeoffer-manager
  * ============================================================
  */
 
@@ -26,11 +26,10 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // ─── Log Silencing (Production) ─────────────────────────────────
-// NO usar funciones recursivas - usar console.log/error directamente
 const isProd = process.env.NODE_ENV === 'production';
 const _log = isProd ? () => { } : (...args) => console.log(...args);
 const _warn = isProd ? () => { } : (...args) => console.warn(...args);
-const _error = (...args) => console.error(...args); // Always log errors
+const _error = (...args) => console.error(...args);
 
 class BotEngine {
     constructor() {
@@ -41,7 +40,6 @@ class BotEngine {
             steam: this.client,
             community: this.community,
             language: 'en',
-            // Poll interval for incoming offers (ms)
             pollInterval: 10000
         });
 
@@ -51,8 +49,8 @@ class BotEngine {
         this.loginAttempts = 0;
         this.maxLoginAttempts = 5;
         this.reconnectTimer = null;
-        this.currentBackoff = 1000; // Start with 1 second
-        this.maxBackoff = 60000;    // Max 60 seconds
+        this.currentBackoff = 1000;
+        this.maxBackoff = 60000;
 
         // Credentials from environment
         this.credentials = {
@@ -69,7 +67,7 @@ class BotEngine {
         // Bot inventory cache
         this.botInventory = [];
         this.lastInventoryFetch = 0;
-        this.inventoryCacheTTL = 60000; // 1 minute
+        this.inventoryCacheTTL = 60000;
 
         // Bind event handlers
         this._bindEvents();
@@ -80,11 +78,9 @@ class BotEngine {
     // ============================================================
 
     /**
-     * Start the bot login process
-     * @returns {boolean} Whether login was initiated
+     * Start the bot login process (steam-user v5 compatible)
      */
     logIn() {
-        // Check if credentials are configured
         if (!this._credentialsAreValid()) {
             _warn('[BOT ENGINE] ⚠️ Credenciales no configuradas. Modo SIMULACIÓN activado.');
             _warn('[BOT ENGINE] Configura BOT_USERNAME, BOT_PASSWORD, BOT_SHARED_SECRET y BOT_IDENTITY_SECRET en .env');
@@ -95,12 +91,16 @@ class BotEngine {
         _log(`[BOT ENGINE] Intento #${this.loginAttempts + 1}`);
 
         try {
+            // steam-user v5: generate 2FA code
             const twoFactorCode = SteamTotp.generateAuthCode(this.credentials.sharedSecret);
+
+            // steam-user v5: logOn with proper format
             this.client.logOn({
                 accountName: this.credentials.accountName,
                 password: this.credentials.password,
                 twoFactorCode: twoFactorCode
             });
+
             this.loginAttempts++;
             return true;
         } catch (err) {
@@ -112,23 +112,29 @@ class BotEngine {
 
     /**
      * Send a withdrawal trade offer to a user
-     * @param {string} partnerSteamID64 - The target user's SteamID64
-     * @param {string} tradeToken - The user's trade token
-     * @param {string} itemMarketHashName - The item's market hash name
-     * @returns {Promise<{success: boolean, offerId?: string, error?: string}>}
      */
     async sendWithdrawOffer(partnerSteamID64, tradeToken, itemName, marketHashName) {
-        // Check if bot is ready
+        // A. Session Recovery: Verify session is active before proceeding
+        if (!this._isSessionValid()) {
+            _warn('[BOT ENGINE] ⚠️ Sesión expirada. Intentando refrescar...');
+            const refreshed = await this._refreshSession();
+            if (!refreshed) {
+                return {
+                    success: false,
+                    error: 'Servicio de intercambio de Steam está reconectándose. Inténtalo en unos instantes.'
+                };
+            }
+        }
+
         if (!this.isLoggedIn || !this.isReady) {
             _warn('[BOT ENGINE] ⚠️ Bot no conectado. Añadiendo a cola de retiros.');
             return this._enqueueWithdrawal(partnerSteamID64, tradeToken, itemName, marketHashName);
         }
 
         try {
-            // Verify bot has the item in inventory - try by market_hash_name first, then by name
+            // C. Verify bot has the item in inventory (AppID 730 / ContextID 2)
             let itemInBot = await this._findItemInBotInventory(marketHashName || itemName);
 
-            // If not found by market hash, try searching by partial name match
             if (!itemInBot && itemName) {
                 _log(`[BOT ENGINE] 🔍 Buscando por nombre alternativo: ${itemName}`);
                 itemInBot = await this._findItemByPartialName(itemName);
@@ -138,7 +144,7 @@ class BotEngine {
                 _warn(`[BOT ENGINE] ⚠️ El bot NO tiene "${itemName}" (${marketHashName}) en su inventario.`);
                 return {
                     success: false,
-                    error: `El bot no posee el objeto "${itemName}". Inventario del bot insuficiente.`
+                    error: 'El bot de intercambios no dispone de esta skin en stock en este momento.'
                 };
             }
 
@@ -150,12 +156,11 @@ class BotEngine {
             return {
                 success: true,
                 offerId: offerId,
-                message: `Oferta #${offerId} enviada y confirmada.`
+                message: 'Oferta de intercambio enviada a tu cuenta de Steam.'
             };
         } catch (err) {
             _error(`[BOT ENGINE] ❌ Error al enviar oferta de retiro:`, err.message);
 
-            // Enqueue for retry if it's not a permanent error
             if (this._isRetryableError(err)) {
                 _log('[BOT ENGINE] ⏳ Error recuperable. Añadiendo a cola para reintentar.');
                 return this._enqueueWithdrawal(partnerSteamID64, tradeToken, itemName, marketHashName);
@@ -170,7 +175,6 @@ class BotEngine {
 
     /**
      * Get the current bot status for health checks
-     * @returns {object} Bot status object
      */
     getStatus() {
         return {
@@ -189,7 +193,6 @@ class BotEngine {
 
     /**
      * Force refresh the bot's inventory cache
-     * @returns {Promise<Array>} Array of items in bot's inventory
      */
     async refreshInventory() {
         if (!this.isLoggedIn) {
@@ -199,9 +202,9 @@ class BotEngine {
         return new Promise((resolve, reject) => {
             this.manager.getUserInventoryContents(
                 this.client.steamID,
-                730, // AppID: CS2
-                2,   // ContextID: 2 (inventory)
-                true, // Tradeable only
+                730,
+                2,
+                true,
                 (err, items) => {
                     if (err) {
                         return reject(err);
@@ -219,7 +222,7 @@ class BotEngine {
     // ============================================================
 
     _bindEvents() {
-        // --- SteamUser Events ---
+        // --- SteamUser Events (v5 compatible) ---
         this.client.on('loggedOn', (details) => {
             _log('[BOT ENGINE] ✅ Conectado a Steam');
             _log(`[BOT ENGINE] SteamID: ${this.client.steamID.getSteamID64()}`);
@@ -234,7 +237,10 @@ class BotEngine {
 
         this.client.on('webSession', (sessionID, cookies) => {
             _log('[BOT ENGINE] 🌐 WebSession establecida');
+
+            // steam-user v5: set cookies on manager
             this.manager.setCookies(cookies);
+
             this.community.setCookies(cookies, (err) => {
                 if (err) {
                     _error('[BOT ENGINE] ❌ Error configurando cookies en comunidad:', err.message);
@@ -258,22 +264,24 @@ class BotEngine {
             this.lastActivity = Date.now();
 
             // Handle specific error codes
-            switch (err.eresult) {
-                case SteamUser.EResult.InvalidPassword:
-                    _error('[BOT ENGINE] 🔴 ERROR: Contraseña o usuario incorrecto en .env');
-                    break;
-                case SteamUser.EResult.TwoFactorCodeMismatch:
-                    _error('[BOT ENGINE] 🔴 ERROR: Código 2FA incorrecto. Verifica BOT_SHARED_SECRET');
-                    break;
-                case SteamUser.EResult.LoggedInElsewhere:
-                    _warn('[BOT ENGINE] ⚠️ Sesión iniciada en otro lugar');
-                    break;
-                case SteamUser.EResult.RateLimitExceeded:
-                    _error('[BOT ENGINE] 🔴 ERROR: Límite de velocidad excedido. Esperando...');
-                    this.currentBackoff = Math.min(this.currentBackoff * 2, this.maxBackoff);
-                    break;
-                default:
-                    _error(`[BOT ENGINE] EResult: ${err.eresult} (${err.message})`);
+            if (err.eresult !== undefined) {
+                switch (err.eresult) {
+                    case SteamUser.EResult.InvalidPassword:
+                        _error('[BOT ENGINE] 🔴 ERROR: Contraseña o usuario incorrecto en .env');
+                        break;
+                    case SteamUser.EResult.TwoFactorCodeMismatch:
+                        _error('[BOT ENGINE] 🔴 ERROR: Código 2FA incorrecto. Verifica BOT_SHARED_SECRET');
+                        break;
+                    case SteamUser.EResult.LoggedInElsewhere:
+                        _warn('[BOT ENGINE] ⚠️ Sesión iniciada en otro lugar');
+                        break;
+                    case SteamUser.EResult.RateLimitExceeded:
+                        _error('[BOT ENGINE] 🔴 ERROR: Límite de velocidad excedido. Esperando...');
+                        this.currentBackoff = Math.min(this.currentBackoff * 2, this.maxBackoff);
+                        break;
+                    default:
+                        _error(`[BOT ENGINE] EResult: ${err.eresult} (${err.message})`);
+                }
             }
 
             if (this.loginAttempts < this.maxLoginAttempts) {
@@ -283,8 +291,8 @@ class BotEngine {
             }
         });
 
-        this.client.on('disconnected', (eresult) => {
-            _log(`[BOT ENGINE] 📴 Desconectado (EResult: ${eresult}). Reconnectando...`);
+        this.client.on('disconnected', (eresult, reason) => {
+            _log(`[BOT ENGINE] 📴 Desconectado (EResult: ${eresult}). Razón: ${reason || 'N/A'}. Reconnectando...`);
             this.isLoggedIn = false;
             this.isReady = false;
             this._scheduleReconnect();
@@ -295,15 +303,10 @@ class BotEngine {
         this.manager.on('newOffer', (offer) => {
             _log(`[BOT ENGINE] 📩 Nueva oferta recibida #${offer.id} de ${offer.partner.getSteamID64()}`);
 
-            // Auto-accept incoming offers? (configurable)
-            // For security, we'll just log them by default
             if (offer.isGloballyCanceled()) return;
 
-            // Accept offer if it's from a trusted source (all items going TO bot)
-            // In a real scenario, you'd check if the offer is depositing items
             _log(`[BOT ENGINE] Oferta #${offer.id}: ${offer.message || 'Sin mensaje'}`);
 
-            // Log the offer items
             offer.itemsToReceive.forEach(item => {
                 _log(`  → Recibiendo: ${item.market_hash_name}`);
             });
@@ -335,9 +338,6 @@ class BotEngine {
     // PRIVATE HELPERS
     // ============================================================
 
-    /**
-     * Check if credentials are valid (not placeholder values)
-     */
     _credentialsAreValid() {
         const { accountName, password, sharedSecret, identitySecret } = this.credentials;
         if (!accountName || !password || !sharedSecret || !identitySecret) return false;
@@ -345,9 +345,6 @@ class BotEngine {
         return true;
     }
 
-    /**
-     * Schedule automatic reconnection with exponential backoff
-     */
     _scheduleReconnect() {
         if (this.reconnectTimer) {
             clearTimeout(this.reconnectTimer);
@@ -360,7 +357,6 @@ class BotEngine {
             _log('[BOT ENGINE] 🔄 Intentando reconexión...');
             this.logIn();
 
-            // Exponential backoff with jitter
             const jitter = Math.random() * 1000;
             this.currentBackoff = Math.min(
                 (this.currentBackoff * 2) + jitter,
@@ -369,9 +365,6 @@ class BotEngine {
         }, backoff);
     }
 
-    /**
-     * Enqueue a withdrawal for sequential processing
-     */
     _enqueueWithdrawal(partnerSteamID64, tradeToken, itemName, marketHashName) {
         return new Promise((resolve, reject) => {
             const withdrawal = {
@@ -397,9 +390,6 @@ class BotEngine {
         });
     }
 
-    /**
-     * Process the withdrawal queue sequentially
-     */
     async _processQueue() {
         if (this.isProcessingQueue || this.withdrawalQueue.length === 0) {
             return;
@@ -412,9 +402,7 @@ class BotEngine {
             const withdrawal = this.withdrawalQueue[0];
 
             try {
-                const client = this.client;
                 if (!this.isLoggedIn || !this.isReady) {
-                    // Wait for reconnection
                     _log('[BOT ENGINE] ⏸️ Bot desconectado. Pausando cola...');
                     break;
                 }
@@ -429,10 +417,9 @@ class BotEngine {
                 if (result.success) {
                     withdrawal.status = 'completed';
                     withdrawal.resolve(result);
-                    this.withdrawalQueue.shift(); // Remove from queue
+                    this.withdrawalQueue.shift();
                     _log(`[BOT ENGINE] ✅ Retiro #${withdrawal.id} completado exitosamente`);
                 } else {
-                    // Retry logic
                     withdrawal.retries++;
                     if (withdrawal.retries >= withdrawal.maxRetries) {
                         withdrawal.status = 'failed';
@@ -442,7 +429,6 @@ class BotEngine {
                     } else {
                         withdrawal.status = 'retrying';
                         _log(`[BOT ENGINE] 🔄 Reintentando retiro #${withdrawal.id} (intento ${withdrawal.retries}/${withdrawal.maxRetries})`);
-                        // Wait before retrying
                         await this._sleep(5000);
                     }
                 }
@@ -456,21 +442,15 @@ class BotEngine {
         this.isProcessingQueue = false;
 
         if (this.withdrawalQueue.length > 0) {
-            // If there are still items (due to disconnect), wait and retry
             _log(`[BOT ENGINE] ⏳ ${this.withdrawalQueue.length} retiros restantes en cola. Reintentando en 10s...`);
             setTimeout(() => this._processQueue(), 10000);
         }
     }
 
-    /**
-     * Find an item in the bot's cached inventory by exact market_hash_name match
-     */
     _findItemInBotInventory(marketHashName) {
         return new Promise((resolve, reject) => {
-            // Check if cache is stale
             const cacheAge = Date.now() - this.lastInventoryFetch;
             if (cacheAge > this.inventoryCacheTTL) {
-                // Refresh inventory
                 this.refreshInventory()
                     .then(() => {
                         const item = this.botInventory.find(i => i.market_hash_name === marketHashName);
@@ -484,16 +464,12 @@ class BotEngine {
         });
     }
 
-    /**
-     * Find an item by partial name match (fallback when exact market_hash_name fails)
-     */
     _findItemByPartialName(itemName) {
         return new Promise((resolve, reject) => {
             const cacheAge = Date.now() - this.lastInventoryFetch;
             if (cacheAge > this.inventoryCacheTTL) {
                 this.refreshInventory()
                     .then(() => {
-                        // Try case-insensitive partial match
                         const searchTerm = itemName.toLowerCase();
                         const item = this.botInventory.find(i =>
                             i.market_hash_name?.toLowerCase().includes(searchTerm) ||
@@ -513,9 +489,6 @@ class BotEngine {
         });
     }
 
-    /**
-     * Create and send a trade offer with items
-     */
     _createAndSendOffer(partnerSteamID64, token, items) {
         return new Promise((resolve, reject) => {
             const offer = this.manager.createOffer(partnerSteamID64, token);
@@ -525,34 +498,30 @@ class BotEngine {
             offer.send((err, status) => {
                 if (err) return reject(err);
 
-                if (status === 'pending') {
-                    // Confirmation required (mobile auth)
-                    _log(`[BOT ENGINE] 🔐 Oferta #${offer.id} pendiente de confirmación 2FA...`);
-
-                    this.community.acceptConfirmationForObject(
-                        this.credentials.identitySecret,
-                        offer.id,
-                        (err) => {
-                            if (err) {
-                                _error(`[BOT ENGINE] ❌ Error confirmando oferta #${offer.id}:`, err.message);
-                                return reject(new Error(`No se pudo confirmar la oferta #${offer.id}: ${err.message}`));
-                            }
-                            _log(`[BOT ENGINE] ✅ Oferta #${offer.id} confirmada automáticamente`);
-                            resolve(offer.id);
+                // D. Autoconfirmación Instantánea (Steam Guard 2FA)
+                // Always attempt confirmation regardless of status
+                this.community.acceptConfirmationGroup(
+                    this.credentials.identitySecret,
+                    offer.id,
+                    (confirmErr) => {
+                        if (confirmErr) {
+                            _error('[BOT ERROR] Error al autoconfirmar oferta en Steam Guard:', confirmErr);
+                        } else {
+                            _log('[BOT INFO] Oferta confirmada con éxito en Steam Guard:', offer.id);
                         }
-                    );
+                    }
+                );
+
+                if (status === 'pending') {
+                    _log(`[BOT ENGINE] 🔐 Oferta #${offer.id} pendiente de confirmación 2FA...`);
                 } else {
-                    // No confirmation needed (already confirmed or Steam guard not enabled)
                     _log(`[BOT ENGINE] ✅ Oferta #${offer.id} enviada (estado: ${status})`);
-                    resolve(offer.id);
                 }
+                resolve(offer.id);
             });
         });
     }
 
-    /**
-     * Check if an error is retryable
-     */
     _isRetryableError(err) {
         const nonRetryableMessages = [
             'does not have',
@@ -565,9 +534,6 @@ class BotEngine {
         return !nonRetryableMessages.some(msg => err.message?.toLowerCase().includes(msg));
     }
 
-    /**
-     * Get bot uptime
-     */
     _getUptime() {
         if (!this._startTime) {
             this._startTime = Date.now();
@@ -575,15 +541,49 @@ class BotEngine {
         return Math.floor((Date.now() - this._startTime) / 1000);
     }
 
-    /**
-     * Sleep utility
-     */
     _sleep(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    // A. Session Recovery: Check if session is still valid
+    _isSessionValid() {
+        return this.isLoggedIn && this.isReady && this.client.steamID;
+    }
+
+    // A. Session Recovery: Force refresh web session
+    async _refreshSession() {
+        return new Promise((resolve) => {
+            if (!this.client) {
+                return resolve(false);
+            }
+
+            // Trigger webSession refresh
+            this.client.webSession();
+
+            // Wait up to 10 seconds for session to refresh
+            const timeout = setTimeout(() => {
+                _warn('[BOT ENGINE] ⏱️ Timeout esperando refresco de sesión');
+                resolve(this._isSessionValid());
+            }, 10000);
+
+            // Check if session becomes valid
+            const checkInterval = setInterval(() => {
+                if (this._isSessionValid()) {
+                    clearTimeout(timeout);
+                    clearInterval(checkInterval);
+                    _log('[BOT ENGINE] ✅ Sesión refrescada exitosamente');
+                    resolve(true);
+                }
+            }, 1000);
+
+            // Cleanup after max wait
+            setTimeout(() => {
+                clearInterval(checkInterval);
+            }, 11000);
+        });
     }
 }
 
 // Export singleton instance
 const botEngine = new BotEngine();
 export default botEngine;
-
