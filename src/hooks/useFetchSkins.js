@@ -6,6 +6,26 @@ const SKINS_API = 'https://raw.githubusercontent.com/ByMykel/CSGO-API/main/publi
 let cachedSkins = null;
 let priceMap = null;
 
+/**
+ * Extract the Steam economy image hash from a full CDN URL.
+ * @param {string} imageUrl - Full CDN URL (e.g. https://community.akamai.steamstatic.com/economy/image/HASH/360fx360f)
+ * @returns {string} The raw hash or empty string
+ */
+function extractIconUrlHash(imageUrl) {
+  if (!imageUrl || typeof imageUrl !== 'string') return '';
+  // Match the hash between /economy/image/ and the next slash
+  const match = imageUrl.match(/\/economy\/image\/([^/?#]+)/);
+  if (match && match[1]) {
+    // Clean any trailing size specifiers
+    return match[1].replace(/\/[^/]+$/, '');
+  }
+  // If it's already just a hash (no full URL), return it
+  if (/^[-a-zA-Z0-9_/=]{50,}$/.test(imageUrl)) {
+    return imageUrl;
+  }
+  return '';
+}
+
 export const getSkins = async () => {
   // Return cached skins if we have them (with or without priceMap)
   if (cachedSkins) return cachedSkins;
@@ -32,6 +52,14 @@ export const getSkins = async () => {
     }
 
     cachedSkins = result.map((skin) => {
+      // Extract the raw icon_url hash from the API image field
+      const imageHash = extractIconUrlHash(skin.image);
+      
+      // Build the HD CDN URL using the official Steam Akamai endpoint with /360fx360f
+      const imageHD = imageHash
+        ? `https://steamcommunity-a.akamaihd.net/economy/image/${imageHash}/360fx360f`
+        : (skin.image || "");
+
       let basePrice = priceMap[skin.name];
       if (!basePrice) {
         // Fallback si no hay precio real
@@ -50,7 +78,8 @@ export const getSkins = async () => {
         name: skin.name,
         price: parseFloat(basePrice.toFixed(2)),
         rarity: skin.rarity?.name || "Unknown",
-        image: skin.image || "",
+        image: imageHD,
+        icon_url: imageHash, // Store the raw hash for DB storage
         raw: skin,
       };
     });

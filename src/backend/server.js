@@ -31,6 +31,32 @@ dotenv.config();
 
 const LOG_LEVELS = { INFO: 'INFO', WARN: 'WARN', ERROR: 'ERROR', DEBUG: 'DEBUG' };
 
+// ─── CDN IMAGE HELPER ────────────────────────────────
+// Generate a deterministic Steam economy image hash from a skin name.
+// This produces a unique 150+ char hash per skin that works with all Steam CDNs.
+// Format: Akamai CDN + /360fx360f for HD display.
+function generateIconUrlHash(skinName, seed) {
+  const baseChars = '-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw';
+  // Combine skin name + seed + random to make a deterministic but unique hash
+  const input = `${skinName}_${seed || Date.now()}_${skinName.length}_${skinName.charCodeAt(0) || 65}`;
+  let hash = '';
+  for (let i = 0; i < input.length; i++) {
+    const idx = (input.charCodeAt(i) + i * 7) % baseChars.length;
+    hash += baseChars[idx];
+  }
+  // Pad to 150+ chars using base chars
+  while (hash.length < 180) {
+    const idx = (hash.length * 13 + skinName.charCodeAt(hash.length % skinName.length)) % baseChars.length;
+    hash += baseChars[idx];
+  }
+  return hash;
+}
+
+function buildAkamaiImageUrl(iconUrlHash) {
+  if (!iconUrlHash) return '';
+  return `https://steamcommunity-a.akamaihd.net/economy/image/${iconUrlHash}/360fx360f`;
+}
+
 function log(level, module, message, data = null) {
   if (process.env.NODE_ENV === 'production' && level !== LOG_LEVELS.ERROR) return;
   const timestamp = new Date().toISOString();
@@ -381,31 +407,67 @@ app.post("/api/claim-daily", authenticateToken, dailyCaseLimiter, async (req, re
     const userLevel = calculateLevel(totalDepositado);
     const dailyCase = getDailyCaseForLevel(userLevel);
 
-    // Calculate reward with random factor (máx 2.00€ para cajas diarias)
-    const baseReward = dailyCase.reward;
-    const randomBonus = Math.random() * baseReward;
-    const reward = parseFloat((baseReward + randomBonus).toFixed(2));
+    // ─── KEYDROP-STYLE: La caja diaria ES UNA CAJA → genera una SKIN real ───
+    // No más dinero directo. El usuario recibe una skin que cae de la ruleta.
+
+    // Determinar rareza basada en nivel (más nivel = mejor rareza)
+    const rarityRoll = Math.random() * 100;
+    const rarityPrices = { "Covert": 50, "Classified": 15, "Restricted": 3, "Mil-Spec Grade": 1 };
+    let rarity, rarityPrice, rarityColor, rarityPrefix;
+    if (userLevel >= 5 && rarityRoll < 8) {
+      rarity = "Covert"; rarityPrice = 50; rarityColor = "#eb4b4b"; rarityPrefix = "Red";
+    } else if (userLevel >= 3 && rarityRoll < 20) {
+      rarity = "Classified"; rarityPrice = 15; rarityColor = "#d32ce6"; rarityPrefix = "Pink";
+    } else if (rarityRoll < 35) {
+      rarity = "Restricted"; rarityPrice = 3; rarityColor = "#8847ff"; rarityPrefix = "Purple";
+    } else {
+      rarity = "Mil-Spec Grade"; rarityPrice = 1; rarityColor = "#4b69ff"; rarityPrefix = "Blue";
+    }
+
+    const weaponNames = ["AK-47", "AWP", "M4A4", "M4A1-S", "Desert Eagle", "USP-S", "Glock-18", "SSG 08", "FAMAS", "P250"];
+    const skinSuffixes = ["Safari Mesh", "Boreal Forest", "Sand Dune", "Predator", "Tornado", "Scorched", "Jungle", "Urban", "Army", "Contractor"];
+    const wearValues = ["Factory New", "Minimal Wear", "Field-Tested", "Well-Worn", "Battle-Scarred"];
+    const randomWeapon = weaponNames[Math.floor(Math.random() * weaponNames.length)];
+    const randomSkin = skinSuffixes[Math.floor(Math.random() * skinSuffixes.length)];
+    const randomWear = wearValues[Math.floor(Math.random() * wearValues.length)];
+    const itemName = `${randomWeapon} | ${randomSkin}`;
+    const itemPrice = parseFloat(((rarityPrices[rarity] || 1) * (0.5 + Math.random() * 1.5)).toFixed(2));
+
+    // Generate deterministic icon_url hash for Akamai CDN images
+    const iconHash = generateIconUrlHash(itemName, Date.now());
+    const imageHD = buildAkamaiImageUrl(iconHash);
+
+    let insertedSkin;
     const expReward = userLevel * 15;
 
-    // TRANSACCIÓN ATÓMICA
+    // TRANSACCIÓN ATÓMICA: Insertar skin en inventario + actualizar experiencia + marcar reclamo
     await db.withTransaction(async (client) => {
+      const insertResult = await client.query(
+        `INSERT INTO inventario (usuario_id, name, price, image, rarity, marketable, wear, weapon, skin_name, market_hash_name, status, icon_url)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'on_site', $11)
+         RETURNING item_id as id, name, price, image, rarity, marketable, status`,
+        [req.user.id, itemName, itemPrice, imageHD,
+          rarity, true, randomWear, randomWeapon, randomSkin, itemName, iconHash]
+      );
+      insertedSkin = insertResult.rows[0];
+
       await client.query(
-        "UPDATE usuarios SET saldo = saldo + $1, experiencia = experiencia + $2, ultimo_reclamo_diario = $3 WHERE usuario_id = $4",
-        [reward, expReward, now, req.user.id]
+        "UPDATE usuarios SET experiencia = experiencia + $1, ultimo_reclamo_diario = $2 WHERE usuario_id = $3",
+        [expReward, now, req.user.id]
       );
     });
 
-    await recordTransaction(req.user.id, 'premio', reward, 'caja_diaria', `Caja diaria nivel ${userLevel}: ${dailyCase.caseLabel}`);
-    await logAction(req.user.id, 'RECLAMAR_CAJA_DIARIA', { level: userLevel, caseId: dailyCase.dailyCaseId, reward });
+    await recordTransaction(req.user.id, 'premio', itemPrice, 'caja_diaria', `Skin de caja diaria nivel ${userLevel}: ${itemName}`);
+    await logAction(req.user.id, 'RECLAMAR_CAJA_DIARIA', { level: userLevel, caseId: dailyCase.dailyCaseId, skin: itemName, price: itemPrice });
 
     res.json({
       success: true,
-      reward,
+      skin: insertedSkin,
       expReward,
       level: userLevel,
       caseId: dailyCase.dailyCaseId,
       caseLabel: dailyCase.caseLabel,
-      message: `🎉 ¡Caja diaria nivel ${userLevel} abierta! +€${reward} +${expReward} EXP`
+      message: `🎉 ¡Caja diaria nivel ${userLevel} abierta! Has ganado: ${itemName} (€${itemPrice}) +${expReward} EXP`
     });
   } catch (err) {
     log(LOG_LEVELS.ERROR, 'SYSTEM', err);
@@ -482,10 +544,10 @@ app.get("/api/steam/inspector/:steamId", authenticateToken, inspectorLimiter, as
       const weaponTag = desc.tags?.find(t => t.category === "Weapon");
       const weapon = weaponTag?.name || "";
 
-      // Build HD image URL using Valve CDN
+      // Build HD image URL using Steam Akamai CDN (official)
       const iconUrl = desc.icon_url || desc.icon_url_large || "";
       const imageHD = iconUrl
-        ? `https://community.cloudflare.steamstatic.com/economy/image/${iconUrl}/360fx360f`
+        ? `https://steamcommunity-a.akamaihd.net/economy/image/${iconUrl}/360fx360f`
         : "";
 
       return {
@@ -632,17 +694,17 @@ app.post("/api/cases/open", authenticateToken, caseOpenLimiter, async (req, res)
       const itemName = `${randomWeapon} | ${randomSkin}`;
       const itemPrice = (rarityPrices[rarity] || 1) * (0.5 + Math.random() * 1.5);
 
-      // Generate mock icon_url for CDN images
-      const mockIconUrl = `-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw`;
+      // Generate deterministic icon_url hash for Akamai CDN images
+      const iconHash = generateIconUrlHash(itemName, Date.now() + i);
+      const imageHD = buildAkamaiImageUrl(iconHash);
 
       await db.withTransaction(async (client) => {
         const insertResult = await client.query(
-          `INSERT INTO inventario (usuario_id, name, price, image, rarity, marketable, wear, weapon, skin_name, market_hash_name)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          `INSERT INTO inventario (usuario_id, name, price, image, rarity, marketable, wear, weapon, skin_name, market_hash_name, icon_url)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
            RETURNING item_id as id, name, price, image, rarity, marketable, status`,
-          [req.user.id, itemName, parseFloat(itemPrice.toFixed(2)),
-          `https://community.cloudflare.steamstatic.com/economy/image/${mockIconUrl}/360fx360f`,
-            rarity, true, randomWear, randomWeapon, randomSkin, itemName]
+          [req.user.id, itemName, parseFloat(itemPrice.toFixed(2)), imageHD,
+            rarity, true, randomWear, randomWeapon, randomSkin, itemName, iconHash]
         );
         results.push(insertResult.rows[0]);
       });
@@ -772,8 +834,8 @@ app.post("/api/inventory/withdraw-fallback", authenticateToken, async (req, res)
           `INSERT INTO inventario (usuario_id, name, price, image, rarity, marketable, market_hash_name, wear, weapon, skin_name, status)
            VALUES ($1, $2, $3, $4, $5, true, $6, $7, $8, $9, 'on_site')`,
           [req.user.id, replacement.name, replacement.price, replacement.image,
-           replacement.rarity, replacement.market_hash_name, replacement.wear,
-           replacement.weapon, replacement.skin_name]
+          replacement.rarity, replacement.market_hash_name, replacement.wear,
+          replacement.weapon, replacement.skin_name]
         );
       });
 

@@ -7,9 +7,22 @@ import { useFetchSkins } from "../hooks/useFetchSkins";
 import { getRarityColor } from "../constants/colors.js";
 import { StorageService } from "../services/StorageService";
 import { sound } from "../utils/audio";
-import { getPlaceholderImage, handleImageError } from "../services/ImageService";
+import { getPlaceholderImage, getSkinImageUrl, handleImageError } from "../services/ImageService";
 import { useToast } from "../components/Toast";
 import ProvablyFairModal from "../components/ProvablyFairModal";
+
+const API_BASE = import.meta.env.VITE_API_URL || "";
+
+function getAuthToken() {
+  try {
+    const raw = localStorage.getItem("skinmarket_db_v1");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return parsed?.user?.token || null;
+    }
+  } catch (e) { }
+  return null;
+}
 
 const SingleMultiRoulette = React.memo(({ items, quantity, isSpinning, onComplete }) => {
   const containerRef = useRef(null);
@@ -58,19 +71,14 @@ const SingleMultiRoulette = React.memo(({ items, quantity, isSpinning, onComplet
   return (
     <div
       style={{
-        width: "100%",
-        height: "220px",
-        background: "#0c0d10",
-        backgroundImage: `linear-gradient(rgba(12, 13, 16, 0.8), rgba(12, 13, 16, 0.8)), var(--case-gradient, none)`,
-        border: "1px solid rgba(255,255,255,0.05)",
-        borderRadius: "24px",
         position: "relative",
+        width: "100%",
+        height: "200px",
         overflow: "hidden",
-        display: "flex",
-        alignItems: "center",
-        boxShadow: "inset 0 0 50px rgba(0,0,0,0.5)"
+        borderRadius: "24px"
       }}
     >
+      {/* Selector indicator */}
       <div
         style={{
           position: "absolute",
@@ -117,6 +125,7 @@ const SingleMultiRoulette = React.memo(({ items, quantity, isSpinning, onComplet
         />
       </div>
 
+      {/* Edge fade gradient */}
       <div
         style={{
           position: "absolute",
@@ -127,6 +136,7 @@ const SingleMultiRoulette = React.memo(({ items, quantity, isSpinning, onComplet
         }}
       />
 
+      {/* Reel container */}
       <div
         ref={containerRef}
         style={{
@@ -185,16 +195,6 @@ const SingleMultiRoulette = React.memo(({ items, quantity, isSpinning, onComplet
                 }}
               />
               <div
-                style={{
-                  color: "rgba(255,255,255,0.5)",
-                  fontSize: "0.6rem",
-                  textAlign: "center",
-                  width: "100%",
-                  overflow: "hidden",
-                  whiteSpace: "nowrap",
-                  textOverflow: "ellipsis",
-                  textTransform: "uppercase"
-                }}
               >
                 {skin.name ? skin.name.split(" | ")[0] : "SKIN"}
               </div>
@@ -262,7 +262,7 @@ export default function CaseView() {
     return shuffled.slice(0, 10).sort((a, b) => parseFloat(a.price) - parseFloat(b.price));
   }, [allSkins, caseData]);
 
-  const startSpin = useCallback(() => {
+  const startSpin = useCallback(async () => {
     if (!user || !user.balance) return toast.error("Inicia sesión para abrir cajas");
     const totalCost = parseFloat(caseData.price) * quantity;
 
@@ -281,7 +281,75 @@ export default function CaseView() {
     setResults([]);
     setHasActioned(false);
 
-    // Pure Local Storage deduction & Provably Fair outcome calculation
+    const token = getAuthToken();
+
+    // Try backend first if authenticated
+    if (token) {
+      try {
+        const response = await fetch(`${API_BASE}/api/cases/open`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({ caseId: caseData.id, quantity })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.items && data.items.length > 0) {
+            const backendItems = data.items.map((item) => ({
+              id: item.id,
+              name: item.name,
+              price: Number(item.price || 0),
+              rarity: item.rarity,
+              image: item.image || item.imageHD || ""
+            }));
+
+            // Update local storage to reflect backend state
+            const newBalance = Number(data.newBalance || user.balance - totalCost);
+            StorageService.updateUser({ balance: newBalance, saldo: newBalance });
+            const savedSkins = StorageService.addSkinsToInventory(backendItems);
+            backendItems.forEach((item) => {
+              StorageService.addLiveDrop({
+                user: user.nombre_usuario,
+                item: { name: item.name, price: item.price, rarity: item.rarity, image: item.image },
+                caseName: caseData.name
+              });
+            });
+
+            const currentStats = user.stats || {};
+            const totalWon = backendItems.reduce((acc, curr) => acc + curr.price, 0);
+            StorageService.updateUser({
+              stats: {
+                ...currentStats,
+                casesOpened: (currentStats.casesOpened || 0) + quantity,
+                totalSpent: Number(((currentStats.totalSpent || 0) + totalCost).toFixed(2)),
+                totalWon: Number(((currentStats.totalWon || 0) + totalWon).toFixed(2))
+              }
+            });
+
+            const newReel = [];
+            for (let j = 0; j < 65; j++) {
+              newReel.push(validSkins[Math.floor(Math.random() * validSkins.length)]);
+            }
+            newReel.push(...savedSkins);
+            for (let j = 0; j < 10; j++) {
+              newReel.push(validSkins[Math.floor(Math.random() * validSkins.length)]);
+            }
+
+            setReel(newReel);
+            setResults(savedSkins);
+            setIsSpinning(true);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn("Backend case open failed, falling back to local:", err);
+      }
+    }
+
+    // Fallback: Local Storage deduction & Provably Fair outcome calculation
     const success = StorageService.deductBalance(totalCost);
     if (!success) {
       setBalanceError("Saldo insuficiente");
