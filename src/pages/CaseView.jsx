@@ -262,7 +262,7 @@ export default function CaseView() {
     return shuffled.slice(0, 10).sort((a, b) => parseFloat(a.price) - parseFloat(b.price));
   }, [allSkins, caseData]);
 
-  const startSpin = useCallback(() => {
+  const startSpin = useCallback(async () => {
     if (!user || !user.balance) return toast.error("Inicia sesión para abrir cajas");
     const totalCost = parseFloat(caseData.price) * quantity;
 
@@ -281,7 +281,75 @@ export default function CaseView() {
     setResults([]);
     setHasActioned(false);
 
-    // Pure Local Storage deduction & Provably Fair outcome calculation
+    const token = getAuthToken();
+
+    // Try backend first if authenticated
+    if (token) {
+      try {
+        const response = await fetch(`${API_BASE}/api/cases/open`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({ caseId: caseData.id, quantity })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.items && data.items.length > 0) {
+            const backendItems = data.items.map((item) => ({
+              id: item.id,
+              name: item.name,
+              price: Number(item.price || 0),
+              rarity: item.rarity,
+              image: item.image || item.imageHD || ""
+            }));
+
+            // Update local storage to reflect backend state
+            const newBalance = Number(data.newBalance || user.balance - totalCost);
+            StorageService.updateUser({ balance: newBalance, saldo: newBalance });
+            const savedSkins = StorageService.addSkinsToInventory(backendItems);
+            backendItems.forEach((item) => {
+              StorageService.addLiveDrop({
+                user: user.nombre_usuario,
+                item: { name: item.name, price: item.price, rarity: item.rarity, image: item.image },
+                caseName: caseData.name
+              });
+            });
+
+            const currentStats = user.stats || {};
+            const totalWon = backendItems.reduce((acc, curr) => acc + curr.price, 0);
+            StorageService.updateUser({
+              stats: {
+                ...currentStats,
+                casesOpened: (currentStats.casesOpened || 0) + quantity,
+                totalSpent: Number(((currentStats.totalSpent || 0) + totalCost).toFixed(2)),
+                totalWon: Number(((currentStats.totalWon || 0) + totalWon).toFixed(2))
+              }
+            });
+
+            const newReel = [];
+            for (let j = 0; j < 65; j++) {
+              newReel.push(validSkins[Math.floor(Math.random() * validSkins.length)]);
+            }
+            newReel.push(...savedSkins);
+            for (let j = 0; j < 10; j++) {
+              newReel.push(validSkins[Math.floor(Math.random() * validSkins.length)]);
+            }
+
+            setReel(newReel);
+            setResults(savedSkins);
+            setIsSpinning(true);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn("Backend case open failed, falling back to local:", err);
+      }
+    }
+
+    // Fallback: Local Storage deduction & Provably Fair outcome calculation
     const success = StorageService.deductBalance(totalCost);
     if (!success) {
       setBalanceError("Saldo insuficiente");
