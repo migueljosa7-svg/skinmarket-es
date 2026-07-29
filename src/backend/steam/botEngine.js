@@ -51,6 +51,8 @@ class BotEngine {
         this.reconnectTimer = null;
         this.currentBackoff = 1000;
         this.maxBackoff = 60000;
+        this.rateLimitExceeded = false;
+        this.rateLimitCooldown = null;
 
         // Credentials from environment
         this.credentials = {
@@ -81,6 +83,12 @@ class BotEngine {
      * Start the bot login process (steam-user v5 compatible)
      */
     logIn() {
+        // Prevent login attempts during rate limit cooldown
+        if (this.rateLimitExceeded) {
+            _warn('[BOT ENGINE] ⚠️ Límite de velocidad excedido. Esperando cooldown...');
+            return false;
+        }
+
         if (!this._credentialsAreValid()) {
             _warn('[BOT ENGINE] ⚠️ Credenciales no configuradas. Modo SIMULACIÓN activado.');
             _warn('[BOT ENGINE] Configura BOT_USERNAME, BOT_PASSWORD, BOT_SHARED_SECRET y BOT_IDENTITY_SECRET en .env');
@@ -276,16 +284,19 @@ class BotEngine {
                         _warn('[BOT ENGINE] ⚠️ Sesión iniciada en otro lugar');
                         break;
                     case SteamUser.EResult.RateLimitExceeded:
-                        _error('[BOT ENGINE] 🔴 ERROR: Límite de velocidad excedido. Esperando...');
-                        this.currentBackoff = Math.min(this.currentBackoff * 2, this.maxBackoff);
+                        _error('[BOT ENGINE] 🔴 ERROR: Límite de velocidad excedido. Activando cooldown...');
+                        this._activateRateLimitCooldown();
                         break;
                     default:
                         _error(`[BOT ENGINE] EResult: ${err.eresult} (${err.message})`);
                 }
             }
 
-            if (this.loginAttempts < this.maxLoginAttempts) {
+            // Only schedule reconnect if not rate limited
+            if (!this.rateLimitExceeded && this.loginAttempts < this.maxLoginAttempts) {
                 this._scheduleReconnect();
+            } else if (this.rateLimitExceeded) {
+                _warn('[BOT ENGINE] ⚠️ Reconección bloqueada por RateLimitExceeded. Esperando cooldown...');
             } else {
                 _error('[BOT ENGINE] 🔴 Se alcanzó el máximo de intentos de reconexión.');
             }
@@ -346,6 +357,12 @@ class BotEngine {
     }
 
     _scheduleReconnect() {
+        // Don't schedule reconnect if rate limited
+        if (this.rateLimitExceeded) {
+            _warn('[BOT ENGINE] ⚠️ No se puede reconectar: RateLimitExceeded activo');
+            return;
+        }
+
         if (this.reconnectTimer) {
             clearTimeout(this.reconnectTimer);
         }
@@ -363,6 +380,40 @@ class BotEngine {
                 this.maxBackoff
             );
         }, backoff);
+    }
+
+    /**
+     * Activate rate limit cooldown to prevent IP saturation
+     * Stops all reconnection attempts for a extended period
+     */
+    _activateRateLimitCooldown() {
+        this.rateLimitExceeded = true;
+
+        // Clear any existing reconnect timer
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+        }
+
+        // Clear any existing cooldown timer
+        if (this.rateLimitCooldown) {
+            clearTimeout(this.rateLimitCooldown);
+        }
+
+        // Set extended cooldown period (5 minutes)
+        const cooldownMs = 5 * 60 * 1000;
+        _warn(`[BOT ENGINE] 🚫 Cooldown activado: ${cooldownMs / 1000 / 60} minutos sin intentos de login`);
+
+        this.rateLimitCooldown = setTimeout(() => {
+            _log('[BOT ENGINE] ✅ Cooldown finalizado. Reactivando intentos de conexión...');
+            this.rateLimitExceeded = false;
+            this.rateLimitCooldown = null;
+            this.loginAttempts = 0;
+            this.currentBackoff = 1000;
+
+            // Attempt to reconnect after cooldown
+            this.logIn();
+        }, cooldownMs);
     }
 
     _enqueueWithdrawal(partnerSteamID64, tradeToken, itemName, marketHashName) {

@@ -432,8 +432,8 @@ export async function handleImageError(event, skin) {
   // Get the fallback sources for this skin
   var sources = getSkinImageSources(skin);
 
-  // Try next CDN in chain
-  if (tryIndex < sources.length) {
+  // Try next CDN in chain (iterate instead of recursive call to avoid infinite loop)
+  while (tryIndex < sources.length) {
     var nextUrl = sources[tryIndex];
 
     if (nextUrl && !failedUrls.has(nextUrl) && nextUrl !== currentSrc) {
@@ -445,10 +445,8 @@ export async function handleImageError(event, skin) {
     }
 
     // This source is null or already failed, skip to next
-    img.setAttribute('data-try-index', tryIndex + 1);
-    // Retry with incremented index (will pick next non-null source)
-    handleImageError(event, skin);
-    return;
+    tryIndex++;
+    img.setAttribute('data-try-index', tryIndex);
   }
 
   // All CDNs exhausted: silent SVG placeholder fallback

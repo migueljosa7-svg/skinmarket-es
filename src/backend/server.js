@@ -1022,11 +1022,31 @@ app.post("/api/inventory/withdraw", authenticateToken, withdrawLimiter, async (r
         }
       } catch (botErr) {
         log(LOG_LEVELS.ERROR, 'TRADE', `[TRADE] ❌ Error del bot en retiro - ${botErr.message} | Item: ${item.name}`);
+
+        // Determine specific error type for better user feedback
+        let errorMessage = "Error al procesar el retiro. ";
+        let errorCode = 'BOT_ERROR';
+
+        if (botErr.message && botErr.message.includes('RateLimitExceeded')) {
+          errorMessage = "Steam está limitando las solicitudes. Espera 5 minutos e intenta de nuevo.";
+          errorCode = 'RATE_LIMIT_EXCEEDED';
+        } else if (botErr.message && (botErr.message.includes('no dispone') || botErr.message.includes('no tiene'))) {
+          errorMessage = "El bot no tiene esta skin en stock actualmente. Intenta más tarde o usa la opción de venta.";
+          errorCode = 'ITEM_OUT_OF_STOCK';
+        } else if (botErr.message && (botErr.message.includes('conexión') || botErr.message.includes('network') || botErr.message.includes('timeout'))) {
+          errorMessage = "Error de conexión con Steam. Verifica tu internet e intenta de nuevo.";
+          errorCode = 'CONNECTION_ERROR';
+        } else if (botErr.message && (botErr.message.includes('trade') || botErr.message.includes('intercambio'))) {
+          errorMessage = "Error en la oferta de intercambio. La skin puede no ser intercambiable o ya fue usada.";
+          errorCode = 'TRADE_ERROR';
+        }
+
         return res.status(500).json({
           success: false,
-          error: "Servicio de trades temporalmente no disponible. Intenta de nuevo.",
-          code: 'BOT_ERROR',
-          itemId
+          error: errorMessage,
+          code: errorCode,
+          itemId,
+          details: botErr.message
         });
       }
     } else {
