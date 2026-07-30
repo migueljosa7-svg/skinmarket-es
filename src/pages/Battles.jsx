@@ -1110,6 +1110,30 @@ export default function Battles() {
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #2a2e38; border-radius: 3px; }
+        @media (max-width: 768px) {
+          .battles-hero { padding: 40px 20px !important; }
+          .battles-hero h1 { font-size: 2.5rem !important; }
+          .battles-hero p { font-size: 0.8rem !important; letter-spacing: 3px !important; }
+          .battles-hero button { padding: 16px 30px !important; font-size: 1rem !important; }
+          .battles-roulette-grid { grid-template-columns: 1fr !important; gap: 15px !important; }
+          .battles-scores-grid { grid-template-columns: 1fr !important; }
+          .battles-history-grid { grid-template-columns: 1fr !important; }
+          .battles-round-header { flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; }
+          .battles-arena { padding: 15px !important; }
+          .battles-final-result { padding: 40px 20px !important; }
+          .battles-final-result h2 { font-size: 2rem !important; }
+          .battles-controls { flex-direction: column !important; gap: 8px !important; }
+          .battles-selector-modal { padding: 20px !important; }
+          .battles-selector-modal h2 { font-size: 1.5rem !important; }
+          .battles-config-grid { grid-template-columns: 1fr !important; gap: 20px !important; }
+          .battles-footer { flex-direction: column !important; gap: 15px !important; text-align: center !important; }
+          .battles-bot-grid { grid-template-columns: 1fr !important; }
+        }
+        @media (max-width: 480px) {
+          .battles-hero h1 { font-size: 1.8rem !important; }
+          .battles-final-result h2 { font-size: 1.5rem !important; }
+          .battles-player-card { min-width: 0 !important; width: 100% !important; padding: 15px 20px !important; }
+        }
       `}</style>
 
       <div style={{ maxWidth: "1400px", margin: "0 auto" }}>

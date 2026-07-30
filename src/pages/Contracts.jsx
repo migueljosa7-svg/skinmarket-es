@@ -313,8 +313,25 @@ export default function Contracts() {
   return (
     <div style={{ minHeight: "100vh", background: "#0f1115", color: "white", fontFamily: "'Inter', sans-serif", padding: "20px" }}>
       <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
+        <style>{`
+          @media (max-width: 768px) {
+            .contracts-header { padding: 30px 20px !important; }
+            .contracts-header h1 { font-size: 2.2rem !important; }
+            .contracts-header p { font-size: 0.75rem !important; letter-spacing: 2px !important; }
+            .contracts-layout { grid-template-columns: 1fr !important; gap: 20px !important; }
+            .contracts-inventory-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)) !important; }
+            .contracts-panel { padding: 20px !important; }
+          }
+          @media (max-width: 480px) {
+            .contracts-header h1 { font-size: 1.6rem !important; }
+            .contracts-inventory-grid { grid-template-columns: repeat(2, 1fr) !important; }
+            .contracts-skin-preview { width: 55px !important; }
+          }
+        `}</style>
+
         {/* Header */}
         <div
+          className="contracts-header"
           style={{
             textAlign: "center",
             padding: "60px 40px",
@@ -357,7 +374,7 @@ export default function Contracts() {
         </div>
 
         {/* Main Layout */}
-        <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: "30px" }}>
+        <div className="contracts-layout" style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: "30px" }}>
           {/* Left: Inventory Selection */}
           <div
             style={{

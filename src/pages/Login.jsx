@@ -43,6 +43,17 @@ export default function Login() {
   // Handle token from Steam OAuth redirect (?token=xxx)
   useEffect(() => {
     const token = searchParams.get("token");
+
+    // ─── ANTI-BUCLE POR "BACK": Limpiar query params de Steam ───
+    // Si hay token en la URL, limpiamos después de procesar para evitar
+    // que un "back" del navegador re-ejecute el login con token expirado.
+    const cleanSteamParams = () => {
+      if (window.location.search.includes('token=') || window.location.search.includes('error=')) {
+        const cleanUrl = window.location.pathname + window.location.hash;
+        window.history.replaceState({}, document.title, cleanUrl);
+      }
+    };
+
     if (token) {
       // Store the JWT token from Steam redirect
       localStorage.setItem("token", token);
@@ -76,6 +87,9 @@ export default function Login() {
           // Even if user data fetch fails, we have the token, so redirect
         })
         .finally(() => {
+          // Clean Steam query params AFTER processing the token
+          cleanSteamParams();
+
           setTimeout(() => {
             try {
               navigate("/dashboard");
@@ -85,6 +99,9 @@ export default function Login() {
             }
           }, 800);
         });
+    } else {
+      // No token in URL — still clean any stale Steam params (for popstate / back navigation)
+      cleanSteamParams();
     }
   }, [searchParams, navigate]);
 

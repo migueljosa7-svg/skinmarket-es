@@ -67,13 +67,21 @@ export default function Navbar() {
           transition: all 0.2s ease; font-family: inherit; font-size: 0.95rem;
         }
         .login-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(245, 172, 59, 0.4); }
-        @media (max-width: 900px) {
-          .nav-links { display: none; }
+        @media (max-width: 768px) {
+          nav { padding: 0 16px !important; height: 64px !important; }
+          .nav-links { display: none !important; }
           .mobile-toggle { display: flex !important; }
-          .nav-icons { gap: 8px; }
+          .nav-icons.desktop-icons { display: none !important; }
+          .nav-icons.mobile-icons { display: flex !important; gap: 8px !important; }
+          .nav-icons .icon-btn.hide-mobile { display: none !important; }
         }
-        @media (min-width: 901px) {
-          .mobile-menu { display: none !important; }
+        @media (min-width: 769px) {
+          .mobile-toggle { display: none !important; }
+          .mobile-menu-backdrop { display: none !important; }
+        }
+        @media (max-width: 900px) and (min-width: 769px) {
+          .nav-links { gap: 2px; }
+          .nav-links a { font-size: 0.8rem; padding: 6px 8px; }
         }
       `}</style>
 

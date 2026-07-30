@@ -1,32 +1,26 @@
-# TODO: SkinMarket Platform Pro - Implementation Progress
+# Implementation Progress
 
-## Step 1: Enhanced Daily Cases → Level 360 (cases.js)
-- [x] Enhanced 11 daily levels with unique visual themes
-- [x] Added real CS2 skin names (Dragon Lore, Howl, Empress, etc.)
-- [x] Improved gradients, glow effects, border animations per level
+## PASO 1: Reparar Socket.IO, CORS y Prevenir Error 502
+- [x] Update CORS config in server.js (explicit origins, credentials, transports)
+- [x] Improve uncaughtException / unhandledRejection handlers
+- [x] Add SIGTERM/SIGINT graceful shutdown handlers
 
-## Step 2: Server Sync (server.js)
-- [x] Updated LEVEL_THRESHOLDS rewards to match cases.js
+## PASO 2: Diversificación Visual de Cajas
+- [x] Add 5 new case container image constants (.svg) per plan
+- [x] Add getContainerForCase() mapping function (category-based + daily progression)
+- [x] Add generatePreviewSkins() helper (deterministic seeded random, unique combos per case)
+- [x] Update generateAllCases() to use getContainerForCase() and generatePreviewSkins()
+- [x] Update Cases.jsx CaseCard to use c.previewSkins as primary source
+- [x] Verify skin catalogs theme-matching (Eco=pistols/SMGs, Mid=rifles, Premium=AWPs/AKs, Limited=Dragon Lore/Karambit)
 
-## Step 3: Joker Mode Enhancements (CaseView.jsx)
-- [x] Enhanced Joker Mode aura/fire glow effects
-- [x] Emoji → Professional Icon Replacement
+## PASO 3: Crear imágenes SVG de contenedores
+- [x] Create case_covert.svg (red covert-themed container)
+- [x] Create case_knife.svg (purple knife-themed container)
+- [x] Create case_vip.svg (gold VIP container with crown)
+- [x] Create case_rare.svg (cyan/teal rare container with diamond)
+- [x] Create case_legendary.svg (orange fire-themed legendary container)
 
-## Step 4: Professional UI Audit - Emoji Removal
-- [x] Dashboard.jsx - Emoji → Icons
-- [x] Contracts.jsx - Emoji → Icons
-- [x] Upgrade.jsx - Emoji → Icons
-- [x] Battles.jsx - Emoji → Icons
-- [x] Ranking.jsx - Emoji → Icons
-- [x] Login.jsx - Emoji → Icons
-- [x] Home.jsx - Minor icon fixes
-- [x] Cases.jsx - Minor icon fixes
-- [x] NavBar.jsx - Minor icon fixes
-- [x] Footer.jsx - Minor icon fixes
-
-## Step 5: Build & Git Push
-- [x] npm run build (verify zero errors) ✅ Build successful with 0 errors!
-- [ ] Git init/verify repo
-- [ ] git add . && git commit
-- [ ] Push to GitHub
+## PASO 4: Verificación
+- [ ] Run `npm run build` (0 errors)
+- [ ] git add, commit & push to master
 

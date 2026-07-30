@@ -262,7 +262,25 @@ export default function Upgrade() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#0f1115", padding: "30px", fontFamily: "'Inter', sans-serif", color: "white" }}>
-      <div style={{ maxWidth: "1500px", margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1.3fr 1fr", gap: "30px" }}>
+      <style>{`
+        @media (max-width: 768px) {
+          .upgrade-layout { grid-template-columns: 1fr !important; gap: 20px !important; }
+          .upgrade-inventory-grid { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)) !important; }
+          .upgrade-target-grid { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)) !important; }
+          .upgrade-center { order: -1 !important; }
+          .upgrade-spinner { width: 250px !important; height: 250px !important; }
+          .upgrade-btn { max-width: 100% !important; padding: 14px 30px !important; font-size: 1rem !important; }
+          .upgrade-mode-select { flex-wrap: wrap !important; }
+          .upgrade-mode-select button { flex: 1 !important; min-width: 100px !important; text-align: center !important; }
+        }
+        @media (max-width: 480px) {
+          .upgrade-inventory-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .upgrade-target-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .upgrade-spinner { width: 200px !important; height: 200px !important; }
+          .upgrade-column { padding: 15px !important; height: auto !important; max-height: 50vh !important; }
+        }
+      `}</style>
+      <div style={{ maxWidth: "1500px", margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1.3fr 1fr", gap: "30px" }} className="upgrade-layout">
         {/* INVENTORY COLUMN */}
         <div style={{ background: "rgba(255,255,255,0.02)", padding: "25px", borderRadius: "24px", border: "1px solid rgba(255,255,255,0.05)", height: "calc(100vh - 140px)", overflowY: "auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>

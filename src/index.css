@@ -4,6 +4,7 @@ body {
   background: #0f1115;
   color: white;
   overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .app-container {
@@ -168,3 +169,93 @@ input:focus, select:focus {
   border-color: #f5ac3b;
   box-shadow: 0 0 10px rgba(245, 172, 59, 0.3);
 }
+
+/* ─── RESPONSIVE & GLOBAL UTILITY STYLES ───── */
+
+/* Scrollbar personalizada */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2a2e38; border-radius: 3px; }
+
+/* Animaciones globales */
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-10px); } }
+
+/* ─── RESPONSIVE BREAKPOINTS ────────────────── */
+
+/* Tablets y móviles grandes (< 900px) */
+@media (max-width: 900px) {
+  .container {
+    padding: 20px;
+  }
+
+  .hero {
+    padding: 60px 20px;
+  }
+
+  .hero h1 {
+    font-size: 32px !important;
+  }
+
+  .inventory-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+  }
+}
+
+/* Móviles (< 640px) */
+@media (max-width: 640px) {
+  .app-container {
+    padding: 12px;
+    gap: 20px;
+  }
+
+  .container {
+    padding: 12px;
+  }
+
+  .hero {
+    padding: 40px 16px;
+  }
+
+  .hero h1 {
+    font-size: 24px !important;
+  }
+
+  .inventory-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .modal {
+    padding: 20px;
+    margin: 10px;
+    width: calc(100% - 20px);
+  }
+
+  .card {
+    padding: 16px;
+  }
+}
+
+/* Ocultar/mostrar helpers */
+@media (max-width: 768px) {
+  .hide-mobile {
+    display: none !important;
+  }
+  .show-mobile {
+    display: flex !important;
+  }
+}
+
+@media (min-width: 769px) {
+  .hide-desktop {
+    display: none !important;
+  }
+  .show-desktop {
+    display: flex !important;
+  }
+}
+
