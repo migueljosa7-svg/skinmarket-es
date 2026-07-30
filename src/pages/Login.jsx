@@ -30,7 +30,7 @@ export default function Login() {
       if (!email.trim() || !password.trim()) return setError("Todos los campos son obligatorios");
       setLoading(true);
       try {
-        await login(email);
+        await login(email, password);
         setSuccess(true);
         setTimeout(() => navigate("/dashboard"), 500);
       } catch (err) {
@@ -46,7 +46,7 @@ export default function Login() {
 
       setLoading(true);
       try {
-        await register(nombreUsuario, email);
+        await register(nombreUsuario, email, password);
         setSuccess(true);
         setTimeout(() => navigate("/dashboard"), 500);
       } catch (err) {
