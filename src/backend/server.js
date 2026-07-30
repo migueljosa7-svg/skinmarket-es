@@ -13,6 +13,7 @@ import hpp from "hpp";
 import rateLimit from "express-rate-limit";
 import passport from "passport";
 import { Strategy as SteamStrategy } from "@dessly/passport-steam";
+import { OAuth2Client } from "google-auth-library";
 import { Server as SocketIOServer } from "socket.io";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -264,6 +265,85 @@ if (process.env.STEAM_API_KEY) {
   log(LOG_LEVELS.WARN, 'AUTH', 'STEAM_API_KEY no configurada. Autenticación Steam deshabilitada.');
 }
 
+// ─── GOOGLE OAUTH CLIENT ────────────────────────────
+// Initialize Google OAuth2 client for verifying Google ID tokens server-side.
+// Requires GOOGLE_CLIENT_ID env var. Falls back gracefully if not configured.
+const googleClient = process.env.GOOGLE_CLIENT_ID
+  ? new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
+  : null;
+
+if (googleClient) {
+  log(LOG_LEVELS.INFO, 'AUTH', 'Google OAuth2 client configurado correctamente');
+} else {
+  log(LOG_LEVELS.WARN, 'AUTH', 'GOOGLE_CLIENT_ID no configurada. Autenticación Google deshabilitada.');
+}
+
+// ─── SECURITY HELPERS (PASO 3) ──────────────────────
+
+/**
+ * Sanitize a string input to prevent XSS and injection attacks.
+ * Removes HTML tags, control characters, and trims whitespace.
+ * @param {string} input - Raw user input
+ * @returns {string} Sanitized string
+ */
+function sanitizeInput(input) {
+  if (input === null || input === undefined) return '';
+  if (typeof input !== 'string') return String(input);
+  // Remove HTML tags
+  let cleaned = input.replace(/<[^>]*>/g, '');
+  // Remove control characters (except newlines/tabs)
+  cleaned = cleaned.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+  // Remove null bytes
+  cleaned = cleaned.replace(/\0/g, '');
+  // Trim and limit length
+  return cleaned.trim().slice(0, 1000);
+}
+
+/**
+ * Validate password against security policy.
+ * Requires: min 8 chars, at least 1 uppercase, 1 number, 1 special char.
+ * @param {string} password - Password to validate
+ * @returns {{valid: boolean, error?: string}}
+ */
+function validatePassword(password) {
+  if (!password || typeof password !== 'string') {
+    return { valid: false, error: 'La contraseña es obligatoria' };
+  }
+  if (password.length < 8) {
+    return { valid: false, error: 'La contraseña debe tener al menos 8 caracteres' };
+  }
+  if (!/[A-Z]/.test(password)) {
+    return { valid: false, error: 'La contraseña debe contener al menos una mayúscula' };
+  }
+  if (!/[0-9]/.test(password)) {
+    return { valid: false, error: 'La contraseña debe contener al menos un número' };
+  }
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(password)) {
+    return { valid: false, error: 'La contraseña debe contener al menos un carácter especial (!@#$%^&*...)' };
+  }
+  return { valid: true };
+}
+
+/**
+ * Validate email format.
+ * @param {string} email
+ * @returns {boolean}
+ */
+function isValidEmail(email) {
+  if (!email || typeof email !== 'string') return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 254;
+}
+
+/**
+ * Validate username format (alphanumeric + underscores, 3-30 chars).
+ * @param {string} username
+ * @returns {boolean}
+ */
+function isValidUsername(username) {
+  if (!username || typeof username !== 'string') return false;
+  return /^[a-zA-Z0-9_]{3,30}$/.test(username);
+}
+
 // Helper para Auditoría
 async function logAction(usuario_id, accion, detalles = null) {
   try {
@@ -313,24 +393,120 @@ const authenticateToken = (req, res, next) => {
 app.get('/api/auth/steam', passport.authenticate('steam', { failureRedirect: '/login' }), (req, res) => { });
 app.get('/api/auth/steam/return', passport.authenticate('steam', { failureRedirect: '/login' }), (req, res) => {
   const user = req.user;
-  const token = jwt.sign({ id: user.usuario_id, email: user.email }, JWT_SECRET, { expiresIn: '24h' });
+  const token = jwt.sign({ id: user.usuario_id, email: user.email }, JWT_SECRET, { expiresIn: '8h' });
   const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
   res.redirect(`${FRONTEND_URL}/login?token=${token}`);
 });
 
+// ─── GOOGLE OAUTH ENDPOINT ─────────────────────────
+// Verifies the Google ID token server-side using the official Google library.
+// The frontend sends the idToken obtained from Google Sign-In.
+app.post("/api/auth/google", async (req, res) => {
+  const { idToken } = req.body;
+
+  if (!idToken || typeof idToken !== 'string') {
+    return res.status(400).json({ error: "idToken es obligatorio" });
+  }
+
+  if (!googleClient) {
+    return res.status(503).json({ error: "Autenticación con Google no está configurada en el servidor" });
+  }
+
+  try {
+    // Verify the ID token using Google's official library
+    const ticket = await googleClient.verifyIdToken({
+      idToken: idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+
+    if (!payload) {
+      return res.status(401).json({ error: "Token de Google inválido" });
+    }
+
+    const googleId = payload['sub'];
+    const email = sanitizeInput(payload['email']);
+    const nombre = sanitizeInput(payload['name'] || payload['given_name'] || email.split('@')[0]);
+    const avatar = payload['picture'] || null;
+
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ error: "Email de Google inválido" });
+    }
+
+    // Check if user exists by Google ID or email
+    let result = await db.query("SELECT * FROM usuarios WHERE google_id = $1 OR email = $2", [googleId, email]);
+
+    if (result.rows.length === 0) {
+      // Create new user with Google account
+      result = await db.query(
+        "INSERT INTO usuarios (nombre_usuario, email, password_hash, google_id, avatar, nivel, experiencia) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING usuario_id, nombre_usuario, email, saldo, nivel, experiencia",
+        [nombre, email, 'google_no_password', googleId, avatar, 0, 0]
+      );
+    } else {
+      // Update Google ID if user existed via email but didn't have google_id
+      if (!result.rows[0].google_id) {
+        await db.query("UPDATE usuarios SET google_id = $1, avatar = COALESCE(avatar, $2) WHERE usuario_id = $3",
+          [googleId, avatar, result.rows[0].usuario_id]);
+      }
+    }
+
+    const user = result.rows[0];
+    const token = jwt.sign({ id: user.usuario_id, email: user.email }, JWT_SECRET, { expiresIn: '8h' });
+
+    await logAction(user.usuario_id, 'LOGIN_GOOGLE', { googleId, email });
+
+    res.json({
+      user: {
+        usuario_id: user.usuario_id,
+        nombre_usuario: user.nombre_usuario,
+        email: user.email,
+        saldo: user.saldo,
+        nivel: user.nivel,
+        experiencia: user.experiencia,
+        avatar: avatar || user.avatar
+      },
+      token
+    });
+  } catch (err) {
+    log(LOG_LEVELS.ERROR, 'AUTH', 'Error en Google OAuth:', err.message);
+    res.status(401).json({ error: "Error al verificar el token de Google. Intenta de nuevo." });
+  }
+});
+
 app.post("/api/register", async (req, res) => {
   const { nombre_usuario, email, password } = req.body;
-  if (!nombre_usuario || !email || !password) {
+
+  // Sanitize inputs
+  const cleanUsername = sanitizeInput(nombre_usuario);
+  const cleanEmail = sanitizeInput(email);
+
+  // Validate inputs
+  if (!cleanUsername || !cleanEmail || !password) {
     return res.status(400).json({ error: "Todos los campos son obligatorios" });
   }
+  if (!isValidUsername(cleanUsername)) {
+    return res.status(400).json({ error: "El nombre de usuario debe tener entre 3 y 30 caracteres alfanuméricos" });
+  }
+  if (!isValidEmail(cleanEmail)) {
+    return res.status(400).json({ error: "Email inválido" });
+  }
+
+  // Validate password security policy
+  const pwdCheck = validatePassword(password);
+  if (!pwdCheck.valid) {
+    return res.status(400).json({ error: pwdCheck.error });
+  }
+
   try {
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 12);
     const result = await db.query(
       "INSERT INTO usuarios (nombre_usuario, email, password_hash, nivel, experiencia) VALUES ($1, $2, $3, $4, $5) RETURNING usuario_id, nombre_usuario, email, saldo, nivel, experiencia",
-      [nombre_usuario, email, hashedPassword, 0, 0]
+      [cleanUsername, cleanEmail, hashedPassword, 0, 0]
     );
     const user = result.rows[0];
-    const token = jwt.sign({ id: user.usuario_id, email: user.email }, JWT_SECRET, { expiresIn: '24h' });
+    const token = jwt.sign({ id: user.usuario_id, email: user.email }, JWT_SECRET, { expiresIn: '8h' });
+    await logAction(user.usuario_id, 'REGISTER', { email: cleanEmail });
     res.status(201).json({ user, token });
   } catch (err) {
     if (err.code === '23505') return res.status(400).json({ error: "El usuario o email ya existe" });
@@ -340,13 +516,25 @@ app.post("/api/register", async (req, res) => {
 
 app.post("/api/login", async (req, res) => {
   const { email, password } = req.body;
+
+  // Sanitize email
+  const cleanEmail = sanitizeInput(email);
+
+  if (!cleanEmail || !password) {
+    return res.status(400).json({ error: "Email y contraseña son obligatorios" });
+  }
+  if (!isValidEmail(cleanEmail)) {
+    return res.status(400).json({ error: "Email inválido" });
+  }
+
   try {
-    const result = await db.query("SELECT * FROM usuarios WHERE email = $1", [email]);
+    const result = await db.query("SELECT * FROM usuarios WHERE email = $1", [cleanEmail]);
     const user = result.rows[0];
     if (!user || !(await bcrypt.compare(password, user.password_hash))) {
       return res.status(401).json({ error: "Credenciales inválidas" });
     }
-    const token = jwt.sign({ id: user.usuario_id, email: user.email }, JWT_SECRET, { expiresIn: '24h' });
+    const token = jwt.sign({ id: user.usuario_id, email: user.email }, JWT_SECRET, { expiresIn: '8h' });
+    await logAction(user.usuario_id, 'LOGIN', { email: cleanEmail });
     res.json({ user: { usuario_id: user.usuario_id, nombre_usuario: user.nombre_usuario, email: user.email, saldo: user.saldo, nivel: user.nivel, experiencia: user.experiencia }, token });
   } catch (err) {
     res.status(500).json({ error: "Error al iniciar sesión" });
@@ -1012,68 +1200,68 @@ app.post("/api/inventory/withdraw", authenticateToken, withdrawLimiter, async (r
 
     // ON-DEMAND: sendWithdrawOffer handles login internally via ensureConnected()
     try {
-        log(LOG_LEVELS.INFO, 'TRADE', `[TRADE] Solicitando retiro de item: ${item.market_hash_name || item.name} para SteamID: ${user.steam_id}`);
+      log(LOG_LEVELS.INFO, 'TRADE', `[TRADE] Solicitando retiro de item: ${item.market_hash_name || item.name} para SteamID: ${user.steam_id}`);
 
-        const result = await botEngine.sendWithdrawOffer(
-          user.steam_id,
-          user.trade_token,
-          item.name,
-          item.market_hash_name || item.name
-        );
+      const result = await botEngine.sendWithdrawOffer(
+        user.steam_id,
+        user.trade_token,
+        item.name,
+        item.market_hash_name || item.name
+      );
 
-        if (result.success) {
-          log(LOG_LEVELS.INFO, 'TRADE', `[TRADE] ✅ Oferta enviada exitosamente - OfferID: ${result.offerId} | Item: ${item.name}`);
+      if (result.success) {
+        log(LOG_LEVELS.INFO, 'TRADE', `[TRADE] ✅ Oferta enviada exitosamente - OfferID: ${result.offerId} | Item: ${item.name}`);
 
-          await db.query("UPDATE inventario SET status = 'withdrawn' WHERE item_id = $1", [itemId]);
-          await recordTransaction(req.user.id, 'retiro', item.price, 'steam_trade', `Retiro real: ${item.name} - Offer ID: ${result.offerId}`);
-          await logAction(req.user.id, 'RETIRAR_ITEM_REAL', { itemId, itemName: item.name, offerId: result.offerId, marketHashName: item.market_hash_name });
+        await db.query("UPDATE inventario SET status = 'withdrawn' WHERE item_id = $1", [itemId]);
+        await recordTransaction(req.user.id, 'retiro', item.price, 'steam_trade', `Retiro real: ${item.name} - Offer ID: ${result.offerId}`);
+        await logAction(req.user.id, 'RETIRAR_ITEM_REAL', { itemId, itemName: item.name, offerId: result.offerId, marketHashName: item.market_hash_name });
 
-          if (req.app.get('io')) {
-            req.app.get('io').to(req.user.id.toString()).emit('withdrawal_update', {
-              itemId, status: 'withdrawn', offerId: result.offerId,
-              message: `Oferta #${result.offerId} enviada a Steam. Revisa tu inventario de ofertas.`
-            });
-          }
-
-          return res.json({ success: true, offerId: result.offerId, message: `Oferta #${result.offerId} enviada a Steam. Revisa tu inventario.` });
-        } else {
-          log(LOG_LEVELS.ERROR, 'TRADE', `[TRADE] ❌ Fallo al enviar oferta - Error: ${result.error} | Item: ${item.name}`);
-          return res.status(400).json({
-            success: false,
-            error: result.error || "No se pudo enviar la oferta real. Inténtalo más tarde.",
-            code: result.code || 'TRADE_OFFER_FAILED',
-            itemId
+        if (req.app.get('io')) {
+          req.app.get('io').to(req.user.id.toString()).emit('withdrawal_update', {
+            itemId, status: 'withdrawn', offerId: result.offerId,
+            message: `Oferta #${result.offerId} enviada a Steam. Revisa tu inventario de ofertas.`
           });
         }
-      } catch (botErr) {
-        log(LOG_LEVELS.ERROR, 'TRADE', `[TRADE] ❌ Error del bot en retiro - ${botErr.message} | Item: ${item.name}`);
 
-        // Determine specific error type for better user feedback
-        let errorMessage = "Error al procesar el retiro. ";
-        let errorCode = 'BOT_ERROR';
-
-        if (botErr.message && botErr.message.includes('RateLimitExceeded')) {
-          errorMessage = "Steam está limitando las solicitudes. Espera 5 minutos e intenta de nuevo.";
-          errorCode = 'RATE_LIMIT_EXCEEDED';
-        } else if (botErr.message && (botErr.message.includes('no dispone') || botErr.message.includes('no tiene'))) {
-          errorMessage = "El bot no tiene esta skin en stock actualmente. Intenta más tarde o usa la opción de venta.";
-          errorCode = 'ITEM_OUT_OF_STOCK';
-        } else if (botErr.message && (botErr.message.includes('conexión') || botErr.message.includes('network') || botErr.message.includes('timeout'))) {
-          errorMessage = "Error de conexión con Steam. Verifica tu internet e intenta de nuevo.";
-          errorCode = 'CONNECTION_ERROR';
-        } else if (botErr.message && (botErr.message.includes('trade') || botErr.message.includes('intercambio'))) {
-          errorMessage = "Error en la oferta de intercambio. La skin puede no ser intercambiable o ya fue usada.";
-          errorCode = 'TRADE_ERROR';
-        }
-
-        return res.status(500).json({
+        return res.json({ success: true, offerId: result.offerId, message: `Oferta #${result.offerId} enviada a Steam. Revisa tu inventario.` });
+      } else {
+        log(LOG_LEVELS.ERROR, 'TRADE', `[TRADE] ❌ Fallo al enviar oferta - Error: ${result.error} | Item: ${item.name}`);
+        return res.status(400).json({
           success: false,
-          error: errorMessage,
-          code: errorCode,
-          itemId,
-          details: botErr.message
+          error: result.error || "No se pudo enviar la oferta real. Inténtalo más tarde.",
+          code: result.code || 'TRADE_OFFER_FAILED',
+          itemId
         });
       }
+    } catch (botErr) {
+      log(LOG_LEVELS.ERROR, 'TRADE', `[TRADE] ❌ Error del bot en retiro - ${botErr.message} | Item: ${item.name}`);
+
+      // Determine specific error type for better user feedback
+      let errorMessage = "Error al procesar el retiro. ";
+      let errorCode = 'BOT_ERROR';
+
+      if (botErr.message && botErr.message.includes('RateLimitExceeded')) {
+        errorMessage = "Steam está limitando las solicitudes. Espera 5 minutos e intenta de nuevo.";
+        errorCode = 'RATE_LIMIT_EXCEEDED';
+      } else if (botErr.message && (botErr.message.includes('no dispone') || botErr.message.includes('no tiene'))) {
+        errorMessage = "El bot no tiene esta skin en stock actualmente. Intenta más tarde o usa la opción de venta.";
+        errorCode = 'ITEM_OUT_OF_STOCK';
+      } else if (botErr.message && (botErr.message.includes('conexión') || botErr.message.includes('network') || botErr.message.includes('timeout'))) {
+        errorMessage = "Error de conexión con Steam. Verifica tu internet e intenta de nuevo.";
+        errorCode = 'CONNECTION_ERROR';
+      } else if (botErr.message && (botErr.message.includes('trade') || botErr.message.includes('intercambio'))) {
+        errorMessage = "Error en la oferta de intercambio. La skin puede no ser intercambiable o ya fue usada.";
+        errorCode = 'TRADE_ERROR';
+      }
+
+      return res.status(500).json({
+        success: false,
+        error: errorMessage,
+        code: errorCode,
+        itemId,
+        details: botErr.message
+      });
+    }
   } catch (err) {
     log(LOG_LEVELS.ERROR, 'TRADE', `[TRADE] Error fatal en retiro - ${err.message} | ItemID: ${itemId}`);
     res.status(500).json({ error: "Error al procesar el retiro", details: err.message });
