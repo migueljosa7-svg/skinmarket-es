@@ -83,7 +83,7 @@ export default function Ranking() {
                   </td>
                   <td style={tdStyle}>
                     <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                      <span style={{ fontSize: "1.4rem" }}>👤</span>
+                      <span style={{ fontSize: "1.4rem" }}>◆</span>
                       <span style={{ fontWeight: "bold" }}>{u.name} {u.isCurrent && "(TÚ)"}</span>
                     </div>
                   </td>
@@ -107,7 +107,7 @@ export default function Ranking() {
 function PodiumCard({ player, place, height, color }) {
   return (
     <div style={{ width: "260px", textAlign: "center" }}>
-      <div style={{ fontSize: place === 1 ? "3.5rem" : "2.5rem", marginBottom: "10px" }}>👤</div>
+      <div style={{ fontSize: place === 1 ? "3.5rem" : "2.5rem", marginBottom: "10px" }}>◆</div>
       <div style={{ fontWeight: "900", fontSize: "1.1rem", marginBottom: "10px" }}>{player.name}</div>
       <div
         style={{

@@ -95,7 +95,7 @@ function ToastItem({ toast, onClose }) {
           : "#3b82f6";
 
   const icon =
-    toast.type === "success" ? "✓" : toast.type === "error" ? "✕" : toast.type === "warning" ? "⚠" : "ℹ";
+    toast.type === "success" ? "◆" : toast.type === "error" ? "◆" : toast.type === "warning" ? "◆" : "◆";
 
   return (
     <div

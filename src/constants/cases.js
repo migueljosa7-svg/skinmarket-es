@@ -47,68 +47,345 @@ export const CASE_PROBABILITIES = {
   }
 };
 
+// ─── SKIN CATALOGS BY CASE TIER ──────────────────────────
+// Each tier has a curated list of real CS2 skins with realistic prices
+// Higher tiers have better skins and higher max prices
+
+export const SKIN_CATALOGS = {
+  económica: {
+    weapons: ["Glock-18", "USP-S", "P2000", "MP9", "MAC-10", "MP7", "UMP-45", "P90", "PP-Bizon", "Nova", "XM1014", "MAG-7", "Sawed-Off", "Negev", "M249"],
+    skins: [
+      "Groundwater", "Candy Apple", "Forest DDPAT", "Bone Mask", "Anodized Navy", "Sandstorm", "Blue Streak", "Urban DDPAT",
+      "Pink DDPAT", "Mudder", "Cobalt Quartz", "Scorpion", "Silver", "Nuclear Threat", "The Emperor", "Bismuth",
+      "Neon Rider", "Urban Shock", "Harvester", "Impire", "Bunsen Burner", "Torn", "Fade", "Ergo",
+      "Bullet Queen", "Cortex", "Sweeper", "Night", "Tread", "Slate", "Flame", "Acid Wash"
+    ],
+    priceRange: [0.10, 3.00],
+    avgPrice: 0.80
+  },
+
+  intermedia: {
+    weapons: ["AK-47", "M4A4", "M4A1-S", "AWP", "FAMAS", "Galil AR", "SSG 08", "SG 553", "AUG", "G3SG1", "SCAR-20", "Desert Eagle", "Tec-9", "Five-SeveN", "CZ75-Auto"],
+    skins: [
+      "Redline", "Vulcan", "Asiimov", "Hyper Beast", "Neon Rider", "Bloodsport", "Phantom Disruptor", "Mecha Industries",
+      "Safari Mesh", "Boreal Forest", "Sand Dune", "Predator", "Tornado", "Scorched", "Jungle", "Urban", "Army", "Contractor",
+      "Wasteland Rebel", "Fuel Injector", "Frontside Misty", "Aqua Terrace", "Sunset Storm", "Printstream", "Monkey Business",
+      "Neon Revolution", "X-Ray", "Vice", "Empress", "Wild Lotus", "Desolate Space", "Atheris", "Cobra Strike"
+    ],
+    priceRange: [3.00, 25.00],
+    avgPrice: 8.00
+  },
+
+  premium: {
+    weapons: ["AK-47", "M4A4", "M4A1-S", "AWP", "Desert Eagle", "USP-S", "Glock-18", "P250", "Five-SeveN", "Tec-9"],
+    skins: [
+      "Asiimov", "Hyper Beast", "Neon Rider", "Bloodsport", "Phantom Disruptor", "Mecha Industries", "Wasteland Rebel",
+      "Fuel Injector", "Frontside Misty", "Aqua Terrace", "Sunset Storm", "Printstream", "Monkey Business", "Wild Lotus",
+      "Neon Revolution", "X-Ray", "Cortex", "Duality", "Atheris", "Vice", "Cobra Strike", "Jungle Slipstream",
+      "Empress", "The Empress", "Poseidon", "Medusa", "Knight", "Stainless", "Hot Rod", "Blaze",
+      "Kill Confirmed", "Fever Dream", "Blue Gem", "Royal Paladin", "Exo", "Deft"
+    ],
+    priceRange: [15.00, 150.00],
+    avgPrice: 45.00
+  },
+
+  limited: {
+    weapons: ["AK-47", "M4A4", "M4A1-S", "AWP", "Desert Eagle", "USP-S", "Glock-18", "★ Karambit", "★ Butterfly Knife", "★ Flip Knife", "★ Talon Knife", "★ M9 Bayonet", "★ Bowie Knife", "★ Huntsman Knife", "★ Falchion Knife", "★ Shadow Daggers", "★ Ursus Knife", "★ Navaja Knife", "★ Stiletto Knife", "★ Classic Knife", "★ Survival Knife", "★ Nomad Knife", "★ Skeleton Knife", "★ Paracord Knife"],
+    skins: [
+      "Dragon Lore", "Howl", "Medusa", "Gungnir", "Souvenir AWP | Dragon Lore",
+      "Prince", "Princess", "Empress", "The Empress",
+      "Doppler", "Fade", "Marble Fade", "Crimson Web", "Case Hardened", "Tiger Tooth", "Lore",
+      "Gamma Doppler", "Autotronic", "Black Laminate", "Ultraviolet",
+      "Doppler Phase 2", "Doppler Phase 4", "Emerald", "Ruby", "Sapphire",
+      "Slaughter", "Night", "Damascus Steel", "Urban Masked",
+      "Fade", "Tiger Tooth", "Marble Fade", "Doppler", "Lore",
+      "Crimson Web", "Ultraviolet", "Autotronic", "Gamma Doppler",
+      "Baggage", "Forest DDPAT", "Crimson Web", "Boreal Forest",
+      "Chromatic Aberration", "Spider Lily", "Desolação", "Inheritance", "Contamination"
+    ],
+    priceRange: [50.00, 2500.00],
+    avgPrice: 350.00
+  }
+};
+
+// ─── Level-Based Daily Cases (KeyDrop-style) ─────────────
+// Escalado hasta Nivel 360 - Sistema VIP Supreme
+// Unlocked by user level (based on total deposited volume)
+// Cada caja tiene temática, gradiente, glow y borde ÚNICOS
+export const DAILY_CASES_BY_LEVEL = [
+  {
+    level: 0,
+    name: "DAILY FREE",
+    color: "#10b981",
+    bgGradient: "linear-gradient(135deg, #052e16 0%, #10b981 100%)",
+    badge: "FREE",
+    rtp: 95,
+    minDeposit: 0,
+    caseId: "daily-0",
+    category: "económica",
+    maxSkinPrice: 5.00,
+    knifeChance: 0,
+    gloveChance: 0,
+    description: "Caja diaria gratuita para nuevos usuarios",
+    theme: "Crystal",
+    glowColor: "#10b981",
+    borderGlow: "0 0 30px rgba(16,185,129,0.3)",
+    icon: "diamond"
+  },
+  {
+    level: 5,
+    name: "BRONZE DAILY",
+    color: "#cd7f32",
+    bgGradient: "linear-gradient(135deg, #1a0a00 0%, #cd7f32 100%)",
+    badge: "BRONZE",
+    rtp: 92,
+    minDeposit: 10,
+    caseId: "daily-5",
+    category: "económica",
+    maxSkinPrice: 10.00,
+    knifeChance: 0,
+    gloveChance: 0,
+    description: "Desbloqueado con €10 depositados",
+    theme: "Steampunk",
+    glowColor: "#cd7f32",
+    borderGlow: "0 0 30px rgba(205,127,50,0.3)",
+    icon: "shield"
+  },
+  {
+    level: 15,
+    name: "SILVER DAILY",
+    color: "#c0c0c0",
+    bgGradient: "linear-gradient(135deg, #0a0a1a 0%, #8a9bb5 100%)",
+    badge: "SILVER",
+    rtp: 90,
+    minDeposit: 50,
+    caseId: "daily-15",
+    category: "intermedia",
+    maxSkinPrice: 30.00,
+    knifeChance: 0,
+    gloveChance: 0,
+    description: "Desbloqueado con €50 depositados",
+    theme: "Cyber",
+    glowColor: "#c0c0c0",
+    borderGlow: "0 0 30px rgba(192,192,192,0.3)",
+    icon: "hexagon"
+  },
+  {
+    level: 30,
+    name: "GOLD DAILY",
+    color: "#ffd700",
+    bgGradient: "linear-gradient(135deg, #1a1200 0%, #ffd700 100%)",
+    badge: "GOLD",
+    rtp: 88,
+    minDeposit: 150,
+    caseId: "daily-30",
+    category: "intermedia",
+    maxSkinPrice: 75.00,
+    knifeChance: 0.5,
+    gloveChance: 0,
+    description: "Desbloqueado con €150 depositados - Primera oportunidad de cuchillos",
+    theme: "Ancient",
+    glowColor: "#ffd700",
+    borderGlow: "0 0 40px rgba(255,215,0,0.4)",
+    icon: "crown"
+  },
+  {
+    level: 50,
+    name: "DIAMOND DAILY",
+    color: "#b9f2ff",
+    bgGradient: "linear-gradient(135deg, #001a2e 0%, #5cceff 100%)",
+    badge: "DIAMOND",
+    rtp: 85,
+    minDeposit: 500,
+    caseId: "daily-50",
+    category: "premium",
+    maxSkinPrice: 200.00,
+    knifeChance: 1.5,
+    gloveChance: 0.5,
+    description: "Desbloqueado con €500 depositados - Guantes posibles",
+    theme: "Crystal",
+    glowColor: "#b9f2ff",
+    borderGlow: "0 0 40px rgba(185,242,255,0.4)",
+    icon: "gem"
+  },
+  {
+    level: 80,
+    name: "PLATINUM DAILY",
+    color: "#e5e4e2",
+    bgGradient: "linear-gradient(135deg, #0a0a1e 0%, #b0b0c0 100%)",
+    badge: "PLATINUM",
+    rtp: 83,
+    minDeposit: 1500,
+    caseId: "daily-80",
+    category: "premium",
+    maxSkinPrice: 500.00,
+    knifeChance: 3,
+    gloveChance: 1,
+    description: "Desbloqueado con €1500 depositados - Skins clandestinas posibles",
+    theme: "Frost",
+    glowColor: "#e5e4e2",
+    borderGlow: "0 0 50px rgba(229,228,226,0.4)",
+    icon: "snowflake"
+  },
+  {
+    level: 120,
+    name: "EMERALD DAILY",
+    color: "#50c878",
+    bgGradient: "linear-gradient(135deg, #002a1a 0%, #00e676 100%)",
+    badge: "EMERALD",
+    rtp: 81,
+    minDeposit: 4000,
+    caseId: "daily-120",
+    category: "limited",
+    maxSkinPrice: 1200.00,
+    knifeChance: 5,
+    gloveChance: 2,
+    description: "Desbloqueado con €4000 depositados - Alta probabilidad de items raros",
+    theme: "Dragon",
+    glowColor: "#50c878",
+    borderGlow: "0 0 50px rgba(80,200,120,0.5)",
+    icon: "skull"
+  },
+  {
+    level: 170,
+    name: "RUBY DAILY",
+    color: "#e0115f",
+    bgGradient: "linear-gradient(135deg, #2a0010 0%, #ff1464 100%)",
+    badge: "RUBY",
+    rtp: 79,
+    minDeposit: 10000,
+    caseId: "daily-170",
+    category: "limited",
+    maxSkinPrice: 2500.00,
+    knifeChance: 8,
+    gloveChance: 3,
+    description: "Desbloqueado con €10000 depositados - Cuchillos frecuentes",
+    theme: "Inferno",
+    glowColor: "#e0115f",
+    borderGlow: "0 0 60px rgba(224,17,95,0.5)",
+    icon: "flame"
+  },
+  {
+    level: 230,
+    name: "MASTER DAILY",
+    color: "#ff4500",
+    bgGradient: "linear-gradient(135deg, #1a0500 0%, #ff6a00 100%)",
+    badge: "MASTER",
+    rtp: 77,
+    minDeposit: 25000,
+    caseId: "daily-230",
+    category: "limited",
+    maxSkinPrice: 5000.00,
+    knifeChance: 12,
+    gloveChance: 5,
+    description: "Desbloqueado con €25000 depositados - Skins de élite garantizadas",
+    theme: "Shadow",
+    glowColor: "#ff4500",
+    borderGlow: "0 0 60px rgba(255,69,0,0.6)",
+    icon: "lightning"
+  },
+  {
+    level: 300,
+    name: "LEGENDARY DAILY",
+    color: "#ffd700",
+    bgGradient: "linear-gradient(135deg, #1a0a00 0%, #ffcc00 100%)",
+    badge: "LEGENDARY",
+    rtp: 75,
+    minDeposit: 75000,
+    caseId: "daily-300",
+    category: "limited",
+    maxSkinPrice: 10000.00,
+    knifeChance: 18,
+    gloveChance: 8,
+    description: "Desbloqueado con €75000 depositados - Solo para leyendas",
+    theme: "Heavenly",
+    glowColor: "#ffd700",
+    borderGlow: "0 0 80px rgba(255,215,0,0.6)",
+    icon: "star"
+  },
+  {
+    level: 360,
+    name: "VIP SUPREME",
+    color: "#ff00ff",
+    bgGradient: "linear-gradient(135deg, #1a0030 0%, #ff00ff 100%)",
+    badge: "SUPREME",
+    rtp: 72,
+    minDeposit: 200000,
+    caseId: "daily-360",
+    category: "limited",
+    maxSkinPrice: 25000.00,
+    knifeChance: 25,
+    gloveChance: 12,
+    description: "Nivel maximo - Cuchillos y guantes de alto valor muy frecuentes",
+    theme: "Cosmic",
+    glowColor: "#ff00ff",
+    borderGlow: "0 0 100px rgba(255,0,255,0.7)",
+    icon: "skull"
+  }
+];
+
 // ─── Case Definitions with Professional Naming ───────────
 export const CASE_IMAGES = {
   // Económicas — Temas profesionales CS2 style
   económica: [
-    { name: "Starter Case", color: "#6366f1", bgGradient: "linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)" },
-    { name: "Crystal Vault", color: "#3b82f6", bgGradient: "linear-gradient(135deg, #1e293b 0%, #1e40af 100%)" },
-    { name: "Frost Discovery", color: "#0891b2", bgGradient: "linear-gradient(135deg, #082f49 0%, #0e7490 100%)" },
-    { name: "Neon Dawn", color: "#06b6d4", bgGradient: "linear-gradient(135deg, #042f2e 0%, #0891b2 100%)" },
-    { name: "Forest Spirit", color: "#10b981", bgGradient: "linear-gradient(135deg, #052e16 0%, #065f46 100%)" },
-    { name: "Ember Glow", color: "#f59e0b", bgGradient: "linear-gradient(135deg, #451a03 0%, #92400e 100%)" },
-    { name: "Sunset Ray", color: "#ec4899", bgGradient: "linear-gradient(135deg, #500724 0%, #9d174d 100%)" },
-    { name: "Twilight Keeper", color: "#a855f7", bgGradient: "linear-gradient(135deg, #2e1065 0%, #6b21a8 100%)" },
-    { name: "Phantom Case", color: "#8b5cf6", bgGradient: "linear-gradient(135deg, #1e1b4b 0%, #5b21b6 100%)" },
-    { name: "Thunder Strike", color: "#fbbf24", bgGradient: "linear-gradient(135deg, #422006 0%, #a16207 100%)" },
-    { name: "Iron Clad", color: "#94a3b8", bgGradient: "linear-gradient(135deg, #1e293b 0%, #475569 100%)" },
-    { name: "Copper Wire", color: "#b45309", bgGradient: "linear-gradient(135deg, #451a03 0%, #78350f 100%)" },
+    { name: "Starter Case", color: "#6366f1", bgGradient: "linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)", badge: "ECO", rtp: 90 },
+    { name: "Crystal Vault", color: "#3b82f6", bgGradient: "linear-gradient(135deg, #1e293b 0%, #1e40af 100%)", badge: "ECO", rtp: 90 },
+    { name: "Frost Discovery", color: "#0891b2", bgGradient: "linear-gradient(135deg, #082f49 0%, #0e7490 100%)", badge: "ECO", rtp: 90 },
+    { name: "Neon Dawn", color: "#06b6d4", bgGradient: "linear-gradient(135deg, #042f2e 0%, #0891b2 100%)", badge: "ECO", rtp: 90 },
+    { name: "Forest Spirit", color: "#10b981", bgGradient: "linear-gradient(135deg, #052e16 0%, #065f46 100%)", badge: "ECO", rtp: 90 },
+    { name: "Ember Glow", color: "#f59e0b", bgGradient: "linear-gradient(135deg, #451a03 0%, #92400e 100%)", badge: "ECO", rtp: 90 },
+    { name: "Sunset Ray", color: "#ec4899", bgGradient: "linear-gradient(135deg, #500724 0%, #9d174d 100%)", badge: "ECO", rtp: 90 },
+    { name: "Twilight Keeper", color: "#a855f7", bgGradient: "linear-gradient(135deg, #2e1065 0%, #6b21a8 100%)", badge: "ECO", rtp: 90 },
+    { name: "Phantom Case", color: "#8b5cf6", bgGradient: "linear-gradient(135deg, #1e1b4b 0%, #5b21b6 100%)", badge: "ECO", rtp: 90 },
+    { name: "Thunder Strike", color: "#fbbf24", bgGradient: "linear-gradient(135deg, #422006 0%, #a16207 100%)", badge: "ECO", rtp: 90 },
+    { name: "Iron Clad", color: "#94a3b8", bgGradient: "linear-gradient(135deg, #1e293b 0%, #475569 100%)", badge: "ECO", rtp: 90 },
+    { name: "Copper Wire", color: "#b45309", bgGradient: "linear-gradient(135deg, #451a03 0%, #78350f 100%)", badge: "ECO", rtp: 90 },
   ],
 
   // Intermedias — Temas guerrero/táctico
   intermedia: [
-    { name: "Sentinel Guardian", color: "#2563eb", bgGradient: "linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%)" },
-    { name: "Warrior's Path", color: "#dc2626", bgGradient: "linear-gradient(135deg, #7f1d1d 0%, #dc2626 100%)" },
-    { name: "Phantom Strike", color: "#6366f1", bgGradient: "linear-gradient(135deg, #312e81 0%, #6366f1 100%)" },
-    { name: "Specter Eyes", color: "#059669", bgGradient: "linear-gradient(135deg, #064e3b 0%, #059669 100%)" },
-    { name: "Dragon Warden", color: "#b91c1c", bgGradient: "linear-gradient(135deg, #450a0a 0%, #991b1b 100%)" },
-    { name: "Phoenix Flame", color: "#f59e0b", bgGradient: "linear-gradient(135deg, #78350f 0%, #f59e0b 100%)" },
-    { name: "Thunder Bolt", color: "#ca8a04", bgGradient: "linear-gradient(135deg, #422006 0%, #ca8a04 100%)" },
-    { name: "Steel Resolve", color: "#475569", bgGradient: "linear-gradient(135deg, #1e293b 0%, #475569 100%)" },
-    { name: "Tactical Ops", color: "#1e3a8a", bgGradient: "linear-gradient(135deg, #172554 0%, #1e3a8a 100%)" },
-    { name: "Hunter's Mark", color: "#14532d", bgGradient: "linear-gradient(135deg, #052e16 0%, #14532d 100%)" },
-    { name: "Rogue Spirit", color: "#4c1d95", bgGradient: "linear-gradient(135deg, #2e1065 0%, #4c1d95 100%)" },
-    { name: "Eagle Eye", color: "#1e40af", bgGradient: "linear-gradient(135deg, #172554 0%, #1e40af 100%)" },
-    { name: "Storm Front", color: "#1e3a8a", bgGradient: "linear-gradient(135deg, #0c1838 0%, #2563eb 100%)" },
-    { name: "Inferno Core", color: "#991b1b", bgGradient: "linear-gradient(135deg, #450a0a 0%, #ef4444 100%)" },
+    { name: "Sentinel Guardian", color: "#2563eb", bgGradient: "linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%)", badge: "MID", rtp: 88 },
+    { name: "Warrior's Path", color: "#dc2626", bgGradient: "linear-gradient(135deg, #7f1d1d 0%, #dc2626 100%)", badge: "MID", rtp: 88 },
+    { name: "Phantom Strike", color: "#6366f1", bgGradient: "linear-gradient(135deg, #312e81 0%, #6366f1 100%)", badge: "MID", rtp: 88 },
+    { name: "Specter Eyes", color: "#059669", bgGradient: "linear-gradient(135deg, #064e3b 0%, #059669 100%)", badge: "MID", rtp: 88 },
+    { name: "Dragon Warden", color: "#b91c1c", bgGradient: "linear-gradient(135deg, #450a0a 0%, #991b1b 100%)", badge: "MID", rtp: 88 },
+    { name: "Phoenix Flame", color: "#f59e0b", bgGradient: "linear-gradient(135deg, #78350f 0%, #f59e0b 100%)", badge: "MID", rtp: 88 },
+    { name: "Thunder Bolt", color: "#ca8a04", bgGradient: "linear-gradient(135deg, #422006 0%, #ca8a04 100%)", badge: "MID", rtp: 88 },
+    { name: "Steel Resolve", color: "#475569", bgGradient: "linear-gradient(135deg, #1e293b 0%, #475569 100%)", badge: "MID", rtp: 88 },
+    { name: "Tactical Ops", color: "#1e3a8a", bgGradient: "linear-gradient(135deg, #172554 0%, #1e3a8a 100%)", badge: "MID", rtp: 88 },
+    { name: "Hunter's Mark", color: "#14532d", bgGradient: "linear-gradient(135deg, #052e16 0%, #14532d 100%)", badge: "MID", rtp: 88 },
+    { name: "Rogue Spirit", color: "#4c1d95", bgGradient: "linear-gradient(135deg, #2e1065 0%, #4c1d95 100%)", badge: "MID", rtp: 88 },
+    { name: "Eagle Eye", color: "#1e40af", bgGradient: "linear-gradient(135deg, #172554 0%, #1e40af 100%)", badge: "MID", rtp: 88 },
+    { name: "Storm Front", color: "#1e3a8a", bgGradient: "linear-gradient(135deg, #0c1838 0%, #2563eb 100%)", badge: "MID", rtp: 88 },
+    { name: "Inferno Core", color: "#991b1b", bgGradient: "linear-gradient(135deg, #450a0a 0%, #ef4444 100%)", badge: "MID", rtp: 88 },
   ],
 
   // Premium — Temas leyenda/infinito
   premium: [
-    { name: "Elder Legends", color: "#b91c1c", bgGradient: "linear-gradient(135deg, #450a0a 0%, #b91c1c 100%)" },
-    { name: "Mythical Dragon", color: "#7c3aed", bgGradient: "linear-gradient(135deg, #3b0764 0%, #7c3aed 100%)" },
-    { name: "Cosmic Infinity", color: "#2563eb", bgGradient: "linear-gradient(135deg, #0c1838 0%, #2563eb 100%)" },
-    { name: "Supreme Overlord", color: "#991b1b", bgGradient: "linear-gradient(135deg, #450a0a 0%, #991b1b 100%)" },
-    { name: "Golden Dynasty", color: "#ca8a04", bgGradient: "linear-gradient(135deg, #422006 0%, #ca8a04 100%)" },
-    { name: "Celestial Throne", color: "#7c3aed", bgGradient: "linear-gradient(135deg, #2e1065 0%, #7c3aed 100%)" },
-    { name: "Tycoon's Vault", color: "#065f46", bgGradient: "linear-gradient(135deg, #022c22 0%, #065f46 100%)" },
-    { name: "Alpha Predator", color: "#450a0a", bgGradient: "linear-gradient(135deg, #1c0a0a 0%, #450a0a 100%)" },
-    { name: "God Mode", color: "#1e3a8a", bgGradient: "linear-gradient(135deg, #172554 0%, #1e3a8a 100%)" },
-    { name: "Immortal Soul", color: "#312e81", bgGradient: "linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)" },
-    { name: "Nexus Point", color: "#0f766e", bgGradient: "linear-gradient(135deg, #042f2e 0%, #0f766e 100%)" },
-    { name: "Omega Strike", color: "#701a75", bgGradient: "linear-gradient(135deg, #3b0764 0%, #701a75 100%)" },
+    { name: "Elder Legends", color: "#b91c1c", bgGradient: "linear-gradient(135deg, #450a0a 0%, #b91c1c 100%)", badge: "PREMIUM", rtp: 85 },
+    { name: "Mythical Dragon", color: "#7c3aed", bgGradient: "linear-gradient(135deg, #3b0764 0%, #7c3aed 100%)", badge: "PREMIUM", rtp: 85 },
+    { name: "Cosmic Infinity", color: "#2563eb", bgGradient: "linear-gradient(135deg, #0c1838 0%, #2563eb 100%)", badge: "PREMIUM", rtp: 85 },
+    { name: "Supreme Overlord", color: "#991b1b", bgGradient: "linear-gradient(135deg, #450a0a 0%, #991b1b 100%)", badge: "PREMIUM", rtp: 85 },
+    { name: "Golden Dynasty", color: "#ca8a04", bgGradient: "linear-gradient(135deg, #422006 0%, #ca8a04 100%)", badge: "PREMIUM", rtp: 85 },
+    { name: "Celestial Throne", color: "#7c3aed", bgGradient: "linear-gradient(135deg, #2e1065 0%, #7c3aed 100%)", badge: "PREMIUM", rtp: 85 },
+    { name: "Tycoon's Vault", color: "#065f46", bgGradient: "linear-gradient(135deg, #022c22 0%, #065f46 100%)", badge: "PREMIUM", rtp: 85 },
+    { name: "Alpha Predator", color: "#450a0a", bgGradient: "linear-gradient(135deg, #1c0a0a 0%, #450a0a 100%)", badge: "PREMIUM", rtp: 85 },
+    { name: "God Mode", color: "#1e3a8a", bgGradient: "linear-gradient(135deg, #172554 0%, #1e3a8a 100%)", badge: "PREMIUM", rtp: 85 },
+    { name: "Immortal Soul", color: "#312e81", bgGradient: "linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)", badge: "PREMIUM", rtp: 85 },
+    { name: "Nexus Point", color: "#0f766e", bgGradient: "linear-gradient(135deg, #042f2e 0%, #0f766e 100%)", badge: "PREMIUM", rtp: 85 },
+    { name: "Omega Strike", color: "#701a75", bgGradient: "linear-gradient(135deg, #3b0764 0%, #701a75 100%)", badge: "PREMIUM", rtp: 85 },
   ],
 
   // Limited — Temas únicos/coleccionista
   limited: [
-    { name: "Collector's Edition", color: "#10b981", bgGradient: "linear-gradient(135deg, #022c22 0%, #10b981 100%)" },
-    { name: "Diamond Jubilee", color: "#0ea5e9", bgGradient: "linear-gradient(135deg, #082f49 0%, #0ea5e9 100%)" },
-    { name: "Gold Rush", color: "#ca8a04", bgGradient: "linear-gradient(135deg, #422006 0%, #facc15 100%)" },
-    { name: "High Roller", color: "#dc2626", bgGradient: "linear-gradient(135deg, #450a0a 0%, #dc2626 100%)" },
-    { name: "Whale's Dream", color: "#0369a1", bgGradient: "linear-gradient(135deg, #082f49 0%, #0369a1 100%)" },
-    { name: "Founders Box", color: "#1e40af", bgGradient: "linear-gradient(135deg, #172554 0%, #1e40af 100%)" },
-    { name: "Legacy Crate", color: "#78350f", bgGradient: "linear-gradient(135deg, #451a03 0%, #78350f 100%)" },
-    { name: "Time Capsule", color: "#1e1b4b", bgGradient: "linear-gradient(135deg, #0c0a1e 0%, #4338ca 100%)" },
+    { name: "Collector's Edition", color: "#10b981", bgGradient: "linear-gradient(135deg, #022c22 0%, #10b981 100%)", badge: "LIMITED", rtp: 82 },
+    { name: "Diamond Jubilee", color: "#0ea5e9", bgGradient: "linear-gradient(135deg, #082f49 0%, #0ea5e9 100%)", badge: "LIMITED", rtp: 82 },
+    { name: "Gold Rush", color: "#ca8a04", bgGradient: "linear-gradient(135deg, #422006 0%, #facc15 100%)", badge: "LIMITED", rtp: 82 },
+    { name: "High Roller", color: "#dc2626", bgGradient: "linear-gradient(135deg, #450a0a 0%, #dc2626 100%)", badge: "LIMITED", rtp: 82 },
+    { name: "Whale's Dream", color: "#0369a1", bgGradient: "linear-gradient(135deg, #082f49 0%, #0369a1 100%)", badge: "LIMITED", rtp: 82 },
+    { name: "Founders Box", color: "#1e40af", bgGradient: "linear-gradient(135deg, #172554 0%, #1e40af 100%)", badge: "LIMITED", rtp: 82 },
+    { name: "Legacy Crate", color: "#78350f", bgGradient: "linear-gradient(135deg, #451a03 0%, #78350f 100%)", badge: "LIMITED", rtp: 82 },
+    { name: "Time Capsule", color: "#1e1b4b", bgGradient: "linear-gradient(135deg, #0c0a1e 0%, #4338ca 100%)", badge: "LIMITED", rtp: 82 },
   ]
 };
 
@@ -141,7 +418,8 @@ export const generateAllCases = () => {
       bgGradient: caseImg.bgGradient,
       rarity: "mil-spec",
       image: CASE_CONTAINER_ECO,
-      rtp: 90 // 90% RTP
+      rtp: 90, // 90% RTP
+      badge: caseImg.badge || "ECO"
     });
   });
 
@@ -158,7 +436,8 @@ export const generateAllCases = () => {
       bgGradient: caseImg.bgGradient,
       rarity: "classified",
       image: CASE_CONTAINER_MID,
-      rtp: 88
+      rtp: 88,
+      badge: caseImg.badge || "MID"
     });
   });
 
@@ -175,7 +454,8 @@ export const generateAllCases = () => {
       bgGradient: caseImg.bgGradient,
       rarity: "covert",
       image: CASE_CONTAINER_PREMIUM,
-      rtp: 85
+      rtp: 85,
+      badge: caseImg.badge || "PREMIUM"
     });
   });
 
@@ -189,39 +469,113 @@ export const generateAllCases = () => {
       price: limitPrices[idx] || 50.00,
       category: "limited",
       color: caseImg.color,
-      bgGradient: "linear-gradient(135deg, #1a1a2e 0%, #f5ac3b 100%)",
+      bgGradient: caseImg.bgGradient,
       rarity: "covert",
       image: CASE_CONTAINER_PREMIUM,
-      rtp: 82
+      rtp: 82,
+      badge: caseImg.badge || "LIMITED"
     });
   });
 
-  // Daily cases for levels
-  const dailyDefinitions = [
-    { level: 0, name: "DAILY FREE", color: "#10b981", id: "daily-0" },
-    { level: 5, name: "BRONZE DAILY", color: "#cd7f32", id: "daily-5" },
-    { level: 10, name: "SILVER DAILY", color: "#c0c0c0", id: "daily-10" },
-    { level: 25, name: "GOLD DAILY", color: "#ffd700", id: "daily-25" },
-    { level: 50, name: "DIAMOND DAILY", color: "#b9f2ff", id: "daily-50" },
-  ];
-
-  dailyDefinitions.forEach(d => {
+  // Daily cases for levels (KeyDrop-style progression)
+  DAILY_CASES_BY_LEVEL.forEach(d => {
     cases.push({
-      id: d.id,
+      id: d.caseId,
       name: d.name,
       imageSrc: CASE_CONTAINER_ECO,
       price: 0.00,
       category: "daily",
       color: d.color,
-      bgGradient: `linear-gradient(135deg, #1f2937 0%, ${d.color} 100%)`,
-      rarity: d.level === 0 ? "mil-spec" : d.level < 25 ? "classified" : "covert",
+      bgGradient: d.bgGradient,
+      rarity: d.level === 0 ? "mil-spec" : d.level < 25 ? "classified" : d.level < 50 ? "covert" : "extraordinary",
       image: CASE_CONTAINER_ECO,
       minLevel: d.level,
-      rtp: 95
+      rtp: d.rtp,
+      badge: d.badge,
+      maxSkinPrice: d.maxSkinPrice,
+      description: d.description
     });
   });
 
   return cases;
+};
+
+// ─── Generate random skin for case opening ────────────────
+// Uses the skin catalogs to create realistic CS2 skins
+export const generateRandomSkin = (caseCategory, userLevel = 0) => {
+  const catalog = SKIN_CATALOGS[caseCategory] || SKIN_CATALOGS.económica;
+  const probs = CASE_PROBABILITIES[caseCategory] || CASE_PROBABILITIES.económica;
+
+  // Roll for rarity tier
+  const roll = Math.random() * 100;
+  let rarity, rarityPrice;
+
+  if (roll < probs.covert) {
+    rarity = "Covert";
+    rarityPrice = catalog.priceRange[1] * (0.6 + Math.random() * 0.4);
+  } else if (roll < probs.covert + probs.classified) {
+    rarity = "Classified";
+    rarityPrice = catalog.priceRange[0] + (catalog.priceRange[1] - catalog.priceRange[0]) * (0.3 + Math.random() * 0.4);
+  } else if (roll < probs.covert + probs.classified + probs.restricted) {
+    rarity = "Restricted";
+    rarityPrice = catalog.priceRange[0] + (catalog.priceRange[1] - catalog.priceRange[0]) * (0.1 + Math.random() * 0.3);
+  } else {
+    rarity = "Mil-Spec Grade";
+    rarityPrice = catalog.priceRange[0] + Math.random() * (catalog.priceRange[1] - catalog.priceRange[0]) * 0.2;
+  }
+
+  // Pick random weapon and skin
+  const weapon = catalog.weapons[Math.floor(Math.random() * catalog.weapons.length)];
+  const skinName = catalog.skins[Math.floor(Math.random() * catalog.skins.length)];
+  const wearValues = ["Factory New", "Minimal Wear", "Field-Tested", "Well-Worn", "Battle-Scarred"];
+  const wear = wearValues[Math.floor(Math.random() * wearValues.length)];
+
+  // Special items (knives/gloves) for high-tier cases
+  let finalWeapon = weapon;
+  let finalSkin = skinName;
+  let finalPrice = rarityPrice;
+
+  if (caseCategory === "limited" && Math.random() < 0.08) {
+    // 8% chance for knife/glove in limited cases
+    const specialItems = [
+      { weapon: "★ Karambit", skins: ["Doppler", "Fade", "Marble Fade", "Crimson Web", "Case Hardened"], priceRange: [400, 1500] },
+      { weapon: "★ Butterfly Knife", skins: ["Doppler", "Fade", "Marble Fade", "Crimson Web", "Gamma Doppler"], priceRange: [300, 1200] },
+      { weapon: "★ Flip Knife", skins: ["Doppler", "Fade", "Marble Fade", "Crimson Web"], priceRange: [150, 600] },
+      { weapon: "★ Talon Knife", skins: ["Doppler", "Fade", "Marble Fade", "Crimson Web"], priceRange: [200, 800] },
+      { weapon: "★ Shadow Daggers", skins: ["Doppler", "Fade", "Marble Fade", "Crimson Web"], priceRange: [120, 500] }
+    ];
+    const special = specialItems[Math.floor(Math.random() * specialItems.length)];
+    finalWeapon = special.weapon;
+    finalSkin = special.skins[Math.floor(Math.random() * special.skins.length)];
+    finalPrice = special.priceRange[0] + Math.random() * (special.priceRange[1] - special.priceRange[0]);
+    rarity = "Extraordinary";
+  } else if (caseCategory === "premium" && Math.random() < 0.03) {
+    // 3% chance for gloves in premium cases
+    const gloves = [
+      { name: "★ Specialist Gloves | Fade", price: 250 },
+      { name: "★ Specialist Gloves | Crimson Web", price: 180 },
+      { name: "★ Sport Gloves | Pandora's Box", price: 350 },
+      { name: "★ Driver Gloves | King Snake", price: 220 },
+      { name: "★ Hand Wraps | Overprint", price: 150 }
+    ];
+    const glove = gloves[Math.floor(Math.random() * gloves.length)];
+    finalWeapon = "★ Gloves";
+    finalSkin = glove.name.split(" | ")[1];
+    finalPrice = glove.price;
+    rarity = "Extraordinary";
+  }
+
+  const itemName = `${finalWeapon} | ${finalSkin}`;
+  const price = parseFloat(finalPrice.toFixed(2));
+
+  return {
+    name: itemName,
+    weapon: finalWeapon,
+    skin_name: finalSkin,
+    rarity: rarity,
+    price: price,
+    wear: wear
+  };
 };
 
 // ─── Weighted Random Selection based on skin price ────────

@@ -69,7 +69,7 @@ const SettingsModal = ({ open, onClose }) => {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(15px)", zIndex: 3000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
       <div style={{ background: "#16191e", width: "100%", maxWidth: "520px", borderRadius: "28px", border: "1px solid rgba(255,255,255,0.08)", padding: "35px", textAlign: "center", color: "white", boxShadow: "0 30px 80px rgba(0,0,0,0.6)" }}>
-        <h2 style={{ fontSize: "1.5rem", fontWeight: "900", marginBottom: "8px" }}>⚙️ CONFIGURACIÓN DE CUENTA</h2>
+<h2 style={{ fontSize: "1.5rem", fontWeight: "900", marginBottom: "8px" }}>CONFIGURACIÓN DE CUENTA</h2>
         <p style={{ color: "rgba(255,255,255,0.45)", fontSize: "0.8rem", marginBottom: "25px" }}>
           Configura tu Trade URL de Steam para retirar skins reales mediante ofertas de intercambio.
         </p>
@@ -121,18 +121,19 @@ const SettingsModal = ({ open, onClose }) => {
   );
 };
 
-// ─── LEVEL-BASED DAILY CASE ───────────────────────────
+// ─── LEVEL-BASED DAILY CASE (11-Level System: 0,5,15,30,50,80,120,170,230,300,360) ─────
 const LEVEL_CONFIG = [
-  { level: 1, minDeposit: 0, dailyCaseId: "eco-1", caseLabel: "Caja Eco 💚", reward: 0.15, caseImage: "/case_eco.png" },
-  { level: 2, minDeposit: 10, dailyCaseId: "eco-1", caseLabel: "Caja Eco 💚", reward: 0.25, caseImage: "/case_eco.png" },
-  { level: 3, minDeposit: 50, dailyCaseId: "eco-1", caseLabel: "Caja Eco 💚", reward: 0.50, caseImage: "/case_eco.png" },
-  { level: 4, minDeposit: 100, dailyCaseId: "mid-1", caseLabel: "Caja Mid 💙", reward: 0.75, caseImage: "/case_mid.png" },
-  { level: 5, minDeposit: 250, dailyCaseId: "mid-1", caseLabel: "Caja Mid 💙", reward: 1.00, caseImage: "/case_mid.png" },
-  { level: 6, minDeposit: 500, dailyCaseId: "mid-1", caseLabel: "Caja Mid 💙", reward: 1.25, caseImage: "/case_mid.png" },
-  { level: 7, minDeposit: 1000, dailyCaseId: "premium-1", caseLabel: "Caja Premium 💜", reward: 1.50, caseImage: "/case_premium.png" },
-  { level: 8, minDeposit: 2500, dailyCaseId: "premium-1", caseLabel: "Caja Premium 💜", reward: 1.75, caseImage: "/case_premium.png" },
-  { level: 9, minDeposit: 5000, dailyCaseId: "premium-1", caseLabel: "Caja Premium 💜", reward: 2.00, caseImage: "/case_premium.png" },
-  { level: 10, minDeposit: 10000, dailyCaseId: "premium-1", caseLabel: "Caja Legendaria 👑", reward: 2.00, caseImage: "/case_premium.png" }
+  { level: 0, minDeposit: 0, dailyCaseId: "daily-0", caseLabel: "DAILY FREE", reward: 0.15, caseImage: "/case_eco.png", theme: "Crystal", color: "#10b981" },
+  { level: 5, minDeposit: 10, dailyCaseId: "daily-5", caseLabel: "BRONZE DAILY", reward: 0.25, caseImage: "/case_eco.png", theme: "Steampunk", color: "#cd7f32" },
+  { level: 15, minDeposit: 50, dailyCaseId: "daily-15", caseLabel: "SILVER DAILY", reward: 0.50, caseImage: "/case_mid.png", theme: "Cyber", color: "#c0c0c0" },
+  { level: 30, minDeposit: 150, dailyCaseId: "daily-30", caseLabel: "GOLD DAILY", reward: 1.00, caseImage: "/case_mid.png", theme: "Ancient", color: "#ffd700" },
+  { level: 50, minDeposit: 500, dailyCaseId: "daily-50", caseLabel: "DIAMOND DAILY", reward: 2.00, caseImage: "/case_premium.png", theme: "Crystal", color: "#b9f2ff" },
+  { level: 80, minDeposit: 1500, dailyCaseId: "daily-80", caseLabel: "PLATINUM DAILY", reward: 3.50, caseImage: "/case_premium.png", theme: "Frost", color: "#e5e4e2" },
+  { level: 120, minDeposit: 4000, dailyCaseId: "daily-120", caseLabel: "EMERALD DAILY", reward: 6.00, caseImage: "/case_premium.png", theme: "Dragon", color: "#50c878" },
+  { level: 170, minDeposit: 10000, dailyCaseId: "daily-170", caseLabel: "RUBY DAILY", reward: 10.00, caseImage: "/case_premium.png", theme: "Inferno", color: "#e0115f" },
+  { level: 230, minDeposit: 25000, dailyCaseId: "daily-230", caseLabel: "MASTER DAILY", reward: 18.00, caseImage: "/case_premium.png", theme: "Shadow", color: "#ff4500" },
+  { level: 300, minDeposit: 75000, dailyCaseId: "daily-300", caseLabel: "LEGENDARY DAILY", reward: 30.00, caseImage: "/case_premium.png", theme: "Heavenly", color: "#ffd700" },
+  { level: 360, minDeposit: 200000, dailyCaseId: "daily-360", caseLabel: "VIP SUPREME", reward: 50.00, caseImage: "/case_premium.png", theme: "Cosmic", color: "#ff00ff" }
 ];
 
 function getLevelConfig(level) {
@@ -303,7 +304,7 @@ export default function Dashboard() {
               </div>
               <p style={{ color: "rgba(255,255,255,0.4)", margin: "5px 0 0 0", fontSize: "0.85rem" }}>{user.email}</p>
               <p style={{ color: "rgba(255,255,255,0.3)", margin: "3px 0 0 0", fontSize: "0.75rem" }}>
-                🎯 Nivel {nextLevelDeposit > 0 ? `${user.nivel || 1} → ${(user.nivel || 1) + 1}: Deposita €${(nextLevelDeposit - (user.totalDepositado || 0)).toFixed(2)} más` : "¡Nivel máximo!"}
+                ◆ Nivel {nextLevelDeposit > 0 ? `${user.nivel || 1} → ${(user.nivel || 1) + 1}: Deposita €${(nextLevelDeposit - (user.totalDepositado || 0)).toFixed(2)} más` : "¡Nivel máximo!"}
               </p>
             </div>
           </div>
@@ -319,7 +320,7 @@ export default function Dashboard() {
             </button>
 
             <button onClick={() => setSettingsOpen(true)} style={{ padding: "14px", background: "rgba(255,255,255,0.05)", color: "white", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "14px", cursor: "pointer", fontSize: "1.2rem" }}>
-              ⚙️
+              ◆
             </button>
           </div>
         </div>
@@ -349,7 +350,7 @@ export default function Dashboard() {
 
           <div style={{ flex: 1, minWidth: "200px" }}>
             <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.4)", fontWeight: "bold", marginBottom: "5px" }}>
-              🎁 CAJA DIARIA NIVEL {user.nivel || 1}
+              ◆ CAJA DIARIA NIVEL {user.nivel || 1}
             </div>
             <div style={{ fontSize: "1.8rem", fontWeight: "900", marginBottom: "5px" }}>
               {isDailyAvailable ? "¡LISTA PARA ABRIR!" : "PRÓXIMA CAJA"}
@@ -395,7 +396,7 @@ export default function Dashboard() {
                     ABRIENDO...
                   </>
                 ) : (
-                  "🎁 ABRIR CAJA DIARIA"
+                  "◆ ABRIR CAJA DIARIA"
                 )}
               </button>
             )}

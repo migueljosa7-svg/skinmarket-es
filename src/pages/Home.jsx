@@ -116,7 +116,7 @@ export default function Home() {
                   letterSpacing: '1px'
                 }}
               >
-                EMPEZAR AHORA 🎁
+                EMPEZAR AHORA ◆
               </Motion.button>
             </Link>
 
@@ -155,9 +155,9 @@ export default function Home() {
           gap: '30px'
         }}>
           {[
-            { label: 'Skins Activas', value: '18,500+', icon: '🔥' },
-            { label: 'Cajas Únicas', value: '250+', icon: '📦' },
-            { label: 'Usuarios VIP', value: '125k+', icon: '💎' }
+            { label: 'Skins Activas', value: '18,500+', icon: <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#f5ac3b" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg> },
+            { label: 'Cajas Unicas', value: '250+', icon: <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#f5ac3b" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 3v18"/></svg> },
+            { label: 'Usuarios VIP', value: '125k+', icon: <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#f5ac3b" strokeWidth="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg> }
           ].map((stat, i) => (
             <Motion.div
               key={i}
@@ -173,7 +173,7 @@ export default function Home() {
                 textAlign: 'center'
               }}
             >
-              <div style={{ fontSize: '3rem', marginBottom: '20px' }}>{stat.icon}</div>
+              <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'center' }}>{stat.icon}</div>
               <div style={{ fontSize: '3rem', fontWeight: '900', color: 'white', marginBottom: '8px', letterSpacing: '-1px' }}>{stat.value}</div>
               <div style={{ color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '2px', fontSize: '0.85rem', fontWeight: '900' }}>{stat.label}</div>
             </Motion.div>
