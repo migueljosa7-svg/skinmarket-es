@@ -1,13 +1,10 @@
 // src/context/AuthContext.jsx
 import { createContext, useEffect, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
 import { StorageService } from "../services/StorageService";
 
 export const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const navigate = useNavigate();
-
   // FIX: In incognito/clean tab, user should be null (not a default guest)
   // Only set user from StorageService if there's an actual stored session
   const [user, setUser] = useState(() => {
@@ -155,11 +152,11 @@ export function AuthProvider({ children }) {
     setToken(null);
     setInventory([]);
 
-    // 4. Redirect to home
-    navigate("/");
+    // 4. Redirect to home (clean redirect without React Router dependency)
+    window.location.href = "/";
 
     console.log('🔓 [LOGOUT] Session cleaned and redirected to home');
-  }, [navigate]);
+  }, []);
 
   const updateUser = useCallback((updatedUserOrFn) => {
     StorageService.updateUser(updatedUserOrFn);
@@ -216,7 +213,7 @@ export function AuthProvider({ children }) {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
             body: JSON.stringify({ itemId: skin.id })
-          }).catch(() => {});
+          }).catch(() => { });
         }
       });
     }
@@ -234,7 +231,7 @@ export function AuthProvider({ children }) {
           const parsed = JSON.parse(raw);
           token = parsed?.user?.token || null;
         }
-      } catch (e) {}
+      } catch (e) { }
     }
     console.log('🔑 [TOKEN CHECK]', token ? 'Token presente' : 'TOKEN MISSING');
     if (token) {
@@ -361,9 +358,9 @@ export function AuthProvider({ children }) {
     return `Se ha enviado un correo de recuperación a ${email}`;
   }, []);
 
-// Normalize balance/saldo and merge inventory into user object
-  const userWithInventory = user ? { 
-    ...user, 
+  // Normalize balance/saldo and merge inventory into user object
+  const userWithInventory = user ? {
+    ...user,
     inventory,
     balance: Number(user.balance ?? user.saldo ?? 0),
     saldo: Number(user.saldo ?? user.balance ?? 0)
@@ -388,7 +385,7 @@ export function AuthProvider({ children }) {
         fetchInventory,
         claimDaily,
         recoverPassword,
-        checkAuth: () => {}
+        checkAuth: () => { }
       }}
     >
       {children}
