@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
-import { generateAllCases } from "../constants/cases.js";
+import { generateAllCases, pickWeightedSkin } from "../constants/cases.js";
 import { useFetchSkins } from "../hooks/useFetchSkins";
 import { getRarityColor } from "../constants/colors.js";
 import { StorageService } from "../services/StorageService";
@@ -266,11 +266,12 @@ export default function CaseView() {
   }, [allSkins, caseData]);
 
   const startSpin = useCallback(async () => {
-    if (!user || !user.balance) return toast.error("Inicia sesión para abrir cajas");
+    if (!user || !user?.balance) return toast.error("Inicia sesión para abrir cajas");
     const totalCost = parseFloat(caseData.price) * quantity;
+    const userBalance = Number(user?.balance ?? user?.saldo ?? 0);
 
-    if (user.balance < totalCost) {
-      setBalanceError(`Necesitas €${(totalCost - user.balance).toFixed(2)} adicionales`);
+    if (userBalance < totalCost) {
+      setBalanceError(`Necesitas €${(totalCost - userBalance).toFixed(2)} adicionales`);
       return;
     }
 
@@ -359,27 +360,29 @@ export default function CaseView() {
       return;
     }
 
-    // Pick expected won items
+    // Pick expected won items using weighted probability system (RTP-balanced)
     const expectedResults = [];
     for (let i = 0; i < quantity; i++) {
-      // Weighted pick: 70% low tier, 22% mid tier, 8% high tier
-      const roll = Math.random() * 100;
-      let chosenSkin;
-      if (roll < 70) {
-        chosenSkin = validSkins[Math.floor(Math.random() * Math.min(4, validSkins.length))];
-      } else if (roll < 92) {
-        chosenSkin = validSkins[Math.floor(Math.random() * Math.min(8, validSkins.length))];
+      const chosenSkin = pickWeightedSkin(validSkins, caseData.category || "económica");
+      if (!chosenSkin) {
+        // Fallback to cheapest skin if pickWeightedSkin returns null
+        const fallbackSkin = validSkins[0];
+        expectedResults.push({
+          id: `won_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 4)}`,
+          name: fallbackSkin.name,
+          price: Number(fallbackSkin.price),
+          rarity: fallbackSkin.rarity,
+          image: fallbackSkin.image
+        });
       } else {
-        chosenSkin = validSkins[validSkins.length - 1]; // Top drop
+        expectedResults.push({
+          id: `won_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 4)}`,
+          name: chosenSkin.name,
+          price: Number(chosenSkin.price),
+          rarity: chosenSkin.rarity,
+          image: chosenSkin.image
+        });
       }
-
-      expectedResults.push({
-        id: `won_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 4)}`,
-        name: chosenSkin.name,
-        price: Number(chosenSkin.price),
-        rarity: chosenSkin.rarity,
-        image: chosenSkin.image
-      });
     }
 
     // Add won items to user inventory & push to live drops
@@ -634,9 +637,17 @@ export default function CaseView() {
                       MEJORAR
                     </button>
                     <button
-                      onClick={() => {
+                      onClick={async () => {
+                        // Check if user has Trade URL configured before withdrawing
+                        const currentUser = user;
+                        if (!currentUser?.link_intercambio) {
+                          toast.error("🔗 Configura tu Trade URL de Steam en Ajustes de Perfil antes de retirar.");
+                          return;
+                        }
                         setHasActioned(true);
-                        results.forEach((r) => withdrawSkin(r.id));
+                        for (const r of results) {
+                          await withdrawSkin(r.id);
+                        }
                         toast.success("Retiro procesado a tu Trade Link.");
                       }}
                       style={{

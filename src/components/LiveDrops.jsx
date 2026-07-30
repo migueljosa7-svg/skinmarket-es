@@ -33,14 +33,20 @@ export default function LiveDrops() {
     });
 
     // 2. Subscribe to StorageService live drops (local fallback)
+    //    Use optional chaining to handle null data (e.g. after logout)
     const unsubStorage = StorageService.subscribe((data) => {
-      const formatted = (data.liveDrops || []).map((d) => ({
-        id: d.id,
-        name: d.item?.name || "Skin",
-        price: d.item?.price || 10,
-        rarity: d.item?.rarity || "Mil-Spec",
-        user: d.user || "Jugador",
-        image: d.item?.image || ""
+      // After logout, data is null — handle gracefully without crashing
+      if (!data) {
+        setDrops([]);
+        return;
+      }
+      const formatted = (data?.liveDrops || []).map((d) => ({
+        id: d?.id || `drop_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+        name: d?.item?.name || "Skin",
+        price: d?.item?.price || 10,
+        rarity: d?.item?.rarity || "Mil-Spec",
+        user: d?.user || "Jugador",
+        image: d?.item?.image || ""
       }));
       if (formatted.length > 0) {
         setDrops((prev) => {

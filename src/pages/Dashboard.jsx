@@ -68,9 +68,9 @@ const SettingsModal = ({ open, onClose }) => {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(15px)", zIndex: 3000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
-      <div style={{ background: "#16191e", width: "100%", maxWidth: "480px", borderRadius: "28px", border: "1px solid rgba(255,255,255,0.05)", padding: "35px", textAlign: "center", color: "white" }}>
-        <h2 style={{ fontSize: "1.5rem", fontWeight: "900", marginBottom: "10px" }}>⚙️ CONFIGURACIÓN DE CUENTA</h2>
-        <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.8rem", marginBottom: "25px" }}>
+      <div style={{ background: "#16191e", width: "100%", maxWidth: "520px", borderRadius: "28px", border: "1px solid rgba(255,255,255,0.08)", padding: "35px", textAlign: "center", color: "white", boxShadow: "0 30px 80px rgba(0,0,0,0.6)" }}>
+        <h2 style={{ fontSize: "1.5rem", fontWeight: "900", marginBottom: "8px" }}>⚙️ CONFIGURACIÓN DE CUENTA</h2>
+        <p style={{ color: "rgba(255,255,255,0.45)", fontSize: "0.8rem", marginBottom: "25px" }}>
           Configura tu Trade URL de Steam para retirar skins reales mediante ofertas de intercambio.
         </p>
 
@@ -85,6 +85,14 @@ const SettingsModal = ({ open, onClose }) => {
             placeholder="https://steamcommunity.com/tradeoffer/new/..."
             style={{ width: "100%", padding: "14px", borderRadius: "12px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", color: "white", outline: "none" }}
           />
+          <a
+            href="https://steamcommunity.com/profiles/me/tradeoffers/privacy#trade_offer_access_url"
+            target="_blank"
+            rel="noreferrer"
+            style={{ display: "inline-block", marginTop: "8px", fontSize: "0.75rem", color: "#f5ac3b", textDecoration: "none", fontWeight: "700" }}
+          >
+            ¿Dónde encuentro mi Trade URL?
+          </a>
         </div>
 
         <div style={{ marginBottom: "25px", textAlign: "left" }}>
@@ -263,14 +271,14 @@ export default function Dashboard() {
     </div>
   );
 
-  const inventory = user.inventory || [];
+  const inventory = user?.inventory || [];
   const filteredInventory = inventory.filter((item) => {
-    return !search || item.name?.toLowerCase().includes(search.toLowerCase());
+    return !search || item?.name?.toLowerCase().includes(search.toLowerCase());
   });
 
-  const totalValue = inventory.reduce((acc, curr) => acc + Number(curr.price || 0), 0);
-  const stats = user.stats || {};
-  const nextLevelConfig = getLevelConfig((user.level || 1) + 1);
+  const totalValue = inventory.reduce((acc, curr) => acc + Number(curr?.price || 0), 0);
+  const stats = user?.stats || {};
+  const nextLevelConfig = getLevelConfig((user?.nivel || 1) + 1);
   const nextLevelDeposit = nextLevelConfig.minDeposit;
   const currentLevelDeposit = levelConfig.minDeposit;
 
@@ -471,8 +479,6 @@ export default function Dashboard() {
                             return;
                           }
 
-                          console.log('🔑 [TOKEN CHECK]', token ? 'Token presente' : 'TOKEN MISSING');
-                          console.log('🚀 [FRONTEND] Enviando petición de retiro real a la API...');
                           const res = await fetch(`${API_BASE}/api/inventory/withdraw`, {
                             method: "POST",
                             headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },

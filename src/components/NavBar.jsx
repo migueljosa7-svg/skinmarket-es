@@ -163,7 +163,7 @@ export default function Navbar() {
                 }}>
                   <GiTwoCoins style={{ color: '#f5ac3b', fontSize: '1.1rem' }} />
                   <span style={{ fontWeight: '900', color: '#f5ac3b', fontSize: '0.95rem' }}>
-                    {Number(user.balance !== undefined ? user.balance : user.saldo || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
+                    {Number(user?.balance ?? user?.saldo ?? 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
                   </span>
                 </div>
                 <button

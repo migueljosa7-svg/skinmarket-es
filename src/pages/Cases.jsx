@@ -8,6 +8,7 @@ import { StorageService } from "../services/StorageService";
 import { handleImageError, getSkinImageUrl } from "../services/ImageService";
 import { useAuth } from "../context/useAuth";
 import { useToast } from "../components/Toast";
+import { motion as Motion } from "framer-motion";
 
 const DailyRouletteModal = ({ isOpen, onClose, rewardAmount, skinsPool }) => {
   const [isSpinning, setIsSpinning] = useState(false);
@@ -179,6 +180,7 @@ const DailyRouletteModal = ({ isOpen, onClose, rewardAmount, skinsPool }) => {
   );
 };
 
+// ─── Professional Case Card with 3D container image ────────
 const CaseCard = ({ c, skinsPool, onClick }) => {
   const skins = useMemo(() => {
     if (!skinsPool || skinsPool.length === 0) return [];
@@ -186,7 +188,9 @@ const CaseCard = ({ c, skinsPool, onClick }) => {
   }, [skinsPool]);
 
   return (
-    <div
+    <Motion.div
+      whileHover={{ y: -8, scale: 1.02 }}
+      transition={{ type: "spring", damping: 20, stiffness: 300 }}
       onClick={onClick}
       style={{
         position: "relative",
@@ -194,12 +198,13 @@ const CaseCard = ({ c, skinsPool, onClick }) => {
         overflow: "hidden",
         border: "1.5px solid rgba(255,255,255,0.05)",
         cursor: "pointer",
-        transition: "all 0.3s ease",
         background: "rgba(255,255,255,0.02)",
         display: "flex",
-        flexDirection: "column"
+        flexDirection: "column",
+        boxShadow: "0 4px 20px rgba(0,0,0,0.3)"
       }}
     >
+      {/* Case container image area — professional 3D look */}
       <div
         style={{
           height: "220px",
@@ -210,16 +215,53 @@ const CaseCard = ({ c, skinsPool, onClick }) => {
           alignItems: "center",
           justifyContent: "center",
           position: "relative",
-          padding: "20px"
+          padding: "20px",
+          overflow: "hidden"
         }}
       >
-        <div style={{ fontSize: "4.5rem", filter: `drop-shadow(0 15px 25px ${c.color}66)` }}>{c.emoji || "📦"}</div>
-        <div style={{ position: "absolute", bottom: "15px", fontWeight: "900", fontSize: "1.1rem", color: "white", textShadow: "0 2px 10px rgba(0,0,0,0.8)" }}>
+        {/* Glow effect behind case */}
+        <div style={{
+          position: "absolute",
+          width: "180px",
+          height: "180px",
+          borderRadius: "50%",
+          background: `radial-gradient(circle, ${c.color}30 0%, transparent 70%)`,
+          filter: "blur(30px)",
+          zIndex: 0
+        }} />
+        {/* Professional case container image */}
+        <img
+          src={c.image || c.imageSrc || "/case_eco.png"}
+          alt={c.name}
+          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.style.opacity = "0.3"; }}
+          style={{
+            width: "140px",
+            height: "140px",
+            objectFit: "contain",
+            zIndex: 1,
+            filter: `drop-shadow(0 15px 30px ${c.color}66)`,
+            transition: "transform 0.3s ease"
+          }}
+        />
+        <div style={{ position: "absolute", bottom: "15px", fontWeight: "900", fontSize: "1.1rem", color: "white", textShadow: "0 2px 10px rgba(0,0,0,0.8)", zIndex: 2 }}>
           {c.name}
         </div>
+        {/* RTP badge */}
+        {c.rtp && (
+          <div style={{
+            position: "absolute", top: "10px", right: "10px",
+            background: "rgba(0,0,0,0.5)", backdropFilter: "blur(10px)",
+            color: "rgba(255,255,255,0.6)", fontSize: "0.6rem", fontWeight: 700,
+            padding: "3px 8px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.1)",
+            zIndex: 2
+          }}>
+            RTP {c.rtp}%
+          </div>
+        )}
       </div>
 
       <div style={{ padding: "20px", background: "#121419", display: "flex", flexDirection: "column", gap: "15px", flex: 1, justifyContent: "space-between" }}>
+        {/* Preview skins */}
         <div style={{ display: "flex", gap: "5px", justifyContent: "center" }}>
           {skins.map((skin, i) => (
             <img
@@ -243,7 +285,7 @@ const CaseCard = ({ c, skinsPool, onClick }) => {
           <span style={{ fontSize: "0.8rem", fontWeight: "bold", color: "rgba(255,255,255,0.4)" }}>ABRIR →</span>
         </div>
       </div>
-    </div>
+    </Motion.div>
   );
 };
 
@@ -275,7 +317,7 @@ export default function Cases() {
 
   const categories = [
     { id: "todos", label: "TODAS", icon: "📦" },
-    { id: "económica", label: "ECONÓMICAS", icon: "🍕" },
+    { id: "económica", label: "ECONÓMICAS", icon: "💚" },
     { id: "intermedia", label: "ESTÁNDAR", icon: "🔥" },
     { id: "premium", label: "PREMIUM", icon: "💎" },
     { id: "limited", label: "LIMITADAS", icon: "🌟" }
