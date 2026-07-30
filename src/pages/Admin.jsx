@@ -154,7 +154,7 @@ export default function Admin() {
   return (
     <div style={{ minHeight: "100vh", background: "#0f1115", color: "white", padding: "40px 20px", fontFamily: "'Inter', sans-serif" }}>
       <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
-        <h1 style={{ fontSize: "2.5rem", fontWeight: "900", marginBottom: "40px" }}>🛡️ PANEL DE ADMINISTRACIÓN</h1>
+        <h1 style={{ fontSize: "2.5rem", fontWeight: "900", marginBottom: "40px" }}>◆ PANEL DE ADMINISTRACIÓN</h1>
 
         {/* Stats Grid */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "20px", marginBottom: "50px" }}>
@@ -166,7 +166,7 @@ export default function Admin() {
 
         {/* Steam Inventory Inspector */}
         <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "28px", padding: "40px", marginBottom: "40px" }}>
-          <h2 style={{ fontSize: "1.5rem", fontWeight: "900", marginBottom: "15px" }}>🔍 INSPECTOR DE INVENTARIO DE ESPECTADORES</h2>
+          <h2 style={{ fontSize: "1.5rem", fontWeight: "900", marginBottom: "15px" }}>◆ INSPECTOR DE INVENTARIO DE ESPECTADORES</h2>
           <p style={{ color: "rgba(255,255,255,0.4)", marginBottom: "25px" }}>
             Inspecciona el inventario de CS2 de cualquier usuario de Steam. Introduce su SteamID64 o URL de Trade.
           </p>
@@ -213,14 +213,14 @@ export default function Admin() {
                   CONSULTANDO...
                 </>
               ) : (
-                "🔍 INSPECCIONAR"
+                "◆ INSPECCIONAR"
               )}
             </button>
           </div>
 
           {inspectorError && (
             <div style={{ padding: "15px", background: "rgba(239, 68, 68, 0.15)", border: "1px solid rgba(239, 68, 68, 0.3)", borderRadius: "12px", color: "#ef4444", marginBottom: "20px", fontWeight: "bold" }}>
-              ❌ {inspectorError}
+              ◆ {inspectorError}
             </div>
           )}
 
@@ -310,7 +310,7 @@ export default function Admin() {
 
         {/* Settings Area */}
         <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "28px", padding: "40px" }}>
-          <h2 style={{ fontSize: "1.5rem", fontWeight: "900", marginBottom: "15px" }}>⚙️ CONFIGURACIÓN DE PROBABILIDADES (PROVABLY FAIR)</h2>
+          <h2 style={{ fontSize: "1.5rem", fontWeight: "900", marginBottom: "15px" }}>◆ CONFIGURACIÓN DE PROBABILIDADES (PROVABLY FAIR)</h2>
           <p style={{ color: "rgba(255,255,255,0.4)", marginBottom: "30px" }}>Define los porcentajes (%) de aparición de cada rareza en las aperturas.</p>
 
           {message && (

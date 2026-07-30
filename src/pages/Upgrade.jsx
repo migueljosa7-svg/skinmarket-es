@@ -312,7 +312,7 @@ export default function Upgrade() {
           )}
           {lastResult && (
             <button onClick={() => setShowProvablyFair(true)} style={{ padding: "12px 28px", background: "rgba(16, 185, 129, 0.1)", border: "1px solid rgba(16, 185, 129, 0.2)", color: "#10b981", borderRadius: "14px", fontSize: "0.85rem", fontWeight: "900", cursor: "pointer", marginTop: "10px" }}>
-              🔐 VERIFICAR PROVABLY FAIR
+              ◆ VERIFICAR PROVABLY FAIR
             </button>
           )}
         </div>

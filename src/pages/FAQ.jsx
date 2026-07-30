@@ -30,7 +30,7 @@ const subheadingStyle = {
 const faqData = [
   {
     category: "General",
-    icon: "❓",
+    icon: "◆",
     questions: [
       {
         q: "¿Qué es SkinMarket ES?",
@@ -52,7 +52,7 @@ const faqData = [
   },
   {
     category: "Depósitos y Saldo",
-    icon: "💳",
+    icon: "◆",
     questions: [
       {
         q: "¿Cómo puedo depositar dinero en mi cuenta?",
@@ -74,7 +74,7 @@ const faqData = [
   },
   {
     category: "Retiros y Steam",
-    icon: "🎮",
+    icon: "◆",
     questions: [
       {
         q: "¿Cómo retiro mis skins a Steam?",
@@ -96,7 +96,7 @@ const faqData = [
   },
   {
     category: "Cajas y Probabilidades",
-    icon: "📦",
+    icon: "◆",
     questions: [
       {
         q: "¿Cómo funcionan las cajas?",
@@ -114,7 +114,7 @@ const faqData = [
   },
   {
     category: "Seguridad y Cuenta",
-    icon: "🔒",
+    icon: "◆",
     questions: [
       {
         q: "¿Cómo protegen mi cuenta?",
@@ -136,7 +136,7 @@ const faqData = [
   },
   {
     category: "Juego Responsable",
-    icon: "⚠️",
+    icon: "◆",
     questions: [
       {
         q: "¿Qué medidas de juego responsable ofrecen?",
@@ -270,7 +270,7 @@ export default function FAQ() {
         fontSize: '0.85rem',
         color: 'rgba(255,255,255,0.4)',
       }}>
-        ⚠️ SkinMarket ES no está afiliado con Valve Corporation, Steam, o cualquiera de sus subsidiarias.
+        ◆ SkinMarket ES no está afiliado con Valve Corporation, Steam, o cualquiera de sus subsidiarias.
         Todas las marcas comerciales y derechos de autor son propiedad de sus respectivos dueños.
       </div>
 
@@ -309,7 +309,7 @@ export default function FAQ() {
           ...subheadingStyle,
           textAlign: 'center',
         }}>
-          📧 ¿No encuentras lo que buscas?
+          ◆ ¿No encuentras lo que buscas?
         </h2>
         <p style={{ color: 'rgba(255,255,255,0.7)', marginBottom: '10px' }}>
           Si tienes alguna pregunta adicional, no dudes en contactarnos.

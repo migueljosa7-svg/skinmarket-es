@@ -474,6 +474,125 @@ app.post("/api/auth/google", async (req, res) => {
   }
 });
 
+// ─── PASSWORD RECOVERY ──────────────────────────────
+// In-memory store for password reset tokens (in production, use Redis or DB)
+const passwordResetTokens = new Map();
+
+app.post("/api/auth/forgot-password", async (req, res) => {
+  const { email } = req.body;
+
+  if (!email || !isValidEmail(email)) {
+    return res.status(400).json({ error: "Email inválido" });
+  }
+
+  try {
+    const result = await db.query("SELECT usuario_id, email, nombre_usuario FROM usuarios WHERE email = $1", [email]);
+
+    // Always return success to prevent email enumeration attacks
+    if (result.rows.length === 0) {
+      return res.json({
+        success: true,
+        message: "Si el email existe en nuestro sistema, recibirás un enlace de recuperación."
+      });
+    }
+
+    const user = result.rows[0];
+
+    // Generate secure reset token (valid for 1 hour)
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    // Store token (in production, use database table)
+    passwordResetTokens.set(tokenHash, {
+      userId: user.usuario_id,
+      email: user.email,
+      expiresAt: expiresAt,
+      used: false
+    });
+
+    // Clean up expired tokens
+    for (const [key, value] of passwordResetTokens.entries()) {
+      if (value.expiresAt < new Date()) {
+        passwordResetTokens.delete(key);
+      }
+    }
+
+    // In production, send email here
+    // For now, log the reset link (in production, remove this log)
+    const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`;
+    log(LOG_LEVELS.INFO, 'AUTH', `Password reset link for ${email}: ${resetLink}`);
+
+    await logAction(user.usuario_id, 'PASSWORD_RESET_REQUESTED', { email });
+
+    res.json({
+      success: true,
+      message: "Si el email existe en nuestro sistema, recibirás un enlace de recuperación.",
+      // Only include resetLink in development
+      ...(process.env.NODE_ENV !== 'production' && { resetLink })
+    });
+  } catch (err) {
+    log(LOG_LEVELS.ERROR, 'AUTH', 'Error in forgot-password:', err);
+    res.status(500).json({ error: "Error al procesar la solicitud" });
+  }
+});
+
+app.post("/api/auth/reset-password", async (req, res) => {
+  const { token, newPassword } = req.body;
+
+  if (!token || !newPassword) {
+    return res.status(400).json({ error: "Token y nueva contraseña son requeridos" });
+  }
+
+  // Validate password security policy
+  const pwdCheck = validatePassword(newPassword);
+  if (!pwdCheck.valid) {
+    return res.status(400).json({ error: pwdCheck.error });
+  }
+
+  try {
+    // Hash the token to compare with stored hash
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const resetData = passwordResetTokens.get(tokenHash);
+
+    if (!resetData) {
+      return res.status(400).json({ error: "Token inválido o expirado" });
+    }
+
+    if (resetData.used) {
+      return res.status(400).json({ error: "Este token ya ha sido utilizado" });
+    }
+
+    if (resetData.expiresAt < new Date()) {
+      passwordResetTokens.delete(tokenHash);
+      return res.status(400).json({ error: "Token expirado. Solicita uno nuevo." });
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+    // Update password in database
+    await db.query(
+      "UPDATE usuarios SET password_hash = $1 WHERE usuario_id = $2",
+      [hashedPassword, resetData.userId]
+    );
+
+    // Mark token as used
+    resetData.used = true;
+    passwordResetTokens.set(tokenHash, resetData);
+
+    await logAction(resetData.userId, 'PASSWORD_RESET_COMPLETED', { email: resetData.email });
+
+    res.json({
+      success: true,
+      message: "Contraseña actualizada correctamente. Ahora puedes iniciar sesión."
+    });
+  } catch (err) {
+    log(LOG_LEVELS.ERROR, 'AUTH', 'Error in reset-password:', err);
+    res.status(500).json({ error: "Error al actualizar la contraseña" });
+  }
+});
+
 app.post("/api/register", async (req, res) => {
   const { nombre_usuario, email, password } = req.body;
 
@@ -542,16 +661,23 @@ app.post("/api/login", async (req, res) => {
 });
 
 // ─── LEVEL SYSTEM ────────────────────────────────────
+// Escalado hasta Nivel 360 - Sistema VIP Supreme
 const LEVEL_THRESHOLDS = [
-  { level: 1, minDeposit: 0, dailyCaseId: "eco-1", caseLabel: "Caja Eco", reward: 0.15 },
-  { level: 2, minDeposit: 10, dailyCaseId: "eco-1", caseLabel: "Caja Eco", reward: 0.25 },
-  { level: 3, minDeposit: 50, dailyCaseId: "eco-1", caseLabel: "Caja Eco", reward: 0.50 },
-  { level: 4, minDeposit: 100, dailyCaseId: "mid-1", caseLabel: "Caja Mid", reward: 1.00 },
-  { level: 5, minDeposit: 250, dailyCaseId: "mid-1", caseLabel: "Caja Mid", reward: 2.00 },
+  { level: 0, minDeposit: 0, dailyCaseId: "daily-0", caseLabel: "DAILY FREE", reward: 0.15 },
+  { level: 5, minDeposit: 10, dailyCaseId: "daily-5", caseLabel: "BRONZE DAILY", reward: 0.25 },
+  { level: 15, minDeposit: 50, dailyCaseId: "daily-15", caseLabel: "SILVER DAILY", reward: 0.50 },
+  { level: 30, minDeposit: 150, dailyCaseId: "daily-30", caseLabel: "GOLD DAILY", reward: 1.00 },
+  { level: 50, minDeposit: 500, dailyCaseId: "daily-50", caseLabel: "DIAMOND DAILY", reward: 2.00 },
+  { level: 80, minDeposit: 1500, dailyCaseId: "daily-80", caseLabel: "PLATINUM DAILY", reward: 3.50 },
+  { level: 120, minDeposit: 4000, dailyCaseId: "daily-120", caseLabel: "EMERALD DAILY", reward: 6.00 },
+  { level: 170, minDeposit: 10000, dailyCaseId: "daily-170", caseLabel: "RUBY DAILY", reward: 10.00 },
+  { level: 230, minDeposit: 25000, dailyCaseId: "daily-230", caseLabel: "MASTER DAILY", reward: 18.00 },
+  { level: 300, minDeposit: 75000, dailyCaseId: "daily-300", caseLabel: "LEGENDARY DAILY", reward: 30.00 },
+  { level: 360, minDeposit: 200000, dailyCaseId: "daily-360", caseLabel: "VIP SUPREME", reward: 50.00 },
 ];
 
 function calculateLevel(totalDeposited) {
-  let maxLevel = 1;
+  let maxLevel = 0;
   for (const t of LEVEL_THRESHOLDS) {
     if (totalDeposited >= t.minDeposit) maxLevel = t.level;
   }
@@ -898,43 +1024,53 @@ app.get("/api/steam/price", inspectorLimiter, async (req, res) => {
 // ─── CASE OPENING (with atomic transactions) ─────────────
 
 app.post("/api/cases/open", authenticateToken, caseOpenLimiter, async (req, res) => {
-  const { caseId, quantity } = req.body;
+  const { caseId, quantity, jokerMode } = req.body;
 
   try {
     const casePrices = { "eco-1": 1.5, "mid-1": 5.0, "premium-1": 25.0 };
     const casePrice = casePrices[caseId] || 2.5;
-    const totalCost = casePrice * (quantity || 1);
+    const priceMultiplier = jokerMode ? 3 : 1;
+    const totalCost = casePrice * priceMultiplier * (quantity || 1);
 
     const userResult = await db.query("SELECT saldo FROM usuarios WHERE usuario_id = $1", [req.user.id]);
     if (userResult.rows[0].saldo < totalCost) {
       return res.status(400).json({ error: "Saldo insuficiente" });
     }
 
-    const configResult = await db.query("SELECT valor FROM configuracion WHERE clave = 'probabilidades'");
-    const probs = configResult.rows[0]?.valor || { covert: 0.5, classified: 2, restricted: 15, mil_spec: 82.5 };
+    // Import case configuration for realistic skins
+    const { CASE_PROBABILITIES, SKIN_CATALOGS, pickWeightedSkin } = await import("../constants/cases.js");
+
+    const caseCategory = caseId?.startsWith("eco") ? "económica" : caseId?.startsWith("mid") ? "intermedia" : caseId?.startsWith("premium") ? "premium" : "económica";
+    const catalog = SKIN_CATALOGS[caseCategory] || SKIN_CATALOGS.económica;
+    const probs = CASE_PROBABILITIES[caseCategory] || CASE_PROBABILITIES.económica;
 
     const results = [];
     for (let i = 0; i < (quantity || 1); i++) {
-      const roll = Math.random() * 100;
-      let rarity = "Mil-Spec Grade";
-      if (roll < probs.covert) rarity = "Covert";
-      else if (roll < probs.covert + probs.classified) rarity = "Classified";
-      else if (roll < probs.covert + probs.classified + probs.restricted) rarity = "Restricted";
+      // Joker Mode: equalized probabilities (all rarities have equal chance)
+      let rarity, rarityPrice;
+      if (jokerMode) {
+        const equalizedRoll = Math.random() * 100;
+        if (equalizedRoll < 20) { rarity = "Covert"; rarityPrice = catalog.priceRange[1] * 0.8; }
+        else if (equalizedRoll < 40) { rarity = "Classified"; rarityPrice = catalog.priceRange[1] * 0.5; }
+        else if (equalizedRoll < 60) { rarity = "Restricted"; rarityPrice = catalog.priceRange[1] * 0.3; }
+        else { rarity = "Mil-Spec Grade"; rarityPrice = catalog.priceRange[0]; }
+      } else {
+        // Standard weighted probabilities
+        const roll = Math.random() * 100;
+        if (roll < probs.covert) { rarity = "Covert"; rarityPrice = catalog.priceRange[1] * (0.6 + Math.random() * 0.4); }
+        else if (roll < probs.covert + probs.classified) { rarity = "Classified"; rarityPrice = catalog.priceRange[0] + (catalog.priceRange[1] - catalog.priceRange[0]) * (0.3 + Math.random() * 0.4); }
+        else if (roll < probs.covert + probs.classified + probs.restricted) { rarity = "Restricted"; rarityPrice = catalog.priceRange[0] + (catalog.priceRange[1] - catalog.priceRange[0]) * (0.1 + Math.random() * 0.3); }
+        else { rarity = "Mil-Spec Grade"; rarityPrice = catalog.priceRange[0] + Math.random() * (catalog.priceRange[1] - catalog.priceRange[0]) * 0.2; }
+      }
 
-      const rarityPrices = { "Covert": 50, "Classified": 15, "Restricted": 3, "Mil-Spec Grade": 1 };
       const rarityColors = { "Covert": "#eb4b4b", "Classified": "#d32ce6", "Restricted": "#8847ff", "Mil-Spec Grade": "#4b69ff" };
-      const rarityPrefixes = { "Covert": "Red", "Classified": "Pink", "Restricted": "Purple", "Mil-Spec Grade": "Blue" };
 
-      const mockName = rarityPrefixes[rarity] || "Mil-Spec";
-      const randomNum = Math.floor(Math.random() * 999) + 1;
-      const weaponNames = ["AK-47", "AWP", "M4A4", "M4A1-S", "Desert Eagle", "USP-S", "Glock-18", "SSG 08", "FAMAS", "P250"];
-      const skinSuffixes = ["Safari Mesh", "Boreal Forest", "Sand Dune", "Predator", "Tornado", "Scorched", "Jungle", "Urban", "Army", "Contractor"];
+      const weapon = catalog.weapons[Math.floor(Math.random() * catalog.weapons.length)];
+      const skinName = catalog.skins[Math.floor(Math.random() * catalog.skins.length)];
       const wearValues = ["Factory New", "Minimal Wear", "Field-Tested", "Well-Worn", "Battle-Scarred"];
-      const randomWeapon = weaponNames[Math.floor(Math.random() * weaponNames.length)];
-      const randomSkin = skinSuffixes[Math.floor(Math.random() * skinSuffixes.length)];
       const randomWear = wearValues[Math.floor(Math.random() * wearValues.length)];
-      const itemName = `${randomWeapon} | ${randomSkin}`;
-      const itemPrice = (rarityPrices[rarity] || 1) * (0.5 + Math.random() * 1.5);
+      const itemName = `${weapon} | ${skinName}`;
+      const itemPrice = parseFloat(rarityPrice.toFixed(2));
 
       const iconHash = generateIconUrlHash(itemName, Date.now() + i);
       const imageHD = buildAkamaiImageUrl(iconHash);
@@ -949,16 +1085,16 @@ app.post("/api/cases/open", authenticateToken, caseOpenLimiter, async (req, res)
           `INSERT INTO inventario (usuario_id, name, price, image, rarity, marketable, wear, weapon, skin_name, market_hash_name, icon_url, provably_fair_hash, server_seed, client_seed, nonce)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
            RETURNING item_id as id, name, price, image, rarity, marketable, status`,
-          [req.user.id, itemName, parseFloat(itemPrice.toFixed(2)), imageHD,
-            rarity, true, randomWear, randomWeapon, randomSkin, itemName, iconHash, provablyFairHash, serverSeed, clientSeed, nonce]
+          [req.user.id, itemName, itemPrice, imageHD,
+            rarity, true, randomWear, weapon, skinName, itemName, iconHash, provablyFairHash, serverSeed, clientSeed, nonce]
         );
         results.push(insertResult.rows[0]);
       });
     }
 
     await db.query("UPDATE usuarios SET saldo = saldo - $1 WHERE usuario_id = $2", [totalCost, req.user.id]);
-    await recordTransaction(req.user.id, 'apertura_caja', totalCost, 'saldo_sitio', `Apertura de ${quantity || 1}x ${caseId}`);
-    await logAction(req.user.id, 'ABRIR_CAJA', { caseId, quantity, winnings: results.map(r => r.name), provablyFairHashes: results.map(r => r.provably_fair_hash) });
+    await recordTransaction(req.user.id, 'apertura_caja', totalCost, 'saldo_sitio', `Apertura de ${quantity || 1}x ${caseId}${jokerMode ? ' (Joker Mode)' : ''}`);
+    await logAction(req.user.id, 'ABRIR_CAJA', { caseId, quantity, jokerMode, winnings: results.map(r => r.name), provablyFairHashes: results.map(r => r.provably_fair_hash) });
 
     res.json({ success: true, items: results, newBalance: userResult.rows[0].saldo - totalCost });
   } catch (err) {

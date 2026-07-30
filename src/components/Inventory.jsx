@@ -24,13 +24,13 @@ const TradeUrlModal = ({ open, onClose, onSave, currentUrl }) => {
 
   const handleSave = () => {
     if (!url || !url.includes("steamcommunity.com/tradeoffer/")) {
-      setError("❌ Introduce un Trade URL válido de Steam (ej: https://steamcommunity.com/tradeoffer/new/?partner=...)");
+      setError("◆ Introduce un Trade URL válido de Steam (ej: https://steamcommunity.com/tradeoffer/new/?partner=...)");
       return;
     }
     const partnerMatch = url.match(/partner=(\d+)/);
     const tokenMatch = url.match(/token=([\w-]+)/);
     if (!partnerMatch || !tokenMatch) {
-      setError("❌ El enlace debe contener 'partner' y 'token'. Copia el enlace completo de tu Trade Offer.");
+      setError("◆ El enlace debe contener 'partner' y 'token'. Copia el enlace completo de tu Trade Offer.");
       return;
     }
     setError("");
@@ -229,7 +229,7 @@ export default function Inventory() {
         };
         const displayError = errorMessages[res.code] || res.message || 'Error al retirar.';
         toast.error(displayError);
-        
+
         // If trade URL is missing, open modal
         if (res.code === 'TRADE_URL_MISSING') {
           setPendingWithdrawId(skinId);

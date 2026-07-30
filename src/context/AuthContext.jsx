@@ -350,12 +350,28 @@ export function AuthProvider({ children }) {
       success: true,
       reward,
       expReward,
-      message: `🎉 ¡Recompensa diaria de €${reward} reclamada!`
+      message: `◆ ¡Recompensa diaria de €${reward} reclamada!`
     };
   }, []);
 
-  const recoverPassword = useCallback((email) => {
-    return `Se ha enviado un correo de recuperación a ${email}`;
+  const recoverPassword = useCallback(async (email) => {
+    try {
+      const API = import.meta.env.VITE_API_URL || "";
+      const response = await fetch(`${API}/api/auth/forgot-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        return data.message || `Se ha enviado un correo de recuperación a ${email}`;
+      } else {
+        throw new Error(data.error || "Error al procesar la solicitud");
+      }
+    } catch (err) {
+      throw new Error(err.message || "Error al conectar con el servidor");
+    }
   }, []);
 
   // Normalize balance/saldo and merge inventory into user object

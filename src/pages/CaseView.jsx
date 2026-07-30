@@ -10,6 +10,7 @@ import { sound } from "../utils/audio";
 import { getPlaceholderImage, getSkinImageUrl, handleImageError } from "../services/ImageService";
 import { useToast } from "../components/Toast";
 import ProvablyFairModal from "../components/ProvablyFairModal";
+import { FiAlertTriangle, FiShield, FiLock, FiCheckCircle } from "react-icons/fi";
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
 
@@ -238,6 +239,7 @@ export default function CaseView() {
   const [balanceError, setBalanceError] = useState("");
   const [hasActioned, setHasActioned] = useState(false);
   const [showProvablyFair, setShowProvablyFair] = useState(false);
+  const [jokerMode, setJokerMode] = useState(false);
 
   const allCases = useMemo(() => generateAllCases(), []);
   const caseData = allCases.find((c) => c.id === id);
@@ -267,7 +269,11 @@ export default function CaseView() {
 
   const startSpin = useCallback(async () => {
     if (!user || !user?.balance) return toast.error("Inicia sesión para abrir cajas");
-    const totalCost = parseFloat(caseData.price) * quantity;
+
+    // Joker Mode: 3x price but equalized probabilities
+    const basePrice = parseFloat(caseData.price);
+    const priceMultiplier = jokerMode ? 3 : 1;
+    const totalCost = basePrice * priceMultiplier * quantity;
     const userBalance = Number(user?.balance ?? user?.saldo ?? 0);
 
     if (userBalance < totalCost) {
@@ -296,7 +302,7 @@ export default function CaseView() {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${token}`
           },
-          body: JSON.stringify({ caseId: caseData.id, quantity })
+          body: JSON.stringify({ caseId: caseData.id, quantity, jokerMode })
         });
 
         if (response.ok) {
@@ -641,7 +647,7 @@ export default function CaseView() {
                         // Check if user has Trade URL configured before withdrawing
                         const currentUser = user;
                         if (!currentUser?.link_intercambio) {
-                          toast.error("🔗 Configura tu Trade URL de Steam en Ajustes de Perfil antes de retirar.");
+                          toast.error("◆ Configura tu Trade URL de Steam en Ajustes de Perfil antes de retirar.");
                           return;
                         }
                         setHasActioned(true);
@@ -676,7 +682,7 @@ export default function CaseView() {
                         cursor: "pointer"
                       }}
                     >
-                      🔐 VERIFICAR
+                    <FiShield size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} /> VERIFICAR
                     </button>
                     <button
                       onClick={() => {
@@ -707,18 +713,58 @@ export default function CaseView() {
           </div>
         )}
 
-        {/* Main Controls Panel */}
+
         {!hasCompleted && !isSpinning && (
           <div
             style={{
-              background: "rgba(255,255,255,0.02)",
+              background: jokerMode ? "rgba(255, 0, 255, 0.05)" : "rgba(255,255,255,0.02)",
               backdropFilter: "blur(20px)",
               borderRadius: "32px",
               padding: "40px",
-              border: "1px solid rgba(255,255,255,0.05)",
-              textAlign: "center"
+              border: jokerMode ? "1px solid rgba(255, 0, 255, 0.3)" : "1px solid rgba(255,255,255,0.05)",
+              textAlign: "center",
+              boxShadow: jokerMode ? "0 0 60px rgba(255, 0, 255, 0.2)" : "none"
             }}
           >
+            {/* Joker Mode Toggle */}
+            <div style={{ marginBottom: "30px", display: "flex", justifyContent: "center", alignItems: "center", gap: "15px" }}>
+              <span style={{ fontSize: "0.85rem", fontWeight: "900", color: jokerMode ? "#ff00ff" : "rgba(255,255,255,0.4)", letterSpacing: "2px" }}>
+                MODO JOKER
+              </span>
+              <button
+                onClick={() => setJokerMode(!jokerMode)}
+                style={{
+                  width: "70px",
+                  height: "36px",
+                  borderRadius: "18px",
+                  background: jokerMode ? "linear-gradient(90deg, #ff00ff, #ff66ff)" : "rgba(255,255,255,0.1)",
+                  border: jokerMode ? "2px solid #ff00ff" : "2px solid rgba(255,255,255,0.1)",
+                  cursor: "pointer",
+                  position: "relative",
+                  transition: "all 0.3s ease"
+                }}
+              >
+                <div
+                  style={{
+                    width: "28px",
+                    height: "28px",
+                    borderRadius: "50%",
+                    background: jokerMode ? "#fff" : "rgba(255,255,255,0.3)",
+                    position: "absolute",
+                    top: "2px",
+                    left: jokerMode ? "38px" : "2px",
+                    transition: "all 0.3s ease",
+                    boxShadow: jokerMode ? "0 0 15px rgba(255, 0, 255, 0.8)" : "none"
+                  }}
+                />
+              </button>
+              {jokerMode && (
+                <span style={{ fontSize: "0.75rem", fontWeight: "900", color: "#ff00ff", letterSpacing: "1px", animation: "pulse 1.5s infinite" }}>
+                  ACTIVADO
+                </span>
+              )}
+            </div>
+
             <div style={{ marginBottom: "30px" }}>
               <div style={{ fontSize: "0.8rem", fontWeight: "900", color: "rgba(255,255,255,0.4)", letterSpacing: "2px", marginBottom: "15px" }}>
                 CANTIDAD DE CAJAS
@@ -748,7 +794,7 @@ export default function CaseView() {
 
             {balanceError && (
               <div style={{ padding: "15px", background: "rgba(239, 68, 68, 0.1)", borderRadius: "12px", color: "#ff5555", marginBottom: "20px", fontWeight: "bold" }}>
-                ⚠️ {balanceError}
+                <FiAlertTriangle size={14} style={{ verticalAlign: 'middle', marginRight: '6px' }} /> {balanceError}
               </div>
             )}
 
@@ -759,16 +805,18 @@ export default function CaseView() {
                 width: "100%",
                 maxWidth: "450px",
                 padding: "20px 50px",
-                background: "linear-gradient(90deg, #f5ac3b, #ffba52)",
-                color: "black",
-                border: "none",
+                background: jokerMode ? "linear-gradient(90deg, #ff00ff, #ff66ff)" : "linear-gradient(90deg, #f5ac3b, #ffba52)",
+                color: jokerMode ? "#fff" : "black",
+                border: jokerMode ? "2px solid #ff00ff" : "none",
                 borderRadius: "20px",
                 fontSize: "1.3rem",
                 fontWeight: "900",
-                cursor: "pointer"
+                cursor: "pointer",
+                boxShadow: jokerMode ? "0 0 30px rgba(255, 0, 255, 0.5)" : "none",
+                animation: jokerMode ? "pulse 2s infinite" : "none"
               }}
             >
-              {skinsLoading ? "PREPARANDO..." : `ABRIR CAJAS • €${Number(parseFloat(caseData.price) * quantity).toFixed(2)}`}
+              {skinsLoading ? "PREPARANDO..." : jokerMode ? `JOKER MODE • €${Number(parseFloat(caseData.price) * 3 * quantity).toFixed(2)}` : `ABRIR CAJAS • €${Number(parseFloat(caseData.price) * quantity).toFixed(2)}`}
             </button>
           </div>
         )}

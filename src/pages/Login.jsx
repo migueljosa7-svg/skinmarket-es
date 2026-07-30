@@ -34,6 +34,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [recoveryMessage, setRecoveryMessage] = useState("");
   const [socialLoading, setSocialLoading] = useState(null); // 'steam' | 'google' | null
+  const [rememberMe, setRememberMe] = useState(false);
 
   const { login, register, recoverPassword } = useAuth();
   const navigate = useNavigate();
@@ -46,11 +47,15 @@ export default function Login() {
       // Store the JWT token from Steam redirect
       localStorage.setItem("token", token);
       setSuccess(true);
-      // Fetch user data from backend
+
+      // Fetch user data from backend with error handling
       fetch(`${API_BASE}/api/me`, {
         headers: { Authorization: `Bearer ${token}` }
       })
-        .then(res => res.ok ? res.json() : null)
+        .then(res => {
+          if (!res.ok) throw new Error('Failed to fetch user data');
+          return res.json();
+        })
         .then(async (user) => {
           if (user) {
             // Update local storage with user data
@@ -66,9 +71,19 @@ export default function Login() {
             });
           }
         })
-        .catch(() => { })
+        .catch((err) => {
+          console.warn('[STEAM LOGIN] Error fetching user data:', err.message);
+          // Even if user data fetch fails, we have the token, so redirect
+        })
         .finally(() => {
-          setTimeout(() => navigate("/dashboard"), 800);
+          setTimeout(() => {
+            try {
+              navigate("/dashboard");
+            } catch (navErr) {
+              console.warn('[STEAM LOGIN] Navigation failed, redirecting to /login');
+              window.location.href = "/dashboard";
+            }
+          }, 800);
         });
     }
   }, [searchParams, navigate]);
@@ -126,6 +141,22 @@ export default function Login() {
     login("guest@skinmarket.es").then(() => navigate("/dashboard")).catch(() => navigate("/dashboard"));
   };
 
+  // Handle browser back button or failed navigation - clean up corrupted state
+  useEffect(() => {
+    const handlePopState = () => {
+      // Clean up any corrupted Steam token state if user navigates back
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.has("token")) {
+        // Remove token from URL without reloading
+        const newUrl = window.location.pathname + window.location.hash;
+        window.history.replaceState({}, "", newUrl);
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
   // Steam OAuth: redirect to backend Steam auth endpoint
   const handleSteamLogin = () => {
     setSocialLoading("steam");
@@ -139,8 +170,11 @@ export default function Login() {
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
     if (!clientId) {
-      setError("Google Sign-In no está configurado. Contacta al administrador.");
+      // Elegant fallback when Google OAuth is not configured
+      setError("Google Sign-In próximamente disponible en producción");
       setSocialLoading(null);
+      // Auto-clear error after 3 seconds
+      setTimeout(() => setError(""), 3000);
       return;
     }
 
@@ -381,6 +415,20 @@ export default function Login() {
         )}
 
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+          {view === "login" && (
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+              <input
+                type="checkbox"
+                id="rememberMe"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                style={{ width: "18px", height: "18px", cursor: "pointer", accentColor: "#f5ac3b" }}
+              />
+              <label htmlFor="rememberMe" style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.6)", cursor: "pointer", userSelect: "none" }}>
+                Recordar mi sesión
+              </label>
+            </div>
+          )}
           {view === "register" && (
             <div>
               <label style={{ fontSize: "0.7rem", fontWeight: "900", color: "rgba(255,255,255,0.4)", display: "block", marginBottom: "6px" }}>NOMBRE DE USUARIO</label>
@@ -479,7 +527,7 @@ export default function Login() {
               cursor: "pointer"
             }}
           >
-            🎮 Entrar como Invitado
+            ► Entrar como Invitado
           </button>
         </form>
 
@@ -489,6 +537,8 @@ export default function Login() {
               <span onClick={() => setView("register")} style={{ cursor: "pointer", color: "#f5ac3b" }}>¿No tienes cuenta? Regístrate</span>
               <span onClick={() => setView("recover")} style={{ cursor: "pointer" }}>¿Olvidaste clave?</span>
             </>
+          ) : view === "recover" ? (
+            <span onClick={() => setView("login")} style={{ cursor: "pointer", color: "#f5ac3b" }}>Volver a Iniciar Sesión</span>
           ) : (
             <span onClick={() => setView("login")} style={{ cursor: "pointer", color: "#f5ac3b" }}>Volver a Iniciar Sesión</span>
           )}

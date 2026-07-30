@@ -9,6 +9,7 @@ import { handleImageError, getSkinImageUrl } from "../services/ImageService";
 import { useAuth } from "../context/useAuth";
 import { useToast } from "../components/Toast";
 import { motion as Motion } from "framer-motion";
+import { FiGrid, FiLayers, FiStar, FiZap, FiAward, FiSearch, FiChevronDown, FiGift, FiTrendingUp } from "react-icons/fi";
 
 const DailyRouletteModal = ({ isOpen, onClose, rewardAmount, skinsPool }) => {
   const [isSpinning, setIsSpinning] = useState(false);
@@ -316,11 +317,11 @@ export default function Cases() {
   }, [allCases, filterCategory, searchTerm, sortBy]);
 
   const categories = [
-    { id: "todos", label: "TODAS", icon: "📦" },
-    { id: "económica", label: "ECONÓMICAS", icon: "💚" },
-    { id: "intermedia", label: "ESTÁNDAR", icon: "🔥" },
-    { id: "premium", label: "PREMIUM", icon: "💎" },
-    { id: "limited", label: "LIMITADAS", icon: "🌟" }
+    { id: "todos", label: "TODAS", icon: <FiGrid size={16} /> },
+    { id: "económica", label: "ECONÓMICAS", icon: <FiLayers size={16} /> },
+    { id: "intermedia", label: "ESTANDAR", icon: <FiZap size={16} /> },
+    { id: "premium", label: "PREMIUM", icon: <FiStar size={16} /> },
+    { id: "limited", label: "LIMITADAS", icon: <FiAward size={16} /> }
   ];
 
   const sortOptions = [
@@ -357,12 +358,12 @@ export default function Cases() {
                   fontWeight: "900",
                   fontSize: "0.85rem",
                   cursor: "pointer",
-                  display: "flex",
+                display: "flex",
                   alignItems: "center",
                   gap: "8px"
                 }}
               >
-                <span>{cat.icon}</span>
+                {cat.icon}
                 {cat.label}
               </button>
             ))}
@@ -396,7 +397,7 @@ export default function Cases() {
                 gap: "8px"
               }}
             >
-              🎁 RECOMPENSA DIARIA
+              <FiGift size={16} /> RECOMPENSA DIARIA
             </button>
             <input
               type="text"

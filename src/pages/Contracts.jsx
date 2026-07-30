@@ -197,7 +197,7 @@ const FusionAnimation = ({ isVisible, onComplete }) => {
             />
             <style>{`@keyframes contractPulse { 0%,100% { transform: scale(0.8); opacity: 0.5; } 50% { transform: scale(1.2); opacity: 1; } }`}</style>
             <div style={{ fontSize: "5rem", filter: "drop-shadow(0 0 30px #f5ac3b)", position: "relative" }}>
-              🔥
+              ◆
             </div>
           </div>
           <h2 style={{ color: "#f5ac3b", fontSize: "2.5rem", fontWeight: "900", margin: 0 }}>
@@ -215,7 +215,7 @@ const FusionAnimation = ({ isVisible, onComplete }) => {
           animate={{ opacity: 1, y: 0 }}
           style={{ textAlign: "center" }}
         >
-          <div style={{ fontSize: "5rem", marginBottom: "20px" }}>📜</div>
+          <div style={{ fontSize: "5rem", marginBottom: "20px" }}>◆</div>
           <h2 style={{ color: "#10b981", fontSize: "3rem", fontWeight: "900", margin: 0 }}>
             ¡CONTRATO COMPLETADO!
           </h2>
@@ -452,7 +452,7 @@ export default function Contracts() {
             }}
           >
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: "3rem", marginBottom: "10px" }}>📜</div>
+              <div style={{ fontSize: "3rem", marginBottom: "10px" }}>◆</div>
               <h2 style={{ fontSize: "1.3rem", fontWeight: "900", margin: 0 }}>NUEVO CONTRATO</h2>
               <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.8rem", marginTop: "5px" }}>
                 Firma un contrato para intercambiar skins
@@ -622,7 +622,7 @@ export default function Contracts() {
                     textAlign: "center",
                   }}
                 >
-                  <div style={{ fontSize: "2.5rem", marginBottom: "10px" }}>🎁</div>
+                  <div style={{ fontSize: "2.5rem", marginBottom: "10px" }}>◆</div>
                   <h3 style={{ color: "#10b981", fontWeight: "900", margin: "0 0 5px 0" }}>
                     ¡CONTRATO COMPLETADO!
                   </h3>

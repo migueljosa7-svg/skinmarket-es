@@ -1,5 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { FiShield, FiFileText, FiLock, FiHelpCircle, FiInfo, FiHome, FiMail, FiClock, FiAlertTriangle, FiCreditCard, FiDollarSign, FiGift, FiServer, FiZap, FiAward, FiGrid } from "react-icons/fi";
+import { FaSteam } from "react-icons/fa";
 
 const footerLinkStyle = {
   color: 'rgba(255,255,255,0.5)',
@@ -8,6 +10,10 @@ const footerLinkStyle = {
   transition: 'color 0.2s ease',
   display: 'block',
   padding: '4px 0',
+};
+
+const footerLinkHoverStyle = {
+  color: 'rgba(255,255,255,0.8)',
 };
 
 const columnTitleStyle = {
@@ -61,7 +67,7 @@ const Footer = () => {
             lineHeight: '1.6',
             marginBottom: '20px',
           }}>
-            El mercado de skins de CS2 más seguro y emocionante en España.
+            El mercado de skins de CS2 mas seguro y emocionante en España.
             Abre cajas, mejora tus skins y participa en batallas.
           </p>
 
@@ -99,7 +105,8 @@ const Footer = () => {
             color: 'rgba(255,255,255,0.3)',
             lineHeight: '1.5',
           }}>
-            ⚠️ SkinMarket ES <strong>no está afiliado</strong> con Valve Corporation,
+            <FiAlertTriangle size={12} style={{ verticalAlign: 'middle', marginRight: '4px', color: '#f5ac3b' }} />
+            SkinMarket ES <strong>no esta afiliado</strong> con Valve Corporation,
             Steam, o cualquiera de sus subsidiarias. Todas las marcas comerciales y
             derechos de autor son propiedad de sus respectivos dueños. CS2 y Steam
             son marcas registradas de Valve Corporation.
@@ -109,36 +116,36 @@ const Footer = () => {
         {/* Column 2: Navigation */}
         <div>
           <div style={columnTitleStyle}>Navegación</div>
-          <Link to="/cases" style={footerLinkStyle}>🎲 Cajas</Link>
-          <Link to="/upgrade" style={footerLinkStyle}>⬆️ Upgrade</Link>
-          <Link to="/contracts" style={footerLinkStyle}>📜 Contratos</Link>
-          <Link to="/battles" style={footerLinkStyle}>⚔️ Batallas</Link>
-          <Link to="/ranking" style={footerLinkStyle}>🏆 Ranking</Link>
-          <Link to="/inventory" style={footerLinkStyle}>🎒 Inventario</Link>
+          <Link to="/cases" style={footerLinkStyle}><FiGrid size={12} style={{ verticalAlign: 'middle', marginRight: '6px' }} />Cajas</Link>
+          <Link to="/upgrade" style={footerLinkStyle}><FiZap size={12} style={{ verticalAlign: 'middle', marginRight: '6px' }} />Upgrade</Link>
+          <Link to="/contracts" style={footerLinkStyle}><FiFileText size={12} style={{ verticalAlign: 'middle', marginRight: '6px' }} />Contratos</Link>
+          <Link to="/battles" style={footerLinkStyle}><FiAward size={12} style={{ verticalAlign: 'middle', marginRight: '6px' }} />Batallas</Link>
+          <Link to="/ranking" style={footerLinkStyle}><FiServer size={12} style={{ verticalAlign: 'middle', marginRight: '6px' }} />Ranking</Link>
+          <Link to="/inventory" style={footerLinkStyle}><FiGrid size={12} style={{ verticalAlign: 'middle', marginRight: '6px' }} />Inventario</Link>
         </div>
 
         {/* Column 3: Legal */}
         <div>
           <div style={columnTitleStyle}>Legal</div>
-          <Link to="/terms" style={footerLinkStyle}>📋 Términos de Servicio</Link>
-          <Link to="/privacy" style={footerLinkStyle}>🔒 Política de Privacidad</Link>
-          <Link to="/faq" style={footerLinkStyle}>❓ Preguntas Frecuentes (FAQ)</Link>
-          <Link to="/about" style={footerLinkStyle}>ℹ️ Sobre Nosotros</Link>
+          <Link to="/terms" style={footerLinkStyle}><FiFileText size={12} style={{ verticalAlign: 'middle', marginRight: '6px' }} />Terminos de Servicio</Link>
+          <Link to="/privacy" style={footerLinkStyle}><FiLock size={12} style={{ verticalAlign: 'middle', marginRight: '6px' }} />Politica de Privacidad</Link>
+          <Link to="/faq" style={footerLinkStyle}><FiHelpCircle size={12} style={{ verticalAlign: 'middle', marginRight: '6px' }} />Preguntas Frecuentes (FAQ)</Link>
+          <Link to="/about" style={footerLinkStyle}><FiInfo size={12} style={{ verticalAlign: 'middle', marginRight: '6px' }} />Sobre Nosotros</Link>
           <a
             href="https://www.valvesoftware.com/"
             target="_blank"
             rel="noopener noreferrer"
             style={footerLinkStyle}
           >
-            🏢 Valve Corporation
+            <FaSteam size={12} style={{ verticalAlign: 'middle', marginRight: '6px' }} />Valve Corporation
           </a>
         </div>
 
         {/* Column 4: Help & Contact */}
         <div>
           <div style={columnTitleStyle}>Ayuda</div>
-          <div style={footerLinkStyle}>📧 soporte@skinmarket.es</div>
-          <div style={{ ...footerLinkStyle, cursor: 'default' }}>🕐 Lun-Vie 10:00-19:00</div>
+          <div style={footerLinkStyle}><FiMail size={12} style={{ verticalAlign: 'middle', marginRight: '6px' }} />soporte@skinmarket.es</div>
+          <div style={{ ...footerLinkStyle, cursor: 'default' }}><FiClock size={12} style={{ verticalAlign: 'middle', marginRight: '6px' }} />Lun-Vie 10:00-19:00</div>
           <div style={{ marginTop: '20px' }}>
             <div style={columnTitleStyle}>Juego Responsable</div>
             <p style={{
@@ -147,13 +154,13 @@ const Footer = () => {
               lineHeight: '1.6',
               margin: 0,
             }}>
-              Esta plataforma está destinada a mayores de 18 años. Las skins
+              Esta plataforma esta destinada a mayores de 18 años. Las skins
               obtenidas no tienen valor monetario real fuera de la plataforma.
-              Establece límites y juega con responsabilidad.
+              Establece limites y juega con responsabilidad.
             </p>
           </div>
           <div style={{ marginTop: '20px' }}>
-            <div style={columnTitleStyle}>Métodos de Pago</div>
+            <div style={columnTitleStyle}>Metodos de Pago</div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <span style={{
                 padding: '6px 10px',
@@ -161,28 +168,40 @@ const Footer = () => {
                 borderRadius: '8px',
                 fontSize: '0.75rem',
                 color: 'rgba(255,255,255,0.6)',
-              }}>💳 Visa</span>
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}><FiCreditCard size={10} />Visa</span>
               <span style={{
                 padding: '6px 10px',
                 background: 'rgba(255,255,255,0.05)',
                 borderRadius: '8px',
                 fontSize: '0.75rem',
                 color: 'rgba(255,255,255,0.6)',
-              }}>💳 Mastercard</span>
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}><FiCreditCard size={10} />Mastercard</span>
               <span style={{
                 padding: '6px 10px',
                 background: 'rgba(255,255,255,0.05)',
                 borderRadius: '8px',
                 fontSize: '0.75rem',
                 color: 'rgba(255,255,255,0.6)',
-              }}>₿ Crypto</span>
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}><FiDollarSign size={10} />Crypto</span>
               <span style={{
                 padding: '6px 10px',
                 background: 'rgba(255,255,255,0.05)',
                 borderRadius: '8px',
                 fontSize: '0.75rem',
                 color: 'rgba(255,255,255,0.6)',
-              }}>🎁 Gift</span>
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}><FiGift size={10} />Gift</span>
             </div>
           </div>
         </div>
@@ -206,9 +225,9 @@ const Footer = () => {
           &copy; 2026 SkinMarket ES. Todos los derechos reservados.
         </div>
         <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-          <span>🍪 Usamos cookies para mejorar tu experiencia</span>
+          <FiShield size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} />Usamos cookies para mejorar tu experiencia
           <Link to="/privacy" style={{ color: '#f5ac3b', textDecoration: 'none' }}>
-            Más info
+            Mas info
           </Link>
         </div>
       </div>

@@ -71,20 +71,38 @@ class StorageServiceClass {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
+        // Validate that raw is not undefined/null and is valid JSON
+        if (raw === 'undefined' || raw === 'null' || raw.trim() === '') {
+          console.warn("StorageService: Invalid localStorage value detected, clearing.");
+          localStorage.removeItem(STORAGE_KEY);
+          return null;
+        }
         const parsed = JSON.parse(raw);
+        // Validate parsed data structure
+        if (!parsed || typeof parsed !== 'object' || parsed === null) {
+          console.warn("StorageService: Corrupted localStorage data detected, clearing.");
+          localStorage.removeItem(STORAGE_KEY);
+          return null;
+        }
         return {
-          user: { ...DEFAULT_USER, ...parsed.user },
-          inventory: parsed.inventory || INITIAL_INVENTORY,
-          history: parsed.history || [],
-          liveDrops: parsed.liveDrops || INITIAL_LIVE_DROPS,
-          adminSettings: parsed.adminSettings || { dropMultiplier: 1.0, winRateBonus: 0, customCases: [] }
+          user: { ...DEFAULT_USER, ...(parsed.user || {}) },
+          inventory: Array.isArray(parsed.inventory) ? parsed.inventory : INITIAL_INVENTORY,
+          history: Array.isArray(parsed.history) ? parsed.history : [],
+          liveDrops: Array.isArray(parsed.liveDrops) ? parsed.liveDrops : INITIAL_LIVE_DROPS,
+          adminSettings: parsed.adminSettings && typeof parsed.adminSettings === 'object' ? parsed.adminSettings : { dropMultiplier: 1.0, winRateBonus: 0, customCases: [] }
         };
       }
       // If localStorage is empty (clean incognito, first visit, or after logout),
       // return null data to signal "no user" state
       return null;
     } catch (e) {
-      console.warn("StorageService: Failed to parse localStorage data, resetting.", e);
+      console.warn("StorageService: Failed to parse localStorage data, clearing corrupted data.", e);
+      // Clear corrupted data to prevent repeated errors
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch (clearErr) {
+        // Ignore if we can't clear
+      }
     }
     return null;
   }
@@ -168,7 +186,7 @@ class StorageServiceClass {
     return newBalance;
   }
 
-// --- INVENTORY API ---
+  // --- INVENTORY API ---
   getInventory() {
     if (!this.data) return [];
     return [...(this.data.inventory || [])];
@@ -374,12 +392,14 @@ class StorageServiceClass {
   hasSession() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return false;
+      if (!raw || raw === 'undefined' || raw === 'null' || raw.trim() === '') return false;
       const parsed = JSON.parse(raw);
+      // Validate parsed data
+      if (!parsed || typeof parsed !== 'object' || !parsed.user) return false;
       // If we have a token or the user is not the default guest, we have a session
       const token = localStorage.getItem("token");
       if (token) return true;
-      if (parsed.user && parsed.user.email !== "guest@skinmarket.es") return true;
+      if (parsed.user.email && parsed.user.email !== "guest@skinmarket.es") return true;
       return false;
     } catch {
       return false;

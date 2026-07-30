@@ -57,7 +57,7 @@ export default function UploadSkin() {
   return (
     <div style={{ width: "100%", minHeight: "100vh", padding: "60px 20px", background: "#0f1115", color: "white", fontFamily: "'Inter', sans-serif" }}>
       <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
-        <h1 style={{ fontSize: "2.5rem", fontWeight: "900", marginBottom: "30px" }}>📥 DEPOSITAR SKINS DESDE STEAM</h1>
+        <h1 style={{ fontSize: "2.5rem", fontWeight: "900", marginBottom: "30px" }}>◆ DEPOSITAR SKINS DESDE STEAM</h1>
 
         <div style={{ background: "rgba(255,255,255,0.02)", padding: "30px", borderRadius: "24px", border: "1px solid rgba(255,255,255,0.05)", marginBottom: "30px" }}>
           <label style={{ fontSize: "0.8rem", fontWeight: "900", color: "rgba(255,255,255,0.4)", display: "block", marginBottom: "10px" }}>
