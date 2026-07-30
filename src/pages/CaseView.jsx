@@ -453,8 +453,32 @@ export default function CaseView() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#0f1115", paddingBottom: "100px" }}>
+      <style>{`
+        @media (max-width: 640px) {
+          .caseview-header { height: 250px !important; }
+          .caseview-header h1 { font-size: 1.5rem !important; }
+          .caseview-header img { width: 180px !important; height: 150px !important; }
+          .caseview-content { margin-top: -40px !important; padding: 0 10px !important; }
+          .caseview-controls { padding: 20px !important; }
+          .caseview-qty-buttons { gap: 6px !important; }
+          .caseview-qty-buttons button { width: 48px !important; height: 48px !important; font-size: 1rem !important; }
+          .caseview-open-btn { font-size: 1rem !important; padding: 16px 20px !important; }
+          .caseview-roulette-container { padding: 16px !important; }
+          .caseview-results-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 12px !important; }
+          .caseview-result-card { width: 100% !important; }
+          .caseview-contains-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+          .caseview-actions { flex-direction: column !important; align-items: stretch !important; gap: 10px !important; }
+          .caseview-actions button { width: 100% !important; }
+        }
+        @media (min-width: 641px) and (max-width: 1024px) {
+          .caseview-contains-grid { grid-template-columns: repeat(3, 1fr) !important; }
+          .caseview-results-grid { grid-template-columns: repeat(3, 1fr) !important; }
+        }
+        .caseview-roulette-wrapper { width: 100%; overflow-x: hidden; }
+      `}</style>
       {/* Header */}
       <div
+        className="caseview-header"
         style={{
           height: "400px",
           width: "100%",

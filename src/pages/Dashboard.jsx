@@ -285,19 +285,42 @@ export default function Dashboard() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#0f1115", padding: "40px", color: "white", fontFamily: "'Inter', sans-serif" }}>
-      <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
+      <style>{`
+        @media (max-width: 640px) {
+          .dashboard-page { padding: 16px 12px !important; }
+          .dashboard-profile { flex-direction: column !important; align-items: flex-start !important; padding: 20px !important; }
+          .dashboard-profile-info { flex-direction: column !important; align-items: flex-start !important; gap: 12px !important; }
+          .dashboard-profile-avatar { width: 60px !important; height: 60px !important; }
+          .dashboard-profile-name { font-size: 1.3rem !important; }
+          .dashboard-profile-actions { flex-direction: row !important; width: 100% !important; justify-content: space-between !important; }
+          .dashboard-balance-text { font-size: 1.5rem !important; }
+          .dashboard-stats-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+          .dashboard-daily { flex-direction: column !important; align-items: stretch !important; text-align: center !important; gap: 16px !important; }
+          .dashboard-daily-image { width: 80px !important; height: 80px !important; }
+          .dashboard-daily-title { font-size: 1.2rem !important; }
+          .dashboard-daily-timer { font-size: 1.8rem !important; }
+          .dashboard-inventory-header { flex-direction: column !important; align-items: flex-start !important; gap: 12px !important; }
+          .dashboard-inventory-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+        }
+        @media (min-width: 641px) and (max-width: 1024px) {
+          .dashboard-stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .dashboard-inventory-grid { grid-template-columns: repeat(3, 1fr) !important; }
+        }
+      `}</style>
+      <div className="dashboard-page" style={{ maxWidth: "1400px", margin: "0 auto" }}>
         {/* Profile Card */}
-        <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "28px", padding: "35px", marginBottom: "30px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "20px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "25px" }}>
+        <div className="dashboard-profile" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "28px", padding: "35px", marginBottom: "30px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "20px" }}>
+          <div className="dashboard-profile-info" style={{ display: "flex", alignItems: "center", gap: "25px" }}>
             <img
               src={user.avatar}
               alt={user.nombre_usuario}
               onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = "https://images.unsplash.com/photo-1566492031773-4f4e44671857?w=150&auto=format&fit=crop&q=80"; }}
+              className="dashboard-profile-avatar"
               style={{ width: "90px", height: "90px", borderRadius: "50%", border: "3px solid #f5ac3b", objectFit: "cover" }}
             />
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <h1 style={{ fontSize: "2rem", fontWeight: "900", margin: 0 }}>{user.nombre_usuario}</h1>
+                <h1 className="dashboard-profile-name" style={{ fontSize: "2rem", fontWeight: "900", margin: 0 }}>{user.nombre_usuario}</h1>
                 <span style={{ background: "rgba(245, 172, 59, 0.15)", color: "#f5ac3b", padding: "4px 10px", borderRadius: "8px", fontSize: "0.75rem", fontWeight: "bold" }}>
                   LVL {user.nivel || 1}
                 </span>
@@ -309,10 +332,10 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: "15px", alignItems: "center", flexWrap: "wrap" }}>
+          <div className="dashboard-profile-actions" style={{ display: "flex", gap: "15px", alignItems: "center", flexWrap: "wrap" }}>
             <div style={{ textAlign: "right", marginRight: "10px" }}>
               <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.4)", fontWeight: "bold" }}>SALDO DISPONIBLE</div>
-              <div style={{ fontSize: "2.2rem", fontWeight: "900", color: "#f5ac3b" }}>€{Number(user.balance || user.saldo || 0).toFixed(2)}</div>
+              <div className="dashboard-balance-text" style={{ fontSize: "2.2rem", fontWeight: "900", color: "#f5ac3b" }}>€{Number(user.balance || user.saldo || 0).toFixed(2)}</div>
             </div>
 
             <button onClick={() => setRechargeOpen(true)} style={{ padding: "14px 28px", background: "#f5ac3b", color: "black", border: "none", borderRadius: "14px", fontWeight: "900", fontSize: "0.95rem", cursor: "pointer" }}>

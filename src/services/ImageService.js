@@ -353,7 +353,78 @@ async function loadEmergencySkinImage(skinId) {
 }
 
 // ---------------------------------------------------------------------------
+// Emergency Skin Loader — tries local fallback images before SVG placeholder
+// ---------------------------------------------------------------------------
+
+/**
+ * Attempt to load an emergency skin image from the local directory.
+ * Tries .png, .webp, and .jpg variants based on skin name or hash.
+ * @param {string} skinName - Name of the skin to look up
+ * @returns {Promise<string|null>} Emergency image URL or null if none found
+ */
+async function loadEmergencySkin(skinName) {
+  if (!skinName) return null;
+
+  // Try multiple possible filenames: clean skin name, hash of name, etc.
+  const candidates = [
+    skinName.replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase(),
+    skinName.replace(/\s*\|\s*/g, '_').replace(/\s+/g, '_').toLowerCase(),
+    skinName.replace(/[^a-zA-Z0-9]/g, '').toLowerCase().slice(0, 30)
+  ];
+
+  const extensions = ['.png', '.webp', '.jpg'];
+
+  for (const baseName of candidates) {
+    for (const ext of extensions) {
+      try {
+        const url = `/images/emergency-skins/${baseName}${ext}`;
+        const headResponse = await fetch(url, { method: 'HEAD' });
+        if (headResponse.ok) return url;
+      } catch (_e) {
+        // Continue trying
+      }
+    }
+  }
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Public API: getSafeImageUrl — validates URL before returning
+// ---------------------------------------------------------------------------
+
+/**
+ * Safe URL getter that validates the Steam hash BEFORE setting the img src.
+ * Prevents browser 404 errors on first render by checking hash validity.
+ * @param {string} skinName - Skin name for fallback generation
+ * @param {string} originalImage - Original image URL from backend
+ * @returns {string} Safe image URL (never null/undefined)
+ */
+export function getSafeImageUrl(skinName, originalImage) {
+  if (!originalImage && !skinName) return generatePlaceholderDataUrl('SKIN');
+
+  // If there's no original image, generate placeholder immediately
+  if (!originalImage) {
+    return generatePlaceholderDataUrl(skinName || 'SKIN');
+  }
+
+  // Extract Steam hash and validate it
+  const hash = extractSteamImageHash(originalImage);
+  const isSteamUrl = !!hash;
+
+  // If it's a Steam URL with an invalid/truncated hash, skip it
+  if (isSteamUrl && !isValidSteamHash(hash)) {
+    // Return a placeholder instead of a broken Steam URL
+    return generatePlaceholderDataUrl(skinName || 'SKIN');
+  }
+
+  // URL is valid OR not a Steam URL (could be local path), return as-is
+  return originalImage;
+}
+
+// ---------------------------------------------------------------------------
 // Public API: handleImageError — ultra-aggressive multi-tier fallback handler
+// with emergency skin support (5 tiers total)
 // ---------------------------------------------------------------------------
 
 export async function handleImageError(event, skin) {
@@ -370,6 +441,16 @@ export async function handleImageError(event, skin) {
   // ─── ANTI-BUCLE INFINITO: Máximo 2 reintentos totales ──────────────
   var tryCount = parseInt(img.getAttribute('data-try-count'), 10) || 0;
   if (tryCount >= 2) {
+    // Before giving up entirely, try emergency skin path
+    var emergencyUrl = await loadEmergencySkin(skin && skin.name);
+    if (emergencyUrl && !failedUrls.has(emergencyUrl)) {
+      img.setAttribute('data-try-count', tryCount + 1);
+      img.src = emergencyUrl;
+      img.style.opacity = '1';
+      img.style.objectFit = 'contain';
+      return;
+    }
+
     // Cancelar TODOS los eventos de error futuros y poner placeholder silencioso
     img.onerror = null;
     img.removeAttribute('data-try-index');
@@ -411,7 +492,17 @@ export async function handleImageError(event, skin) {
     img.setAttribute('data-try-index', tryIndex);
   }
 
-  // All CDNs exhausted: silent SVG placeholder fallback
+  // All CDNs exhausted: try emergency skin before SVG placeholder
+  var emergencyUrl = await loadEmergencySkin(skin && skin.name);
+  if (emergencyUrl && !failedUrls.has(emergencyUrl)) {
+    failedUrls.add(emergencyUrl);
+    img.src = emergencyUrl;
+    img.style.opacity = '1';
+    img.style.objectFit = 'contain';
+    return;
+  }
+
+  // All fallbacks exhausted: silent SVG placeholder
   // Disable further error handling to prevent infinite loops
   img.onerror = null;
   img.removeAttribute('data-try-index');

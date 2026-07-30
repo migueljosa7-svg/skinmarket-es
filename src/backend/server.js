@@ -138,8 +138,18 @@ const sessionStore = (() => {
 app.use(helmet());
 app.use(hpp());
 
-const corsOrigin = process.env.FRONTEND_URL || "*";
-app.use(cors({ origin: corsOrigin, credentials: true }));
+const allowedOrigins = [
+  "https://skinmarket-frontend.onrender.com",
+  "http://localhost:5173",
+  process.env.FRONTEND_URL
+].filter(Boolean);
+
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+}));
 app.use(express.json());
 
 // Trust proxy — needed for correct IP detection behind Render/Nginx
@@ -618,6 +628,16 @@ app.post("/api/register", async (req, res) => {
   }
 
   try {
+    // Check if db is available before querying
+    if (!db || typeof db.query !== 'function') {
+      log(LOG_LEVELS.ERROR, 'REGISTER', 'Base de datos no disponible');
+      return res.status(503).json({
+        success: false,
+        error: "Servicio de base de datos no disponible. Intenta más tarde.",
+        code: "DB_UNAVAILABLE"
+      });
+    }
+
     const hashedPassword = await bcrypt.hash(password, 12);
     const result = await db.query(
       "INSERT INTO usuarios (nombre_usuario, email, password_hash, nivel, experiencia) VALUES ($1, $2, $3, $4, $5) RETURNING usuario_id, nombre_usuario, email, saldo, nivel, experiencia",
@@ -626,10 +646,48 @@ app.post("/api/register", async (req, res) => {
     const user = result.rows[0];
     const token = jwt.sign({ id: user.usuario_id, email: user.email }, JWT_SECRET, { expiresIn: '8h' });
     await logAction(user.usuario_id, 'REGISTER', { email: cleanEmail });
-    res.status(201).json({ user, token });
+    res.status(201).json({
+      success: true,
+      user: {
+        usuario_id: user.usuario_id,
+        nombre_usuario: user.nombre_usuario,
+        email: user.email,
+        saldo: user.saldo,
+        nivel: user.nivel,
+        experiencia: user.experiencia
+      },
+      token
+    });
   } catch (err) {
-    if (err.code === '23505') return res.status(400).json({ error: "El usuario o email ya existe" });
-    res.status(500).json({ error: "Error al registrar usuario" });
+    log(LOG_LEVELS.ERROR, 'REGISTER', 'Error al registrar usuario', { error: err.message, code: err.code });
+
+    // Error de conexión a la base de datos
+    if (err.code === 'ECONNREFUSED' || err.code === 'ENOTFOUND' || err.message?.includes('connect')) {
+      return res.status(503).json({
+        success: false,
+        error: "No se pudo conectar con la base de datos. Verifica tu conexión e intenta de nuevo.",
+        code: "DB_CONNECTION_ERROR"
+      });
+    }
+
+    // Violación de clave única (usuario o email ya existe)
+    if (err.code === '23505') {
+      const detail = err.detail || '';
+      const campo = detail.includes('nombre_usuario') ? 'nombre de usuario' : 'email';
+      return res.status(409).json({
+        success: false,
+        error: `El ${campo} ya está registrado. Por favor, usa otro o inicia sesión.`,
+        code: "DUPLICATE_ENTRY",
+        field: detail.includes('nombre_usuario') ? 'nombre_usuario' : 'email'
+      });
+    }
+
+    // Error genérico del servidor
+    res.status(500).json({
+      success: false,
+      error: "Error interno al registrar usuario. Por favor, intenta de nuevo más tarde.",
+      code: "REGISTER_ERROR"
+    });
   }
 });
 
@@ -1640,21 +1698,78 @@ app.post("/api/p2p/search", authenticateToken, async (req, res) => {
 });
 
 // ─── GLOBAL ERROR HANDLER ────────────────────────
-process.on('unhandledRejection', (reason) => {
-  log(LOG_LEVELS.ERROR, 'GLOBAL', 'Unhandled Rejection', { reason: reason?.toString() });
-  // En producción, no dejar que el proceso se caiga
-  if (process.env.NODE_ENV === 'production') {
-    log(LOG_LEVELS.WARN, 'GLOBAL', 'Unhandled rejection capturada en producción - proceso continúa');
-  }
+process.on('unhandledRejection', (reason, promise) => {
+  log(LOG_LEVELS.ERROR, 'GLOBAL', '❌ Unhandled Promise Rejection', {
+    reason: reason?.toString() || 'Unknown reason',
+    type: typeof reason,
+    isError: reason instanceof Error,
+    stack: reason instanceof Error ? reason.stack : undefined,
+    promise: promise ? 'promise was provided' : 'no promise context'
+  });
+
+  // Never crash on unhandled rejections — log and continue
+  log(LOG_LEVELS.WARN, 'GLOBAL', '🔁 Proceso continúa a pesar del rejection no capturado');
 });
 
 process.on('uncaughtException', (err) => {
-  log(LOG_LEVELS.ERROR, 'GLOBAL', 'Uncaught Exception', { error: err.message, stack: err.stack });
-  // En producción, intentar recuperación graceful en lugar de exit
+  log(LOG_LEVELS.ERROR, 'GLOBAL', '💥 UNCAUGHT EXCEPTION', {
+    error: err.message,
+    stack: err.stack,
+    code: err.code,
+    syscall: err.syscall,
+    errno: err.errno,
+    path: err.path,
+    address: err.address,
+    port: err.port
+  });
+
+  // Log environment context
+  log(LOG_LEVELS.ERROR, 'GLOBAL', '📋 Contexto del error', {
+    nodeEnv: process.env.NODE_ENV || 'development',
+    pid: process.pid,
+    uptime: process.uptime(),
+    memoryUsage: process.memoryUsage(),
+    cwd: process.cwd()
+  });
+
+  // En producción, gracia: no matar el proceso inmediatamente
   if (process.env.NODE_ENV === 'production') {
-    log(LOG_LEVELS.ERROR, 'GLOBAL', 'Error crítico en producción - se recomienda reinicio manual');
+    log(LOG_LEVELS.ERROR, 'GLOBAL', '⚠️ Error crítico en producción — ejecutando shutdown graceful en 5s...');
+
+    // Dar tiempo para que los logs se escriban y las conexiones se cierren
+    setTimeout(() => {
+      log(LOG_LEVELS.INFO, 'GLOBAL', '🔄 Forzando reinicio del proceso...');
+      process.exit(1);
+    }, 5000);
   } else {
+    // En desarrollo, salir inmediatamente para que el watcher reinicie
+    log(LOG_LEVELS.ERROR, 'GLOBAL', '🛑 Saliendo del proceso (desarrollo)');
     process.exit(1);
+  }
+});
+
+// ─── SIGTERM / SIGINT HANDLER (Graceful Shutdown para Render) ──
+process.on('SIGTERM', () => {
+  log(LOG_LEVELS.INFO, 'GLOBAL', '📡 Señal SIGTERM recibida — cerrando servidor gracefulmente...');
+  if (server) {
+    server.close(() => {
+      log(LOG_LEVELS.INFO, 'GLOBAL', '✅ Servidor HTTP cerrado correctamente');
+      process.exit(0);
+    });
+  } else {
+    process.exit(0);
+  }
+});
+
+process.on('SIGINT', () => {
+  log(LOG_LEVELS.INFO, 'GLOBAL', '⌨️ Señal SIGINT recibida — cerrando servidor...');
+  if (server) {
+    server.close(() => {
+      log(LOG_LEVELS.INFO, 'GLOBAL', '✅ Servidor HTTP cerrado correctamente');
+      process.exit(0);
+    });
+  } else {
+    process.exit(0);
   }
 });
 
@@ -1713,13 +1828,18 @@ server.on('error', (err) => {
 });
 
 const io = new SocketIOServer(server, {
-  cors: { origin: corsOrigin, methods: ["GET", "POST"], credentials: true },
-  transports: ['polling', 'websocket'],
-  pingTimeout: 30000,     // Render idle timeout protection (was 60s, now 30s for faster detection)
-  pingInterval: 25000,    // Heartbeat every 25s to keep connection alive
+  cors: {
+    origin: allowedOrigins,
+    methods: ["GET", "POST"],
+    credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization"]
+  },
+  transports: ['websocket', 'polling'],
+  pingTimeout: 30000,
+  pingInterval: 25000,
   allowEIO3: true,
-  connectTimeout: 45000,  // Allow extra time for cold starts on Render
-  maxHttpBufferSize: 1e6  // 1MB max message size
+  connectTimeout: 45000,
+  maxHttpBufferSize: 1e6
 });
 
 io.on("connection", (socket) => {

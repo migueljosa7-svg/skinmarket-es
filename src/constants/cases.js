@@ -6,6 +6,31 @@
 const CASE_CONTAINER_ECO = "/case_eco.png";
 const CASE_CONTAINER_MID = "/case_mid.png";
 const CASE_CONTAINER_PREMIUM = "/case_premium.png";
+const CASE_CONTAINER_COVERT = "/case_covert.svg";
+const CASE_CONTAINER_KNIFE = "/case_knife.svg";
+const CASE_CONTAINER_VIP = "/case_vip.svg";
+const CASE_CONTAINER_RARE = "/case_rare.svg";
+const CASE_CONTAINER_LEGENDARY = "/case_legendary.svg";
+
+// ─── Container Image Mapping by Category ──────────────
+const CONTAINER_BY_CATEGORY = {
+  económica: CASE_CONTAINER_ECO,
+  intermedia: CASE_CONTAINER_MID,
+  premium: CASE_CONTAINER_PREMIUM,
+  limited: CASE_CONTAINER_COVERT
+};
+
+const getContainerForCase = (caseObj) => {
+  // Daily cases have their own progression
+  if (caseObj.category === "daily") {
+    if (caseObj.level >= 170) return CASE_CONTAINER_LEGENDARY;
+    if (caseObj.level >= 80) return CASE_CONTAINER_KNIFE;
+    if (caseObj.level >= 50) return CASE_CONTAINER_VIP;
+    if (caseObj.level >= 15) return CASE_CONTAINER_RARE;
+    return CASE_CONTAINER_ECO;
+  }
+  return CONTAINER_BY_CATEGORY[caseObj.category] || CASE_CONTAINER_ECO;
+};
 
 // ─── Probability Configuration per Case Tier ──────────────
 // RTP (Return to Player) is balanced to ~90% for eco, ~88% for mid, ~85% for premium
@@ -396,6 +421,64 @@ export const getCaseImage = (category) => {
   return cases[Math.floor(Math.random() * cases.length)];
 };
 
+// ─── Helper: Generate unique preview skins per case ──────────
+// Uses the SKIN_CATALOGS to create 4 unique preview skins per case
+// No two cases get the same combination
+const generatePreviewSkins = (caseObj, caseIndex, category) => {
+  const catalog = SKIN_CATALOGS[category] || SKIN_CATALOGS.económica;
+  const previews = [];
+  const usedCombos = new Set();
+  const seedStr = `${caseObj.id || caseObj.name}_${caseIndex}`;
+  let seed = 0;
+  for (let i = 0; i < seedStr.length; i++) {
+    seed = ((seed << 5) - seed) + seedStr.charCodeAt(i);
+    seed |= 0;
+  }
+
+  // Deterministic "random" based on case seed + index
+  const seededRandom = (offset) => {
+    const x = Math.sin(seed + offset * 9973) * 10000;
+    return x - Math.floor(x);
+  };
+
+  // Pick 1 featured skin (mid-to-high range) and 3 secondary skins
+  for (let i = 0; i < 4; i++) {
+    let attempts = 0;
+    let weapon, skinName, combo;
+
+    do {
+      const wIndex = Math.floor(seededRandom(i * 7 + attempts * 13 + caseIndex) * catalog.weapons.length);
+      const sIndex = Math.floor(seededRandom(i * 11 + attempts * 17 + caseIndex + 1) * catalog.skins.length);
+      weapon = catalog.weapons[wIndex];
+      skinName = catalog.skins[sIndex];
+      combo = `${weapon}|${skinName}`;
+      attempts++;
+    } while (usedCombos.has(combo) && attempts < 50);
+
+    usedCombos.add(combo);
+
+    // Price proportional to position: first is featured (higher), rest are lower
+    const priceRatio = i === 0 ? 0.7 + seededRandom(i * 5 + caseIndex) * 0.3 : 0.1 + seededRandom(i * 3 + caseIndex) * 0.4;
+    const price = parseFloat((catalog.priceRange[0] + (catalog.priceRange[1] - catalog.priceRange[0]) * priceRatio).toFixed(2));
+
+    const rarities = ["Mil-Spec Grade", "Restricted", "Classified", "Covert"];
+    const rarity = i === 0 ? rarities[Math.min(2 + Math.floor(seededRandom(i * 23 + caseIndex) * 2), 3)]
+                           : rarities[Math.min(Math.floor(seededRandom(i * 19 + caseIndex) * 2), 2)];
+
+    previews.push({
+      id: `preview-${caseObj.id || `case-${caseIndex}`}-${i}`,
+      name: `${weapon} | ${skinName}`,
+      price,
+      rarity,
+      weapon,
+      skin_name: skinName,
+      image: ""
+    });
+  }
+
+  return previews;
+};
+
 // ─── Generate all cases with logical pricing ──────────────
 // Prices are set to ensure RTP balance:
 // - Económica: €0.50 - €3.50 (avg €1.50)
@@ -404,11 +487,12 @@ export const getCaseImage = (category) => {
 // - Limited: €30.00 - €100.00 (avg €50.00)
 export const generateAllCases = () => {
   const cases = [];
+  let globalIndex = 0;
 
   // Económicas — Fixed logical prices
   const ecoPrices = [0.50, 0.75, 1.00, 1.25, 1.50, 1.75, 2.00, 2.25, 2.50, 2.75, 3.00, 3.50];
   CASE_IMAGES.económica.forEach((caseImg, idx) => {
-    cases.push({
+    const caseObj = {
       id: `econ-${idx}`,
       name: caseImg.name,
       imageSrc: CASE_CONTAINER_ECO,
@@ -418,15 +502,21 @@ export const generateAllCases = () => {
       bgGradient: caseImg.bgGradient,
       rarity: "mil-spec",
       image: CASE_CONTAINER_ECO,
-      rtp: 90, // 90% RTP
+      rtp: 90,
       badge: caseImg.badge || "ECO"
-    });
+    };
+    // Assign distinct container
+    caseObj.image = getContainerForCase(caseObj);
+    caseObj.imageSrc = caseObj.image;
+    // Generate unique preview skins
+    caseObj.previewSkins = generatePreviewSkins(caseObj, globalIndex++, "económica");
+    cases.push(caseObj);
   });
 
   // Intermedias
   const midPrices = [3.00, 3.50, 4.00, 4.50, 5.00, 5.50, 6.00, 6.50, 7.00, 7.50, 8.00, 8.50, 9.00, 9.50];
   CASE_IMAGES.intermedia.forEach((caseImg, idx) => {
-    cases.push({
+    const caseObj = {
       id: `inter-${idx}`,
       name: caseImg.name,
       imageSrc: CASE_CONTAINER_MID,
@@ -438,13 +528,17 @@ export const generateAllCases = () => {
       image: CASE_CONTAINER_MID,
       rtp: 88,
       badge: caseImg.badge || "MID"
-    });
+    };
+    caseObj.image = getContainerForCase(caseObj);
+    caseObj.imageSrc = caseObj.image;
+    caseObj.previewSkins = generatePreviewSkins(caseObj, globalIndex++, "intermedia");
+    cases.push(caseObj);
   });
 
   // Premium
   const premPrices = [10.00, 12.00, 15.00, 18.00, 20.00, 22.00, 25.00, 28.00, 30.00, 35.00, 40.00, 45.00];
   CASE_IMAGES.premium.forEach((caseImg, idx) => {
-    cases.push({
+    const caseObj = {
       id: `prem-${idx}`,
       name: caseImg.name,
       imageSrc: CASE_CONTAINER_PREMIUM,
@@ -456,30 +550,39 @@ export const generateAllCases = () => {
       image: CASE_CONTAINER_PREMIUM,
       rtp: 85,
       badge: caseImg.badge || "PREMIUM"
-    });
+    };
+    caseObj.image = getContainerForCase(caseObj);
+    caseObj.imageSrc = caseObj.image;
+    caseObj.previewSkins = generatePreviewSkins(caseObj, globalIndex++, "premium");
+    cases.push(caseObj);
   });
 
   // Limited
   const limitPrices = [30.00, 40.00, 50.00, 60.00, 75.00, 80.00, 90.00, 100.00];
   CASE_IMAGES.limited.forEach((caseImg, idx) => {
-    cases.push({
+    const caseObj = {
       id: `limit-${idx}`,
       name: caseImg.name,
-      imageSrc: CASE_CONTAINER_PREMIUM,
+      imageSrc: CASE_CONTAINER_COVERT,
       price: limitPrices[idx] || 50.00,
       category: "limited",
       color: caseImg.color,
       bgGradient: caseImg.bgGradient,
       rarity: "covert",
-      image: CASE_CONTAINER_PREMIUM,
+      image: CASE_CONTAINER_COVERT,
       rtp: 82,
       badge: caseImg.badge || "LIMITED"
-    });
+    };
+    caseObj.image = getContainerForCase(caseObj);
+    caseObj.imageSrc = caseObj.image;
+    caseObj.previewSkins = generatePreviewSkins(caseObj, globalIndex++, "limited");
+    cases.push(caseObj);
   });
 
   // Daily cases for levels (KeyDrop-style progression)
   DAILY_CASES_BY_LEVEL.forEach(d => {
-    cases.push({
+    const dailyCat = d.category || "económica";
+    const caseObj = {
       id: d.caseId,
       name: d.name,
       imageSrc: CASE_CONTAINER_ECO,
@@ -493,8 +596,13 @@ export const generateAllCases = () => {
       rtp: d.rtp,
       badge: d.badge,
       maxSkinPrice: d.maxSkinPrice,
-      description: d.description
-    });
+      description: d.description,
+      level: d.level
+    };
+    caseObj.image = getContainerForCase(caseObj);
+    caseObj.imageSrc = caseObj.image;
+    caseObj.previewSkins = generatePreviewSkins(caseObj, globalIndex++, dailyCat);
+    cases.push(caseObj);
   });
 
   return cases;

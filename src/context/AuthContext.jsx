@@ -94,45 +94,59 @@ export function AuthProvider({ children }) {
       // Try backend register first to get a real JWT
       const API = import.meta.env.VITE_API_URL || "";
       if (password) {
-        try {
-          const response = await fetch(`${API}/api/register`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ nombre_usuario, email, password })
+        const response = await fetch(`${API}/api/register`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nombre_usuario, email, password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          // Store JWT in localStorage
+          localStorage.setItem("token", data.token);
+          setToken(data.token);
+          // Sync user data with StorageService
+          StorageService.updateUser({
+            ...data.user,
+            nombre_usuario: data.user.nombre_usuario,
+            email: data.user.email,
+            saldo: data.user.saldo,
+            balance: data.user.saldo,
+            nivel: data.user.nivel || 0,
+            experiencia: data.user.experiencia || 0
           });
-          if (response.ok) {
-            const data = await response.json();
-            // Store JWT in localStorage
-            localStorage.setItem("token", data.token);
-            setToken(data.token);
-            // Sync user data with StorageService
-            StorageService.updateUser({
-              ...data.user,
-              nombre_usuario: data.user.nombre_usuario,
-              email: data.user.email,
-              saldo: data.user.saldo,
-              balance: data.user.saldo,
-              nivel: data.user.nivel || 0,
-              experiencia: data.user.experiencia || 0
-            });
-            console.log('🔑 [REGISTER] Token JWT obtained from backend and stored');
-            return data.user;
-          }
-        } catch (err) {
-          console.warn('[REGISTER] Backend unavailable, falling back to local:', err.message);
+          console.log('🔑 [REGISTER] Token JWT obtained from backend and stored');
+          return data.user;
+        }
+
+        // Backend responded with an error — throw it so the UI shows the toast
+        const errorMsg = data.error || "Error al registrar en el servidor";
+        const errorCode = data.code || "UNKNOWN_ERROR";
+
+        // Handle specific error codes from the improved backend
+        if (response.status === 409) {
+          throw new Error(errorMsg);
+        } else if (response.status === 503) {
+          throw new Error(errorMsg);
+        } else if (response.status === 400) {
+          throw new Error(errorMsg);
+        } else {
+          throw new Error(errorMsg);
         }
       }
 
-      // Fallback: simulated local register
-      const updatedUser = StorageService.updateUser({
-        nombre_usuario,
-        email
-      });
-      // Remove any stale token on local fallback
-      localStorage.removeItem("token");
-      setToken(null);
-      console.log('🔑 [REGISTER] Local fallback (no JWT token stored)');
-      return updatedUser;
+      // Fallback: simulated local register (only if no password was provided, e.g. guest)
+      if (!password) {
+        const updatedUser = StorageService.updateUser({
+          nombre_usuario,
+          email
+        });
+        localStorage.removeItem("token");
+        setToken(null);
+        console.log('🔑 [REGISTER] Local fallback (no JWT token stored)');
+        return updatedUser;
+      }
     } finally {
       setLoading(false);
     }

@@ -184,9 +184,12 @@ const DailyRouletteModal = ({ isOpen, onClose, rewardAmount, skinsPool }) => {
 // ─── Professional Case Card with 3D container image ────────
 const CaseCard = ({ c, skinsPool, onClick }) => {
   const skins = useMemo(() => {
+    // Use pre-generated previewSkins from the case data (unique per case)
+    if (c.previewSkins && c.previewSkins.length > 0) return c.previewSkins;
+    // Fallback: slice from global pool
     if (!skinsPool || skinsPool.length === 0) return [];
     return skinsPool.slice(0, 4);
-  }, [skinsPool]);
+  }, [c.previewSkins, skinsPool]);
 
   return (
     <Motion.div
@@ -333,9 +336,27 @@ export default function Cases() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#0f1115", padding: "50px 20px", color: "white", fontFamily: "'Inter', sans-serif" }}>
-      <div style={{ maxWidth: "1500px", margin: "0 auto" }}>
+      <style>{`
+        @media (max-width: 640px) {
+          .cases-page { padding: 20px 10px !important; }
+          .cases-header h1 { font-size: 1.8rem !important; }
+          .cases-header p { font-size: 0.7rem !important; letter-spacing: 1px !important; }
+          .cases-filters { flex-direction: column !important; align-items: stretch !important; gap: 12px !important; }
+          .cases-filters-cats { overflow-x: auto !important; flex-wrap: nowrap !important; padding-bottom: 4px; }
+          .cases-filters-cats button { flex-shrink: 0; font-size: 0.75rem !important; padding: 8px 14px !important; }
+          .cases-filters-right { flex-direction: column !important; width: 100% !important; }
+          .cases-filters-right input,
+          .cases-filters-right select { width: 100% !important; }
+          .cases-filters-right button { width: 100% !important; justify-content: center !important; }
+          .cases-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 12px !important; }
+        }
+        @media (min-width: 641px) and (max-width: 1024px) {
+          .cases-grid { grid-template-columns: repeat(3, 1fr) !important; gap: 16px !important; }
+        }
+      `}</style>
+      <div className="cases-page" style={{ maxWidth: "1500px", margin: "0 auto" }}>
         {/* Header */}
-        <header style={{ textAlign: "center", marginBottom: "50px" }}>
+        <header className="cases-header" style={{ textAlign: "center", marginBottom: "50px" }}>
           <h1 style={{ fontSize: "3.5rem", fontWeight: "900", margin: "0 0 10px 0" }}>TIENDA DE CAJAS</h1>
           <p style={{ color: "#f5ac3b", fontWeight: "bold", letterSpacing: "2px", textTransform: "uppercase" }}>
             Abre cajas exclusivas y obtén las mejores skins instantáneamente
@@ -343,8 +364,8 @@ export default function Cases() {
         </header>
 
         {/* Filters & Controls */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "35px", flexWrap: "wrap", gap: "20px" }}>
-          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+        <div className="cases-filters" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "35px", flexWrap: "wrap", gap: "20px" }}>
+          <div className="cases-filters-cats" style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
             {categories.map((cat) => (
               <button
                 key={cat.id}
@@ -369,7 +390,7 @@ export default function Cases() {
             ))}
           </div>
 
-          <div style={{ display: "flex", gap: "15px", alignItems: "center" }}>
+          <div className="cases-filters-right" style={{ display: "flex", gap: "15px", alignItems: "center" }}>
             <button
               onClick={() => {
                 if (!user) {
@@ -421,7 +442,7 @@ export default function Cases() {
         </div>
 
         {/* Cases Grid */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))", gap: "25px" }}>
+        <div className="cases-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))", gap: "25px" }}>
           {filteredCases.map((c) => (
             <CaseCard key={c.id} c={c} skinsPool={allSkins} onClick={() => navigate(`/case/${c.id}`)} />
           ))}
