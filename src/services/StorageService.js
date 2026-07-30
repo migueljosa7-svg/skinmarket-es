@@ -80,18 +80,13 @@ class StorageServiceClass {
           adminSettings: parsed.adminSettings || { dropMultiplier: 1.0, winRateBonus: 0, customCases: [] }
         };
       }
+      // If localStorage is empty (clean incognito, first visit, or after logout),
+      // return null data to signal "no user" state
+      return null;
     } catch (e) {
       console.warn("StorageService: Failed to parse localStorage data, resetting.", e);
     }
-    const initial = {
-      user: DEFAULT_USER,
-      inventory: INITIAL_INVENTORY,
-      history: [],
-      liveDrops: INITIAL_LIVE_DROPS,
-      adminSettings: { dropMultiplier: 1.0, winRateBonus: 0, customCases: [] }
-    };
-    this.saveDataDirect(initial);
-    return initial;
+    return null;
   }
 
   saveDataDirect(data) {
@@ -122,10 +117,17 @@ class StorageServiceClass {
 
   // --- USER API ---
   getUser() {
+    // If no data in localStorage, return null to indicate "no user"
+    if (!this.data) return null;
     return { ...this.data.user };
   }
 
   updateUser(updater) {
+    // Ensure data exists before updating
+    if (!this.data) {
+      // Initialize default data if it doesn't exist
+      this.data = this.createInitialData();
+    }
     const nextUser = typeof updater === "function" ? updater(this.data.user) : { ...this.data.user, ...updater };
     // Ensure numeric types
     if (nextUser.balance !== undefined) {
@@ -137,7 +139,18 @@ class StorageServiceClass {
     return this.data.user;
   }
 
+  createInitialData() {
+    return {
+      user: DEFAULT_USER,
+      inventory: INITIAL_INVENTORY,
+      history: [],
+      liveDrops: INITIAL_LIVE_DROPS,
+      adminSettings: { dropMultiplier: 1.0, winRateBonus: 0, customCases: [] }
+    };
+  }
+
   addBalance(amount) {
+    if (!this.data) return false;
     const num = Number(parseFloat(amount).toFixed(2));
     if (isNaN(num) || num <= 0) return false;
     const newBalance = Number((this.data.user.balance + num).toFixed(2));
@@ -146,6 +159,7 @@ class StorageServiceClass {
   }
 
   deductBalance(amount) {
+    if (!this.data) return false;
     const num = Number(parseFloat(amount).toFixed(2));
     if (isNaN(num) || num <= 0) return false;
     if (this.data.user.balance < num) return false;
@@ -156,15 +170,18 @@ class StorageServiceClass {
 
 // --- INVENTORY API ---
   getInventory() {
+    if (!this.data) return [];
     return [...(this.data.inventory || [])];
   }
 
   // --- PENDING QUEUE (for withdraw requests) ---
   getPendingQueue() {
+    if (!this.data) return [];
     return [...(this.data.pendingQueue || [])];
   }
 
   addToPendingQueue(skinId) {
+    if (!this.data) return { success: false, error: "No hay datos de sesión" };
     const skinIndex = this.data.inventory.findIndex((s) => s.id === skinId);
     if (skinIndex === -1) return { success: false, error: "Skin no encontrada" };
 
@@ -183,6 +200,7 @@ class StorageServiceClass {
   }
 
   processPendingQueue(skinId) {
+    if (!this.data) return { success: false, error: "No hay datos de sesión" };
     this.data.pendingQueue = this.data.pendingQueue || [];
     const queueIndex = this.data.pendingQueue.findIndex((q) => q.skinId === skinId && q.status === "pending");
     if (queueIndex === -1) return { success: false, error: "No hay solicitud pendiente para esta skin" };
@@ -201,6 +219,9 @@ class StorageServiceClass {
   }
 
   addSkinsToInventory(skins) {
+    if (!this.data) {
+      this.data = this.createInitialData();
+    }
     const items = (Array.isArray(skins) ? skins : [skins]).map((s) => ({
       id: s.id || `inv_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
       name: s.name || "Skin",
@@ -220,6 +241,7 @@ class StorageServiceClass {
   }
 
   sellSkin(skinId) {
+    if (!this.data) return false;
     const skinIndex = this.data.inventory.findIndex((s) => s.id === skinId);
     if (skinIndex === -1) return false;
 
@@ -230,6 +252,7 @@ class StorageServiceClass {
   }
 
   sellAllSkins() {
+    if (!this.data) return 0;
     const total = this.data.inventory.reduce((acc, curr) => acc + Number(curr.price || 0), 0);
     this.data.inventory = [];
     if (total > 0) {
@@ -241,6 +264,7 @@ class StorageServiceClass {
   withdrawSkin(skinId) {
     // This is now a LOCAL-ONLY fallback. Real withdraw is handled via API in AuthContext.
     // Only marks the skin locally after a successful API call.
+    if (!this.data) return { success: false, error: "No hay datos de sesión" };
     const skinIndex = this.data.inventory.findIndex((s) => s.id === skinId);
     if (skinIndex === -1) return { success: false, error: "Skin no encontrada" };
     this.data.inventory[skinIndex].status = "withdrawn";
@@ -250,6 +274,7 @@ class StorageServiceClass {
 
   /** Exchange a skin for balance (alternative to withdraw) */
   exchangeSkin(skinId) {
+    if (!this.data) return { success: false, error: "No hay datos de sesión" };
     const skinIndex = this.data.inventory.findIndex((s) => s.id === skinId);
     if (skinIndex === -1) return { success: false, error: "Skin no encontrada" };
 
@@ -281,6 +306,7 @@ class StorageServiceClass {
 
   /** Get pending queue items */
   getPendingWithdrawals() {
+    if (!this.data) return [];
     return this.data.inventory.filter(s => s.status === "pending_withdraw" || s.status === "withdrawing");
   }
 
@@ -297,10 +323,14 @@ class StorageServiceClass {
 
   // --- LIVE DROPS API ---
   getLiveDrops() {
+    if (!this.data) return [];
     return [...(this.data.liveDrops || [])];
   }
 
   addLiveDrop(dropData) {
+    if (!this.data) {
+      this.data = this.createInitialData();
+    }
     const drop = {
       id: `drop_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
       user: dropData.user || this.data.user.nombre_usuario,
@@ -322,21 +352,48 @@ class StorageServiceClass {
 
   // --- ADMIN & SETTINGS ---
   getAdminSettings() {
+    if (!this.data) return null;
     return { ...this.data.adminSettings };
   }
 
   updateAdminSettings(newSettings) {
+    if (!this.data) return null;
     this.data.adminSettings = { ...this.data.adminSettings, ...newSettings };
     this.persistAndNotify();
     return this.data.adminSettings;
   }
 
-  // Reset tool
+  // Reset tool - clears everything
   resetAll() {
     localStorage.removeItem(STORAGE_KEY);
-    this.data = this.loadInitialData();
+    this.data = null;
+    this.persistAndNotify();
+  }
+
+  // Check if there's actual user data stored (not just defaults)
+  hasSession() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return false;
+      const parsed = JSON.parse(raw);
+      // If we have a token or the user is not the default guest, we have a session
+      const token = localStorage.getItem("token");
+      if (token) return true;
+      if (parsed.user && parsed.user.email !== "guest@skinmarket.es") return true;
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
+  // Destroy session data - used by logout
+  destroySession() {
+    localStorage.removeItem("token");
+    localStorage.removeItem(STORAGE_KEY);
+    this.data = null;
     this.persistAndNotify();
   }
 }
 
 export const StorageService = new StorageServiceClass();
+

@@ -1,4 +1,4 @@
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import { useState } from "react";
 import { FaTrophy, FaShoppingBag, FaUser, FaSignOutAlt, FaPlus, FaFire, FaVolumeUp, FaVolumeMute } from "react-icons/fa";
@@ -22,7 +22,6 @@ const ICON_LINKS = [
 
 export default function Navbar() {
   const { user, logout } = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
   const [rechargeOpen, setRechargeOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -31,8 +30,7 @@ export default function Navbar() {
   // Audio activation handled globally in main.jsx — no duplicate listeners needed here
 
   const handleLogout = () => {
-    logout();
-    navigate("/");
+    logout(); // logout() now handles redirect internally
   };
 
   const handleToggleMute = () => {
