@@ -1,19 +1,41 @@
 // src/context/AuthContext.jsx
 import { createContext, useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { StorageService } from "../services/StorageService";
 
 export const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => StorageService.getUser());
-  const [inventory, setInventory] = useState(() => StorageService.getInventory());
+  const navigate = useNavigate();
+
+  // FIX: In incognito/clean tab, user should be null (not a default guest)
+  // Only set user from StorageService if there's an actual stored session
+  const [user, setUser] = useState(() => {
+    if (StorageService.hasSession()) {
+      return StorageService.getUser();
+    }
+    return null;
+  });
+  const [inventory, setInventory] = useState(() => {
+    if (StorageService.hasSession()) {
+      return StorageService.getInventory();
+    }
+    return [];
+  });
+  const [token, setToken] = useState(() => localStorage.getItem("token") || null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     // Subscribe to StorageService state changes
     const unsubscribe = StorageService.subscribe((data) => {
-      setUser(data.user);
-      setInventory(data.inventory);
+      if (data) {
+        setUser(data.user);
+        setInventory(data.inventory);
+      } else {
+        // Data was cleared (e.g., after logout)
+        setUser(null);
+        setInventory([]);
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -34,6 +56,7 @@ export function AuthProvider({ children }) {
             const data = await response.json();
             // Store JWT in localStorage
             localStorage.setItem("token", data.token);
+            setToken(data.token);
             // Sync user data with StorageService
             StorageService.updateUser({
               ...data.user,
@@ -55,11 +78,12 @@ export function AuthProvider({ children }) {
       // Fallback: simulated local login (for guest or when backend is down)
       const currentUser = StorageService.getUser();
       const updatedUser = StorageService.updateUser({
-        email: email || currentUser.email,
-        nombre_usuario: email ? email.split("@")[0] : currentUser.nombre_usuario
+        email: email || currentUser?.email || "guest@skinmarket.es",
+        nombre_usuario: email ? email.split("@")[0] : currentUser?.nombre_usuario || "Invitado"
       });
       // Remove any stale token on local fallback
       localStorage.removeItem("token");
+      setToken(null);
       console.log('🔑 [LOGIN] Local fallback (no JWT token stored)');
       return updatedUser;
     } finally {
@@ -83,6 +107,7 @@ export function AuthProvider({ children }) {
             const data = await response.json();
             // Store JWT in localStorage
             localStorage.setItem("token", data.token);
+            setToken(data.token);
             // Sync user data with StorageService
             StorageService.updateUser({
               ...data.user,
@@ -108,6 +133,7 @@ export function AuthProvider({ children }) {
       });
       // Remove any stale token on local fallback
       localStorage.removeItem("token");
+      setToken(null);
       console.log('🔑 [REGISTER] Local fallback (no JWT token stored)');
       return updatedUser;
     } finally {
@@ -115,19 +141,36 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  // FIX: Complete logout that clears everything and redirects
   const logout = useCallback(() => {
-    StorageService.updateUser({
-      nombre_usuario: "Invitado",
-      email: "guest@skinmarket.es"
-    });
-  }, []);
+    // 1. Destroy all session data from StorageService
+    StorageService.destroySession();
+
+    // 2. Clear any remaining localStorage keys
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+
+    // 3. Reset React state
+    setUser(null);
+    setToken(null);
+    setInventory([]);
+
+    // 4. Redirect to home
+    navigate("/");
+
+    console.log('🔓 [LOGOUT] Session cleaned and redirected to home');
+  }, [navigate]);
 
   const updateUser = useCallback((updatedUserOrFn) => {
     StorageService.updateUser(updatedUserOrFn);
   }, []);
 
   const fetchInventory = useCallback(() => {
-    setInventory(StorageService.getInventory());
+    if (StorageService.hasSession()) {
+      setInventory(StorageService.getInventory());
+    } else {
+      setInventory([]);
+    }
   }, []);
 
   const sellSkin = useCallback(async (skinId) => {
@@ -277,6 +320,9 @@ export function AuthProvider({ children }) {
 
   const claimDaily = useCallback(() => {
     const currentUser = StorageService.getUser();
+    if (!currentUser) {
+      return { success: false, error: "Debes iniciar sesión para reclamar la recompensa diaria." };
+    }
     const now = new Date();
     const lastClaim = currentUser.ultimo_reclamo_diario ? new Date(currentUser.ultimo_reclamo_diario) : null;
 
@@ -349,3 +395,4 @@ export function AuthProvider({ children }) {
     </AuthContext.Provider>
   );
 }
+
