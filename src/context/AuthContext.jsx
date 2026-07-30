@@ -18,28 +18,97 @@ export function AuthProvider({ children }) {
     return () => unsubscribe();
   }, []);
 
-  const login = useCallback(async (email) => {
-    // Simulated local login
+  const login = useCallback(async (email, password) => {
     setLoading(true);
     try {
+      // Try backend login first to get a real JWT
+      const API = import.meta.env.VITE_API_URL || "";
+      if (password) {
+        try {
+          const response = await fetch(`${API}/api/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password })
+          });
+          if (response.ok) {
+            const data = await response.json();
+            // Store JWT in localStorage
+            localStorage.setItem("token", data.token);
+            // Sync user data with StorageService
+            StorageService.updateUser({
+              ...data.user,
+              nombre_usuario: data.user.nombre_usuario,
+              email: data.user.email,
+              saldo: data.user.saldo,
+              balance: data.user.saldo,
+              nivel: data.user.nivel || 0,
+              experiencia: data.user.experiencia || 0
+            });
+            console.log('🔑 [LOGIN] Token JWT obtained from backend and stored');
+            return data.user;
+          }
+        } catch (err) {
+          console.warn('[LOGIN] Backend unavailable, falling back to local:', err.message);
+        }
+      }
+
+      // Fallback: simulated local login (for guest or when backend is down)
       const currentUser = StorageService.getUser();
       const updatedUser = StorageService.updateUser({
         email: email || currentUser.email,
         nombre_usuario: email ? email.split("@")[0] : currentUser.nombre_usuario
       });
+      // Remove any stale token on local fallback
+      localStorage.removeItem("token");
+      console.log('🔑 [LOGIN] Local fallback (no JWT token stored)');
       return updatedUser;
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const register = useCallback(async (nombre_usuario, email) => {
+  const register = useCallback(async (nombre_usuario, email, password) => {
     setLoading(true);
     try {
+      // Try backend register first to get a real JWT
+      const API = import.meta.env.VITE_API_URL || "";
+      if (password) {
+        try {
+          const response = await fetch(`${API}/api/register`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ nombre_usuario, email, password })
+          });
+          if (response.ok) {
+            const data = await response.json();
+            // Store JWT in localStorage
+            localStorage.setItem("token", data.token);
+            // Sync user data with StorageService
+            StorageService.updateUser({
+              ...data.user,
+              nombre_usuario: data.user.nombre_usuario,
+              email: data.user.email,
+              saldo: data.user.saldo,
+              balance: data.user.saldo,
+              nivel: data.user.nivel || 0,
+              experiencia: data.user.experiencia || 0
+            });
+            console.log('🔑 [REGISTER] Token JWT obtained from backend and stored');
+            return data.user;
+          }
+        } catch (err) {
+          console.warn('[REGISTER] Backend unavailable, falling back to local:', err.message);
+        }
+      }
+
+      // Fallback: simulated local register
       const updatedUser = StorageService.updateUser({
         nombre_usuario,
         email
       });
+      // Remove any stale token on local fallback
+      localStorage.removeItem("token");
+      console.log('🔑 [REGISTER] Local fallback (no JWT token stored)');
       return updatedUser;
     } finally {
       setLoading(false);
@@ -112,7 +181,19 @@ export function AuthProvider({ children }) {
   }, []);
 
   const withdrawSkin = useCallback(async (skinId) => {
-    const token = localStorage.getItem("token");
+    // Get token from multiple possible sources
+    let token = localStorage.getItem("token");
+    // Fallback: try getting token from StorageService (skinmarket_db_v1.user.token)
+    if (!token) {
+      try {
+        const raw = localStorage.getItem("skinmarket_db_v1");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          token = parsed?.user?.token || null;
+        }
+      } catch (e) {}
+    }
+    console.log('🔑 [TOKEN CHECK]', token ? 'Token presente' : 'TOKEN MISSING');
     if (token) {
       try {
         const API = import.meta.env.VITE_API_URL || "";

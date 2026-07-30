@@ -287,9 +287,22 @@ const authenticateToken = (req, res, next) => {
   if (req.isAuthenticated()) return next();
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
-  if (!token) return res.status(401).json({ error: "No autorizado" });
+  if (!token) {
+    return res.status(401).json({
+      success: false,
+      error: 'TOKEN_MISSING',
+      message: 'No autorizado. Debes iniciar sesión para acceder a este recurso.'
+    });
+  }
   jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ error: "Token inválido o expirado" });
+    if (err) {
+      const isExpired = err.name === 'TokenExpiredError';
+      return res.status(401).json({
+        success: false,
+        error: isExpired ? 'TOKEN_EXPIRED' : 'TOKEN_INVALID',
+        message: isExpired ? 'Sesión expirada. Vuelve a iniciar sesión.' : 'Token inválido. Vuelve a iniciar sesión.'
+      });
+    }
     req.user = user;
     next();
   });

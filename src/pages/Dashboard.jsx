@@ -10,6 +10,10 @@ import { useToast } from "../components/Toast";
 const API_BASE = import.meta.env.VITE_API_URL || "";
 
 function getAuthToken() {
+  // First try the direct token key (set by AuthContext on real login)
+  const directToken = localStorage.getItem("token");
+  if (directToken) return directToken;
+  // Fallback: try getting token from StorageService (skinmarket_db_v1.user.token)
   try {
     const raw = localStorage.getItem("skinmarket_db_v1");
     if (raw) {
@@ -467,6 +471,7 @@ export default function Dashboard() {
                             return;
                           }
 
+                          console.log('🔑 [TOKEN CHECK]', token ? 'Token presente' : 'TOKEN MISSING');
                           console.log('🚀 [FRONTEND] Enviando petición de retiro real a la API...');
                           const res = await fetch(`${API_BASE}/api/inventory/withdraw`, {
                             method: "POST",
