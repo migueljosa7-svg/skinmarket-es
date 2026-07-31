@@ -9,7 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { useFetchSkins } from "../hooks/useFetchSkins";
 import { useAuth } from "../context/useAuth";
 import { useToast } from "../components/Toast";
-import { AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Search, Gift, ChevronDown, ChevronUp, Grid3X3, Layers, Star, Zap, Award, Heart, Eye, EyeOff, Flame, Sparkles, Shield, Sword, Gem, Skull, Gamepad2, Ticket, Crosshair, Crown, ShoppingBag, Coins, Users } from "lucide-react";
 import { FiGrid, FiLayers, FiStar, FiZap, FiAward, FiSearch, FiChevronDown, FiGift, FiEye, FiEyeOff, FiHeart } from "react-icons/fi";
 import CaseCardRenderer from "../components/CaseCardRenderer";

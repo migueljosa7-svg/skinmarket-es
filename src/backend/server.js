@@ -241,6 +241,7 @@ app.use(session({
   cookie: {
     secure: process.env.NODE_ENV === "production",
     httpOnly: true,
+    sameSite: process.env.NODE_ENV === "production" ? "lax" : "lax",
     maxAge: 24 * 60 * 60 * 1000
   }
 }));
@@ -274,9 +275,12 @@ passport.deserializeUser((obj, done) => done(null, obj));
 
 if (process.env.STEAM_API_KEY) {
   try {
-      passport.use(new SteamStrategy({
-      returnUrl: `${BACKEND_URL}/api/auth/steam/return`,
-      realm: `${BACKEND_URL}/`,
+    const steamReturnURL = process.env.STEAM_RETURN_URL || `${BACKEND_URL}/api/auth/steam/return`;
+    const steamRealm = process.env.STEAM_REALM || (BACKEND_URL.endsWith('/') ? BACKEND_URL : `${BACKEND_URL}/`);
+
+    passport.use(new SteamStrategy({
+      returnURL: steamReturnURL,
+      realm: steamRealm,
       apiKey: process.env.STEAM_API_KEY
     }, async (identifier, profile, done) => {
       try {
@@ -310,9 +314,12 @@ if (process.env.STEAM_API_KEY) {
 
 // ─── GOOGLE OAUTH CLIENT ────────────────────────────
 // Initialize Google OAuth2 client for verifying Google ID tokens server-side.
-// Requires GOOGLE_CLIENT_ID env var. Falls back gracefully if not configured.
-const googleClient = process.env.GOOGLE_CLIENT_ID
-  ? new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
+// Requires GOOGLE_CLIENT_ID and optionally GOOGLE_CLIENT_SECRET env vars.
+const googleClientId = process.env.GOOGLE_CLIENT_ID;
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+const googleClient = googleClientId
+  ? new OAuth2Client(googleClientId, googleClientSecret)
   : null;
 
 if (googleClient) {
