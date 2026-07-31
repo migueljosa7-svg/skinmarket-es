@@ -17,7 +17,8 @@ const CONTAINER_BY_CATEGORY = {
   económica: CASE_CONTAINER_ECO,
   intermedia: CASE_CONTAINER_MID,
   premium: CASE_CONTAINER_PREMIUM,
-  limited: CASE_CONTAINER_COVERT
+  limited: CASE_CONTAINER_COVERT,
+  risk: CASE_CONTAINER_KNIFE
 };
 
 const getContainerForCase = (caseObj) => {
@@ -69,6 +70,15 @@ export const CASE_PROBABILITIES = {
     classified: 25,    // 25%
     covert: 12,        // 12%
     extraordinary: 8   // 8%
+  },
+  risk: {
+    // Risk Zone: high volatility — 75% RTP, extreme variance
+    // 50% chance of losing (mil-spec cheap), 30% mid, 15% good, 5% jackpot
+    mil_spec: 50,      // 50% — Cheap blues (€0.10 - €2)
+    restricted: 30,    // 30% — Purple (€2 - €15)
+    classified: 12,    // 12% — Pink (€15 - €60)
+    covert: 5,         // 5%  — Red (€60 - €300)
+    extraordinary: 3   // 3%  — Gold/Knife (€300+)
   }
 };
 
@@ -130,6 +140,22 @@ export const SKIN_CATALOGS = {
     ],
     priceRange: [50.00, 2500.00],
     avgPrice: 350.00
+  },
+  risk: {
+    // Risk Zone: high volatility — knives, gloves, or bust
+    weapons: ["AK-47", "AWP", "M4A4", "M4A1-S", "Desert Eagle", "USP-S", "Glock-18", "★ Karambit", "★ Butterfly Knife", "★ M9 Bayonet", "★ Talon Knife", "★ Flip Knife", "★ Shadow Daggers", "★ Specialist Gloves", "★ Sport Gloves", "★ Driver Gloves", "★ Hand Wraps"],
+    skins: [
+      "Asiimov", "Redline", "Vulcan", "Hyper Beast", "Neon Rider", "Dragon Lore", "Howl",
+      "Doppler", "Fade", "Marble Fade", "Crimson Web", "Case Hardened", "Tiger Tooth", "Lore",
+      "Gamma Doppler", "Autotronic", "Black Laminate", "Ultraviolet",
+      "Doppler Phase 2", "Doppler Phase 4", "Emerald", "Ruby", "Sapphire",
+      "Slaughter", "Night", "Damascus Steel", "Urban Masked",
+      "Pandora's Box", "King Snake", "Overprint", "Slingshot", "Hedge Maze",
+      "Chromatic Aberration", "Spider Lily", "Desolação", "Inheritance", "Contamination",
+      "Kill Confirmed", "Fever Dream", "Blue Gem", "Royal Paladin"
+    ],
+    priceRange: [0.50, 500.00],
+    avgPrice: 25.00
   }
 };
 
@@ -351,7 +377,7 @@ export const DAILY_CASES_BY_LEVEL = [
 
 // ─── Case Definitions with Professional Naming ───────────
 export const CASE_IMAGES = {
-  // Económicas — Temas profesionales CS2 style
+  // Económicas — Temas profesionales CS2 style (0.50€ - 2.50€)
   económica: [
     { name: "Starter Case", color: "#6366f1", bgGradient: "linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)", badge: "ECO", rtp: 90 },
     { name: "Crystal Vault", color: "#3b82f6", bgGradient: "linear-gradient(135deg, #1e293b 0%, #1e40af 100%)", badge: "ECO", rtp: 90 },
@@ -367,7 +393,7 @@ export const CASE_IMAGES = {
     { name: "Copper Wire", color: "#b45309", bgGradient: "linear-gradient(135deg, #451a03 0%, #78350f 100%)", badge: "ECO", rtp: 90 },
   ],
 
-  // Intermedias — Temas guerrero/táctico
+  // Intermedias — Temas guerrero/táctico (5.00€ - 25.00€)
   intermedia: [
     { name: "Sentinel Guardian", color: "#2563eb", bgGradient: "linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%)", badge: "MID", rtp: 88 },
     { name: "Warrior's Path", color: "#dc2626", bgGradient: "linear-gradient(135deg, #7f1d1d 0%, #dc2626 100%)", badge: "MID", rtp: 88 },
@@ -385,7 +411,7 @@ export const CASE_IMAGES = {
     { name: "Inferno Core", color: "#991b1b", bgGradient: "linear-gradient(135deg, #450a0a 0%, #ef4444 100%)", badge: "MID", rtp: 88 },
   ],
 
-  // Premium — Temas leyenda/infinito
+  // Premium — Temas leyenda/infinito (50.00€ - 300.00€)
   premium: [
     { name: "Elder Legends", color: "#b91c1c", bgGradient: "linear-gradient(135deg, #450a0a 0%, #b91c1c 100%)", badge: "PREMIUM", rtp: 85 },
     { name: "Mythical Dragon", color: "#7c3aed", bgGradient: "linear-gradient(135deg, #3b0764 0%, #7c3aed 100%)", badge: "PREMIUM", rtp: 85 },
@@ -401,7 +427,7 @@ export const CASE_IMAGES = {
     { name: "Omega Strike", color: "#701a75", bgGradient: "linear-gradient(135deg, #3b0764 0%, #701a75 100%)", badge: "PREMIUM", rtp: 85 },
   ],
 
-  // Limited — Temas únicos/coleccionista
+  // Limited — Temas únicos/coleccionista (50.00€ - 300.00€)
   limited: [
     { name: "Collector's Edition", color: "#10b981", bgGradient: "linear-gradient(135deg, #022c22 0%, #10b981 100%)", badge: "LIMITED", rtp: 82 },
     { name: "Diamond Jubilee", color: "#0ea5e9", bgGradient: "linear-gradient(135deg, #082f49 0%, #0ea5e9 100%)", badge: "LIMITED", rtp: 82 },
@@ -411,6 +437,18 @@ export const CASE_IMAGES = {
     { name: "Founders Box", color: "#1e40af", bgGradient: "linear-gradient(135deg, #172554 0%, #1e40af 100%)", badge: "LIMITED", rtp: 82 },
     { name: "Legacy Crate", color: "#78350f", bgGradient: "linear-gradient(135deg, #451a03 0%, #78350f 100%)", badge: "LIMITED", rtp: 82 },
     { name: "Time Capsule", color: "#1e1b4b", bgGradient: "linear-gradient(135deg, #0c0a1e 0%, #4338ca 100%)", badge: "LIMITED", rtp: 82 },
+  ],
+
+  // Risk Zone — Alta volatilidad (10.00€ - 150.00€)
+  risk: [
+    { name: "Russian Roulette", color: "#ef4444", bgGradient: "linear-gradient(135deg, #1a0000 0%, #dc2626 100%)", badge: "RISK", rtp: 75 },
+    { name: "All or Nothing", color: "#f97316", bgGradient: "linear-gradient(135deg, #1a0500 0%, #ea580c 100%)", badge: "RISK", rtp: 75 },
+    { name: "Double or Quits", color: "#eab308", bgGradient: "linear-gradient(135deg, #1a1200 0%, #ca8a04 100%)", badge: "RISK", rtp: 75 },
+    { name: "Chaos Theory", color: "#a855f7", bgGradient: "linear-gradient(135deg, #1a0030 0%, #9333ea 100%)", badge: "RISK", rtp: 75 },
+    { name: "Devil's Deal", color: "#dc2626", bgGradient: "linear-gradient(135deg, #2a0000 0%, #b91c1c 100%)", badge: "RISK", rtp: 75 },
+    { name: "Lucky Shot", color: "#f59e0b", bgGradient: "linear-gradient(135deg, #1a0a00 0%, #d97706 100%)", badge: "RISK", rtp: 75 },
+    { name: "Mortal Coil", color: "#7c3aed", bgGradient: "linear-gradient(135deg, #1a0030 0%, #7c3aed 100%)", badge: "RISK", rtp: 75 },
+    { name: "Last Stand", color: "#b91c1c", bgGradient: "linear-gradient(135deg, #1a0000 0%, #991b1b 100%)", badge: "RISK", rtp: 75 },
   ]
 };
 
@@ -463,7 +501,7 @@ const generatePreviewSkins = (caseObj, caseIndex, category) => {
 
     const rarities = ["Mil-Spec Grade", "Restricted", "Classified", "Covert"];
     const rarity = i === 0 ? rarities[Math.min(2 + Math.floor(seededRandom(i * 23 + caseIndex) * 2), 3)]
-                           : rarities[Math.min(Math.floor(seededRandom(i * 19 + caseIndex) * 2), 2)];
+      : rarities[Math.min(Math.floor(seededRandom(i * 19 + caseIndex) * 2), 2)];
 
     previews.push({
       id: `preview-${caseObj.id || `case-${caseIndex}`}-${i}`,
@@ -576,6 +614,28 @@ export const generateAllCases = () => {
     caseObj.image = getContainerForCase(caseObj);
     caseObj.imageSrc = caseObj.image;
     caseObj.previewSkins = generatePreviewSkins(caseObj, globalIndex++, "limited");
+    cases.push(caseObj);
+  });
+
+  // Risk Zone — High volatility (10.00€ - 150.00€)
+  const riskPrices = [10.00, 15.00, 20.00, 30.00, 50.00, 75.00, 100.00, 150.00];
+  CASE_IMAGES.risk.forEach((caseImg, idx) => {
+    const caseObj = {
+      id: `risk-${idx}`,
+      name: caseImg.name,
+      imageSrc: CASE_CONTAINER_KNIFE,
+      price: riskPrices[idx] || 20.00,
+      category: "risk",
+      color: caseImg.color,
+      bgGradient: caseImg.bgGradient,
+      rarity: "extraordinary",
+      image: CASE_CONTAINER_KNIFE,
+      rtp: 75,
+      badge: caseImg.badge || "RISK"
+    };
+    caseObj.image = getContainerForCase(caseObj);
+    caseObj.imageSrc = caseObj.image;
+    caseObj.previewSkins = generatePreviewSkins(caseObj, globalIndex++, "risk");
     cases.push(caseObj);
   });
 

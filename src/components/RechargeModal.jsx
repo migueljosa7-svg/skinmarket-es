@@ -3,14 +3,13 @@ import { useState } from "react";
 import { useAuth } from "../context/useAuth";
 import { useToast } from "./Toast";
 import { motion as Motion, AnimatePresence } from "framer-motion";
+import { QRCodeSVG } from "qrcode.react";
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
 
 function getAuthToken() {
-  // First try the direct token key (set by AuthContext on real login)
   const directToken = localStorage.getItem("token");
   if (directToken) return directToken;
-  // Fallback: try getting token from StorageService (skinmarket_db_v1.user.token)
   try {
     const raw = localStorage.getItem("skinmarket_db_v1");
     if (raw) {
@@ -33,8 +32,6 @@ async function callPaymentAPI(endpoint, body) {
   return data;
 }
 
-// ─── Payment method cards configuration ──────────────
-// Professional icons via SVG/emoji for each payment method
 const PAYMENT_METHODS = [
   {
     id: "CARD",
@@ -50,7 +47,7 @@ const PAYMENT_METHODS = [
         <rect x="5" y="16" width="4" height="1.5" rx="0.5" fill="#1a1f71" opacity="0.4" />
       </svg>
     ),
-    description: "Pago instantáneo con tarjeta de crédito/débito. Procesado de forma segura."
+    description: "Pago con tarjeta. El saldo se acredita tras confirmación del pago."
   },
   {
     id: "BTC",
@@ -77,7 +74,7 @@ const PAYMENT_METHODS = [
     color: "#26a17b",
     gradient: "linear-gradient(135deg, #26a17b 0%, #50c878 100%)",
     icon: <span style={{ fontSize: "1.3rem", fontWeight: "900" }}>₮</span>,
-    description: "Stablecoin USDT. Sin fluctuación. 1 USDT = 1€. Crédito tras confirmaciones."
+    description: "Stablecoin USDT. 1 USDT = 1€. Crédito tras confirmaciones."
   },
   {
     id: "PSC",
@@ -95,7 +92,7 @@ const PAYMENT_METHODS = [
     color: "#f5ac3b",
     gradient: "linear-gradient(135deg, #f5ac3b 0%, #ffba52 100%)",
     icon: <span style={{ fontSize: "1.3rem" }}>🎮</span>,
-    description: "Deposita skins de tu inventario de Steam como saldo. Evaluación automática."
+    description: "Deposita skins de tu inventario de Steam como saldo."
   },
   {
     id: "GIFT",
@@ -109,6 +106,8 @@ const PAYMENT_METHODS = [
 ];
 
 const QUICK_AMOUNTS = [5, 10, 25, 50, 100];
+const MIN_DEPOSIT = 5.0;
+const MAX_DEPOSIT = 1000.0;
 
 export default function RechargeModal({ open, onClose }) {
   const toast = useToast();
@@ -133,7 +132,8 @@ export default function RechargeModal({ open, onClose }) {
 
   const handleDeposit = async () => {
     if (!amountNum || amountNum <= 0) return toast.error("Introduce un monto válido");
-    if (amountNum < 1) return toast.error("El monto mínimo es €1.00");
+    if (amountNum < MIN_DEPOSIT) return toast.error(`El monto mínimo es €${MIN_DEPOSIT.toFixed(2)}`);
+    if (amountNum > MAX_DEPOSIT) return toast.error(`El monto máximo por transacción es €${MAX_DEPOSIT.toFixed(2)}`);
     setLoading(true);
 
     try {
@@ -155,22 +155,19 @@ export default function RechargeModal({ open, onClose }) {
           toast.error(result.error || "Error al generar dirección.");
         }
       } else {
-        // Card, Paysafecard, SkinPay — all go through the same charge endpoint
+        // SECURITY: Balance is ONLY credited via signed webhook from payment gateway.
+        // This creates a pending payment record — it does NOT add balance directly.
         const result = await callPaymentAPI("/api/payments/create-charge", {
           amount: amountNum, method: activeMethod.toLowerCase()
         });
         if (result.success) {
-          addToBalance(amountNum);
-          toast.success(`✅ €${amountNum.toFixed(2)} añadidos a tu saldo.`);
-          setTimeout(() => onClose(), 1000);
+          toast.success(`✅ Cargo de €${amountNum.toFixed(2)} creado. El saldo se acreditará tras confirmación del pago.`);
+          setTimeout(() => onClose(), 2000);
         } else {
-          addToBalance(amountNum);
-          toast.success(`💳 €${amountNum.toFixed(2)} añadidos a tu saldo.`);
-          setTimeout(() => onClose(), 1000);
+          toast.error(result.error || "Error al crear el cargo de pago.");
         }
       }
     } catch (err) {
-      // Fallback for when backend is unavailable
       if (isCrypto) {
         const fallbackAddresses = {
           BTC: "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
@@ -186,9 +183,7 @@ export default function RechargeModal({ open, onClose }) {
         });
         setShowPaymentModal(true);
       } else {
-        addToBalance(amountNum);
-        toast.success(`✅ €${amountNum.toFixed(2)} añadidos a tu saldo.`);
-        setTimeout(() => onClose(), 1000);
+        toast.error("❌ Servicio de pagos no disponible. Intenta de nuevo más tarde.");
       }
     }
     setLoading(false);
@@ -212,16 +207,8 @@ export default function RechargeModal({ open, onClose }) {
         toast.error(result.error || "Código no válido");
       }
     } catch (err) {
-      const codes = { SKINMARKET: 100, ESPAÑA: 50, START: 25, BIENVENIDO: 10 };
-      const val = codes[code];
-      if (val) {
-        addToBalance(val);
-        toast.success(`🎁 Código ${code}: +€${val.toFixed(2)}`);
-        setGiftCode("");
-        setTimeout(() => onClose(), 1000);
-      } else {
-        toast.error("Código no válido");
-      }
+      // Gift codes can ONLY be redeemed via backend validation (single-use enforcement)
+      toast.error("❌ Servicio de canje no disponible. Intenta de nuevo más tarde.");
     }
     setLoading(false);
   };
@@ -252,7 +239,6 @@ export default function RechargeModal({ open, onClose }) {
             boxShadow: "0 24px 80px rgba(0,0,0,0.9)"
           }}
         >
-          {/* Header with gradient accent */}
           <div style={{
             padding: "28px 32px",
             borderBottom: "1px solid rgba(255,255,255,0.05)",
@@ -285,7 +271,6 @@ export default function RechargeModal({ open, onClose }) {
             >✕</button>
           </div>
 
-          {/* Payment Method Cards Grid */}
           <div style={{ padding: "24px 32px 12px" }}>
             <div style={{
               display: "grid",
@@ -343,7 +328,6 @@ export default function RechargeModal({ open, onClose }) {
             </div>
           </div>
 
-          {/* Amount Selection + Details */}
           <div style={{ padding: "16px 32px 24px" }}>
             {!isGift ? (
               <>
@@ -352,7 +336,6 @@ export default function RechargeModal({ open, onClose }) {
                   display: "block", marginBottom: "10px", textTransform: "uppercase", letterSpacing: "1px"
                 }}>Cantidad (EUR)</label>
 
-                {/* Quick amount selector */}
                 <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
                   {QUICK_AMOUNTS.map(v => (
                     <button
@@ -370,7 +353,6 @@ export default function RechargeModal({ open, onClose }) {
                   ))}
                 </div>
 
-                {/* Custom amount input */}
                 <div style={{ position: "relative", marginBottom: "16px" }}>
                   <span style={{
                     position: "absolute", left: "16px", top: "50%", transform: "translateY(-50%)",
@@ -381,7 +363,8 @@ export default function RechargeModal({ open, onClose }) {
                     value={amount}
                     onChange={e => setAmount(e.target.value)}
                     placeholder="Otro importe"
-                    min="1"
+                    min={MIN_DEPOSIT}
+                    max={MAX_DEPOSIT}
                     style={{
                       width: "100%", padding: "14px 14px 14px 36px", borderRadius: "12px",
                       background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.08)",
@@ -391,7 +374,25 @@ export default function RechargeModal({ open, onClose }) {
                   />
                 </div>
 
-                {/* Method description */}
+                {/* ─── DEPOSIT LIMITS DISPLAY ─────────────── */}
+                <div style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "16px",
+                  padding: "10px 16px",
+                  borderRadius: "12px",
+                  background: "rgba(255,255,255,0.02)",
+                  border: "1px solid rgba(255,255,255,0.04)"
+                }}>
+                  <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.4)" }}>
+                    <span style={{ fontWeight: 700, color: "#10b981" }}>Mín: €{MIN_DEPOSIT.toFixed(2)}</span>
+                  </div>
+                  <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.4)" }}>
+                    <span style={{ fontWeight: 700, color: "#f5ac3b" }}>Máx: €{MAX_DEPOSIT.toFixed(2)}</span>
+                  </div>
+                </div>
+
                 <div style={{
                   padding: "14px 16px", borderRadius: "12px",
                   background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)",
@@ -401,7 +402,6 @@ export default function RechargeModal({ open, onClose }) {
                   <span style={{ color: method.color, fontWeight: 700 }}>{method.name}</span> — {method.description}
                 </div>
 
-                {/* Deposit button */}
                 <Motion.button
                   whileHover={{ scale: loading ? 1 : 1.02 }}
                   whileTap={{ scale: loading ? 1 : 0.98 }}
@@ -410,7 +410,7 @@ export default function RechargeModal({ open, onClose }) {
                   style={{
                     width: "100%", padding: "16px", borderRadius: "14px",
                     background: loading ? `${method.color}55` : method.gradient,
-                    color: isCard || isPsc || isSkinPay ? "white" : "white",
+                    color: "white",
                     border: "none", fontWeight: 900, fontSize: "1rem",
                     cursor: loading ? "not-allowed" : "pointer",
                     display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
@@ -428,7 +428,6 @@ export default function RechargeModal({ open, onClose }) {
               </>
             ) : (
               <>
-                {/* Gift Card / Promo Code section */}
                 <div style={{
                   padding: "20px", borderRadius: "16px",
                   background: "rgba(236,72,153,0.05)", border: "1px solid rgba(236,72,153,0.15)",
@@ -463,24 +462,13 @@ export default function RechargeModal({ open, onClose }) {
                       {loading ? "..." : "Canjear"}
                     </button>
                   </div>
-                  <div style={{ marginTop: "12px", display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                    <span style={{ color: "rgba(255,255,255,0.3)", fontSize: "0.7rem" }}>Códigos de prueba:</span>
-                    {["SKINMARKET (+€100)", "ESPAÑA (+€50)", "START (+€25)", "BIENVENIDO (+€10)"].map(c => (
-                      <span
-                        key={c}
-                        onClick={() => setGiftCode(c.split(" ")[0])}
-                        style={{
-                          color: "#ec4899", fontSize: "0.7rem", cursor: "pointer",
-                          textDecoration: "underline", fontWeight: 600
-                        }}
-                      >{c}</span>
-                    ))}
+                  <div style={{ marginTop: "8px", fontSize: "0.7rem", color: "rgba(255,255,255,0.3)", textAlign: "center" }}>
+                    Los códigos solo pueden canjearse una vez por usuario.
                   </div>
                 </div>
               </>
             )}
 
-            {/* Security badge */}
             <div style={{
               display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
               marginTop: "16px", fontSize: "0.7rem", color: "rgba(255,255,255,0.25)"
@@ -494,7 +482,7 @@ export default function RechargeModal({ open, onClose }) {
         </Motion.div>
       </Motion.div>
 
-      {/* Crypto Payment Modal (shows address + QR-like info) */}
+      {/* ─── CRYPTO PAYMENT MODAL WITH QR CODE ─────────────── */}
       <AnimatePresence>
         {showPaymentModal && paymentInfo && (
           <Motion.div
@@ -531,6 +519,24 @@ export default function RechargeModal({ open, onClose }) {
               <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.85rem", marginBottom: "24px" }}>
                 Envía exactamente <strong style={{ color: "#f5ac3b" }}>{paymentInfo.coinAmount} {paymentInfo.coin}</strong> (€{paymentInfo.amount.toFixed(2)}) a:
               </p>
+
+              {/* ─── QR CODE ─────────────────────────────── */}
+              <div style={{
+                background: "white",
+                borderRadius: "16px",
+                padding: "16px",
+                marginBottom: "20px",
+                display: "inline-block"
+              }}>
+                <QRCodeSVG
+                  value={paymentInfo.address}
+                  size={180}
+                  bgColor="#ffffff"
+                  fgColor="#000000"
+                  level="M"
+                  includeMargin={false}
+                />
+              </div>
 
               <div style={{
                 background: "rgba(0,0,0,0.4)", borderRadius: "14px", padding: "20px",
@@ -582,9 +588,20 @@ export default function RechargeModal({ open, onClose }) {
                 }}
               >CERRAR</button>
 
-              <p style={{ color: "rgba(255,255,255,0.25)", fontSize: "0.7rem", marginTop: "16px" }}>
-                El saldo se acreditará automáticamente tras las confirmaciones de red requeridas.
-              </p>
+              {/* ─── BLOCKCHAIN CONFIRMATION TEXT ─────────── */}
+              <div style={{
+                marginTop: "16px",
+                padding: "12px 16px",
+                borderRadius: "12px",
+                background: "rgba(245,172,59,0.05)",
+                border: "1px solid rgba(245,172,59,0.1)"
+              }}>
+                <p style={{ color: "rgba(255,255,255,0.5)", fontSize: "0.7rem", margin: 0, lineHeight: 1.5 }}>
+                  <strong style={{ color: "#f5ac3b" }}>Depósito Mínimo: €{MIN_DEPOSIT.toFixed(2)} / Depósito Máximo: €{MAX_DEPOSIT.toFixed(2)}</strong>
+                  <br /><br />
+                  El saldo se acreditará automáticamente tras la confirmación de la transacción en la red blockchain (1-3 confirmaciones).
+                </p>
+              </div>
             </Motion.div>
           </Motion.div>
         )}

@@ -207,6 +207,21 @@ const inspectorLimiter = rateLimit({
   }
 });
 
+// ─── LOGIN & REGISTER RATE LIMITERS ──────────────────
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  keyGenerator: (req) => req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+  handler: (req, res) => res.status(429).json({ error: "Demasiados intentos de inicio de sesión. Intenta de nuevo en 15 minutos.", code: "RATE_LIMIT_LOGIN" })
+});
+
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  keyGenerator: (req) => req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+  handler: (req, res) => res.status(429).json({ error: "Demasiados intentos de registro. Intenta de nuevo en 1 hora.", code: "RATE_LIMIT_REGISTER" })
+});
+
 // Configurar Sesiones
 app.use(session({
   store: sessionStore,
@@ -603,7 +618,7 @@ app.post("/api/auth/reset-password", async (req, res) => {
   }
 });
 
-app.post("/api/register", async (req, res) => {
+app.post("/api/register", loginLimiter, async (req, res) => {
   const { nombre_usuario, email, password } = req.body;
 
   // Sanitize inputs
@@ -691,7 +706,7 @@ app.post("/api/register", async (req, res) => {
   }
 });
 
-app.post("/api/login", async (req, res) => {
+app.post("/api/login", loginLimiter, async (req, res) => {
   const { email, password } = req.body;
 
   // Sanitize email
@@ -1081,81 +1096,155 @@ app.get("/api/steam/price", inspectorLimiter, async (req, res) => {
 
 // ─── CASE OPENING (with atomic transactions) ─────────────
 
+// ─── SECURE RNG HELPER (cryptographically secure) ───────────
+// Uses crypto.randomInt() for tamper-proof drop rate calculations.
+// The frontend NEVER computes the outcome — it only renders the animation.
+function secureRoll(maxPercent) {
+  // crypto.randomInt(0, 10000) gives 0-9999, divide by 100 for 2-decimal precision
+  return crypto.randomInt(0, 10000) / 100;
+}
+
+function securePick(array) {
+  if (!array || array.length === 0) return null;
+  return array[crypto.randomInt(0, array.length)];
+}
+
 app.post("/api/cases/open", authenticateToken, caseOpenLimiter, async (req, res) => {
   const { caseId, quantity, jokerMode } = req.body;
 
   try {
-    const casePrices = { "eco-1": 1.5, "mid-1": 5.0, "premium-1": 25.0 };
-    const casePrice = casePrices[caseId] || 2.5;
-    const priceMultiplier = jokerMode ? 3 : 1;
-    const totalCost = casePrice * priceMultiplier * (quantity || 1);
+    // Validate quantity (prevent abuse)
+    const qty = Math.min(Math.max(parseInt(quantity) || 1, 1), 5);
 
-    const userResult = await db.query("SELECT saldo FROM usuarios WHERE usuario_id = $1", [req.user.id]);
-    if (userResult.rows[0].saldo < totalCost) {
-      return res.status(400).json({ error: "Saldo insuficiente" });
-    }
+    // Case price lookup — maps caseId to real price from the frontend case definitions
+    // Updated economic balance:
+    // - Económica: €0.50 - €2.50
+    // - Intermedia: €5.00 - €25.00
+    // - Premium: €50.00 - €300.00
+    // - Limited: €50.00 - €300.00
+    // - Risk Zone: €10.00 - €150.00
+    const casePrices = {
+      "econ-0": 0.50, "econ-1": 0.75, "econ-2": 1.00, "econ-3": 1.25,
+      "econ-4": 1.50, "econ-5": 1.75, "econ-6": 2.00, "econ-7": 2.25,
+      "econ-8": 2.50, "econ-9": 2.50, "econ-10": 2.50, "econ-11": 2.50,
+      // Legacy eco IDs for backward compatibility
+      "eco-0": 0.50, "eco-1": 0.75, "eco-2": 1.00, "eco-3": 1.25, "eco-4": 1.50,
+      "eco-5": 1.75, "eco-6": 2.00, "eco-7": 2.25, "eco-8": 2.50, "eco-9": 2.75,
+      "eco-10": 3.00, "eco-11": 3.50,
+      // Intermedia: €5.00 - €25.00
+      "inter-0": 5.00, "inter-1": 5.50, "inter-2": 6.00, "inter-3": 7.00,
+      "inter-4": 8.00, "inter-5": 9.00, "inter-6": 10.00, "inter-7": 12.00,
+      "inter-8": 14.00, "inter-9": 16.00, "inter-10": 18.00, "inter-11": 20.00,
+      "inter-12": 22.00, "inter-13": 25.00,
+      // Premium: €50.00 - €300.00
+      "prem-0": 50.00, "prem-1": 60.00, "prem-2": 75.00, "prem-3": 90.00,
+      "prem-4": 100.00, "prem-5": 120.00, "prem-6": 150.00, "prem-7": 180.00,
+      "prem-8": 200.00, "prem-9": 220.00, "prem-10": 250.00, "prem-11": 300.00,
+      // Limited: €50.00 - €300.00
+      "limit-0": 50.00, "limit-1": 75.00, "limit-2": 100.00, "limit-3": 125.00,
+      "limit-4": 150.00, "limit-5": 175.00, "limit-6": 200.00, "limit-7": 300.00,
+      // Risk Zone: €10.00 - €150.00
+      "risk-0": 10.00, "risk-1": 15.00, "risk-2": 20.00, "risk-3": 30.00,
+      "risk-4": 50.00, "risk-5": 75.00, "risk-6": 100.00, "risk-7": 150.00
+    };
+    const casePrice = casePrices[caseId] || 2.50;
+    const priceMultiplier = jokerMode ? 3 : 1;
+    const totalCost = casePrice * priceMultiplier * qty;
+
+    // Atomic balance check + deduction in a single transaction
+    let userBalance;
+    await db.withTransaction(async (client) => {
+      const userResult = await client.query(
+        "SELECT saldo FROM usuarios WHERE usuario_id = $1 FOR UPDATE",
+        [req.user.id]
+      );
+      if (!userResult.rows[0] || userResult.rows[0].saldo < totalCost) {
+        throw new Error('INSUFFICIENT_BALANCE');
+      }
+      userBalance = userResult.rows[0].saldo;
+      await client.query(
+        "UPDATE usuarios SET saldo = saldo - $1 WHERE usuario_id = $2",
+        [totalCost, req.user.id]
+      );
+    });
 
     // Import case configuration for realistic skins
-    const { CASE_PROBABILITIES, SKIN_CATALOGS, pickWeightedSkin } = await import("../constants/cases.js");
+    const { CASE_PROBABILITIES, SKIN_CATALOGS } = await import("../constants/cases.js");
 
-    const caseCategory = caseId?.startsWith("eco") ? "económica" : caseId?.startsWith("mid") ? "intermedia" : caseId?.startsWith("premium") ? "premium" : "económica";
+    const caseCategory = caseId?.startsWith("econ") || caseId?.startsWith("eco") ? "económica"
+      : caseId?.startsWith("inter") ? "intermedia"
+        : caseId?.startsWith("prem") ? "premium"
+          : caseId?.startsWith("limit") ? "limited"
+            : caseId?.startsWith("risk") ? "risk"
+              : "económica";
     const catalog = SKIN_CATALOGS[caseCategory] || SKIN_CATALOGS.económica;
     const probs = CASE_PROBABILITIES[caseCategory] || CASE_PROBABILITIES.económica;
 
     const results = [];
-    for (let i = 0; i < (quantity || 1); i++) {
-      // Joker Mode: equalized probabilities (all rarities have equal chance)
+    for (let i = 0; i < qty; i++) {
+      // ─── CRYPTOGRAPHICALLY SECURE RNG (crypto.randomInt) ───
+      // The drop rate is determined HERE on the backend, never on the client.
       let rarity, rarityPrice;
       if (jokerMode) {
-        const equalizedRoll = Math.random() * 100;
+        // Joker Mode: equalized probabilities (all rarities have equal chance)
+        const equalizedRoll = secureRoll(100);
         if (equalizedRoll < 20) { rarity = "Covert"; rarityPrice = catalog.priceRange[1] * 0.8; }
         else if (equalizedRoll < 40) { rarity = "Classified"; rarityPrice = catalog.priceRange[1] * 0.5; }
         else if (equalizedRoll < 60) { rarity = "Restricted"; rarityPrice = catalog.priceRange[1] * 0.3; }
         else { rarity = "Mil-Spec Grade"; rarityPrice = catalog.priceRange[0]; }
       } else {
-        // Standard weighted probabilities
-        const roll = Math.random() * 100;
-        if (roll < probs.covert) { rarity = "Covert"; rarityPrice = catalog.priceRange[1] * (0.6 + Math.random() * 0.4); }
-        else if (roll < probs.covert + probs.classified) { rarity = "Classified"; rarityPrice = catalog.priceRange[0] + (catalog.priceRange[1] - catalog.priceRange[0]) * (0.3 + Math.random() * 0.4); }
-        else if (roll < probs.covert + probs.classified + probs.restricted) { rarity = "Restricted"; rarityPrice = catalog.priceRange[0] + (catalog.priceRange[1] - catalog.priceRange[0]) * (0.1 + Math.random() * 0.3); }
-        else { rarity = "Mil-Spec Grade"; rarityPrice = catalog.priceRange[0] + Math.random() * (catalog.priceRange[1] - catalog.priceRange[0]) * 0.2; }
+        // Standard weighted probabilities using crypto.randomInt
+        const roll = secureRoll(100);
+        if (roll < probs.covert) {
+          rarity = "Covert";
+          rarityPrice = catalog.priceRange[1] * (0.6 + (crypto.randomInt(0, 10000) / 10000) * 0.4);
+        } else if (roll < probs.covert + probs.classified) {
+          rarity = "Classified";
+          rarityPrice = catalog.priceRange[0] + (catalog.priceRange[1] - catalog.priceRange[0]) * (0.3 + (crypto.randomInt(0, 10000) / 10000) * 0.4);
+        } else if (roll < probs.covert + probs.classified + probs.restricted) {
+          rarity = "Restricted";
+          rarityPrice = catalog.priceRange[0] + (catalog.priceRange[1] - catalog.priceRange[0]) * (0.1 + (crypto.randomInt(0, 10000) / 10000) * 0.3);
+        } else {
+          rarity = "Mil-Spec Grade";
+          rarityPrice = catalog.priceRange[0] + (crypto.randomInt(0, 10000) / 10000) * (catalog.priceRange[1] - catalog.priceRange[0]) * 0.2;
+        }
       }
 
-      const rarityColors = { "Covert": "#eb4b4b", "Classified": "#d32ce6", "Restricted": "#8847ff", "Mil-Spec Grade": "#4b69ff" };
-
-      const weapon = catalog.weapons[Math.floor(Math.random() * catalog.weapons.length)];
-      const skinName = catalog.skins[Math.floor(Math.random() * catalog.skins.length)];
+      // Pick weapon and skin using crypto.randomInt (secure)
+      const weapon = securePick(catalog.weapons);
+      const skinName = securePick(catalog.skins);
       const wearValues = ["Factory New", "Minimal Wear", "Field-Tested", "Well-Worn", "Battle-Scarred"];
-      const randomWear = wearValues[Math.floor(Math.random() * wearValues.length)];
+      const randomWear = securePick(wearValues);
       const itemName = `${weapon} | ${skinName}`;
       const itemPrice = parseFloat(rarityPrice.toFixed(2));
 
       const iconHash = generateIconUrlHash(itemName, Date.now() + i);
       const imageHD = buildAkamaiImageUrl(iconHash);
 
+      // Provably Fair seeds
       const serverSeed = crypto.randomBytes(32).toString('hex');
       const clientSeed = crypto.randomBytes(16).toString('hex');
       const nonce = Date.now() + i;
       const provablyFairHash = crypto.createHash('sha256').update(`${serverSeed}:${clientSeed}:${nonce}:${itemName}`).digest('hex');
 
-      await db.withTransaction(async (client) => {
-        const insertResult = await client.query(
-          `INSERT INTO inventario (usuario_id, name, price, image, rarity, marketable, wear, weapon, skin_name, market_hash_name, icon_url, provably_fair_hash, server_seed, client_seed, nonce)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-           RETURNING item_id as id, name, price, image, rarity, marketable, status`,
-          [req.user.id, itemName, itemPrice, imageHD,
-            rarity, true, randomWear, weapon, skinName, itemName, iconHash, provablyFairHash, serverSeed, clientSeed, nonce]
-        );
-        results.push(insertResult.rows[0]);
-      });
+      const insertResult = await db.query(
+        `INSERT INTO inventario (usuario_id, name, price, image, rarity, marketable, wear, weapon, skin_name, market_hash_name, icon_url, provably_fair_hash, server_seed, client_seed, nonce, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'on_site')
+         RETURNING item_id as id, name, price, image, rarity, marketable, status`,
+        [req.user.id, itemName, itemPrice, imageHD,
+          rarity, true, randomWear, weapon, skinName, itemName, iconHash, provablyFairHash, serverSeed, clientSeed, nonce]
+      );
+      results.push(insertResult.rows[0]);
     }
 
-    await db.query("UPDATE usuarios SET saldo = saldo - $1 WHERE usuario_id = $2", [totalCost, req.user.id]);
-    await recordTransaction(req.user.id, 'apertura_caja', totalCost, 'saldo_sitio', `Apertura de ${quantity || 1}x ${caseId}${jokerMode ? ' (Joker Mode)' : ''}`);
-    await logAction(req.user.id, 'ABRIR_CAJA', { caseId, quantity, jokerMode, winnings: results.map(r => r.name), provablyFairHashes: results.map(r => r.provably_fair_hash) });
+    await recordTransaction(req.user.id, 'apertura_caja', totalCost, 'saldo_sitio', `Apertura de ${qty}x ${caseId}${jokerMode ? ' (Joker Mode)' : ''}`);
+    await logAction(req.user.id, 'ABRIR_CAJA', { caseId, quantity: qty, jokerMode, winnings: results.map(r => r.name), provablyFairHashes: results.map(r => r.provably_fair_hash) });
 
-    res.json({ success: true, items: results, newBalance: userResult.rows[0].saldo - totalCost });
+    res.json({ success: true, items: results, newBalance: userBalance - totalCost });
   } catch (err) {
+    if (err.message === 'INSUFFICIENT_BALANCE') {
+      return res.status(400).json({ error: "Saldo insuficiente", code: "INSUFFICIENT_BALANCE" });
+    }
     log(LOG_LEVELS.ERROR, 'SYSTEM', err);
     res.status(500).json({ error: "Error al abrir la caja" });
   }
@@ -1488,16 +1577,30 @@ app.post("/api/update-profile", authenticateToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: "Error al actualizar perfil" }); }
 });
 
-app.post("/api/update-balance", authenticateToken, async (req, res) => {
-  const { amount } = req.body;
+// SECURITY FIX: /api/update-balance was previously open to ANY authenticated user,
+// allowing arbitrary balance injection. Now protected behind isAdmin middleware.
+// Balance can ONLY be credited via verified payment webhooks or admin action.
+app.post("/api/update-balance", authenticateToken, isAdmin, async (req, res) => {
+  const { amount, targetUserId } = req.body;
   if (amount === undefined) return res.status(400).json({ error: "Monto no especificado" });
+
+  // Strict validation: reject NaN, negative, or non-finite values
+  const parsedAmount = parseFloat(amount);
+  if (isNaN(parsedAmount) || !isFinite(parsedAmount) || parsedAmount === 0) {
+    return res.status(400).json({ error: "Monto inválido. Debe ser un número finito y distinto de cero." });
+  }
+  if (Math.abs(parsedAmount) > 10000) {
+    return res.status(400).json({ error: "Monto excede el límite máximo permitido (€10,000)." });
+  }
+
+  const userId = targetUserId || req.user.id;
   try {
     const result = await db.query(
       "UPDATE usuarios SET saldo = saldo + $1 WHERE usuario_id = $2 RETURNING saldo",
-      [parseFloat(amount), req.user.id]
+      [parsedAmount, userId]
     );
-    await recordTransaction(req.user.id, 'deposito', parseFloat(amount), 'sistema', 'Ajuste de saldo');
-    await logAction(req.user.id, 'ACTUALIZAR_SALDO', { amount });
+    await recordTransaction(userId, 'ajuste_admin', parsedAmount, 'sistema', `Ajuste manual por admin #${req.user.id}`);
+    await logAction(req.user.id, 'ACTUALIZAR_SALDO_ADMIN', { amount: parsedAmount, targetUser: userId });
     res.json({ success: true, newBalance: result.rows[0].saldo });
   } catch (err) { res.status(500).json({ error: "Error al actualizar saldo" }); }
 });

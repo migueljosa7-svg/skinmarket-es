@@ -5,9 +5,26 @@ import { StorageService } from "../services/StorageService";
 export const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  // FIX: In incognito/clean tab, user should be null (not a default guest)
-  // Only set user from StorageService if there's an actual stored session
   const [user, setUser] = useState(() => {
+    const token = localStorage.getItem("token");
+    if (token && token.length > 10) {
+      // JWT token exists — user is authenticated even if backend sync hasn't happened yet
+      const storedUser = StorageService.getUser();
+      if (storedUser && storedUser.email !== "guest@skinmarket.es") return storedUser;
+      return {
+        id: "oauth_user",
+        nombre_usuario: "Jugador",
+        email: "oauth@skinmarket.es",
+        balance: 0,
+        saldo: 0,
+        nivel: 0,
+        experiencia: 0,
+        steam_id: null,
+        link_intercambio: null,
+        role: "user",
+        inventory: []
+      };
+    }
     if (StorageService.hasSession()) {
       return StorageService.getUser();
     }
@@ -23,13 +40,43 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Subscribe to StorageService state changes
+    const existingToken = localStorage.getItem("token");
+    if (existingToken && existingToken.length > 10) {
+      const API = import.meta.env.VITE_API_URL || "";
+      fetch(`${API}/api/me`, {
+        headers: { Authorization: `Bearer ${existingToken}` }
+      })
+        .then(res => {
+          if (!res.ok) throw new Error('Not authenticated');
+          return res.json();
+        })
+        .then(userData => {
+          if (userData) {
+            StorageService.updateUser({
+              nombre_usuario: userData.nombre_usuario || userData.name,
+              email: userData.email,
+              saldo: userData.saldo || 0,
+              balance: userData.saldo || userData.balance || 0,
+              nivel: userData.nivel || userData.level || 0,
+              experiencia: userData.experiencia || 0,
+              steam_id: userData.steam_id || null,
+              link_intercambio: userData.link_intercambio || null
+            });
+            setUser(StorageService.getUser());
+          }
+        })
+        .catch(() => {
+          // Silently fail - user will still have minimal access via token
+        });
+    }
+  }, []);
+
+  useEffect(() => {
     const unsubscribe = StorageService.subscribe((data) => {
       if (data) {
         setUser(data.user);
         setInventory(data.inventory);
       } else {
-        // Data was cleared (e.g., after logout)
         setUser(null);
         setInventory([]);
       }
@@ -40,7 +87,6 @@ export function AuthProvider({ children }) {
   const login = useCallback(async (email, password) => {
     setLoading(true);
     try {
-      // Try backend login first to get a real JWT
       const API = import.meta.env.VITE_API_URL || "";
       if (password) {
         try {
@@ -51,10 +97,8 @@ export function AuthProvider({ children }) {
           });
           if (response.ok) {
             const data = await response.json();
-            // Store JWT in localStorage
             localStorage.setItem("token", data.token);
             setToken(data.token);
-            // Sync user data with StorageService
             StorageService.updateUser({
               ...data.user,
               nombre_usuario: data.user.nombre_usuario,
@@ -64,24 +108,19 @@ export function AuthProvider({ children }) {
               nivel: data.user.nivel || 0,
               experiencia: data.user.experiencia || 0
             });
-            console.log('🔑 [LOGIN] Token JWT obtained from backend and stored');
             return data.user;
           }
         } catch (err) {
           console.warn('[LOGIN] Backend unavailable, falling back to local:', err.message);
         }
       }
-
-      // Fallback: simulated local login (for guest or when backend is down)
       const currentUser = StorageService.getUser();
       const updatedUser = StorageService.updateUser({
         email: email || currentUser?.email || "guest@skinmarket.es",
         nombre_usuario: email ? email.split("@")[0] : currentUser?.nombre_usuario || "Invitado"
       });
-      // Remove any stale token on local fallback
       localStorage.removeItem("token");
       setToken(null);
-      console.log('🔑 [LOGIN] Local fallback (no JWT token stored)');
       return updatedUser;
     } finally {
       setLoading(false);
@@ -91,7 +130,6 @@ export function AuthProvider({ children }) {
   const register = useCallback(async (nombre_usuario, email, password) => {
     setLoading(true);
     try {
-      // Try backend register first to get a real JWT
       const API = import.meta.env.VITE_API_URL || "";
       if (password) {
         const response = await fetch(`${API}/api/register`, {
@@ -99,14 +137,10 @@ export function AuthProvider({ children }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ nombre_usuario, email, password })
         });
-
         const data = await response.json();
-
         if (response.ok && data.success) {
-          // Store JWT in localStorage
           localStorage.setItem("token", data.token);
           setToken(data.token);
-          // Sync user data with StorageService
           StorageService.updateUser({
             ...data.user,
             nombre_usuario: data.user.nombre_usuario,
@@ -116,15 +150,9 @@ export function AuthProvider({ children }) {
             nivel: data.user.nivel || 0,
             experiencia: data.user.experiencia || 0
           });
-          console.log('🔑 [REGISTER] Token JWT obtained from backend and stored');
           return data.user;
         }
-
-        // Backend responded with an error — throw it so the UI shows the toast
         const errorMsg = data.error || "Error al registrar en el servidor";
-        const errorCode = data.code || "UNKNOWN_ERROR";
-
-        // Handle specific error codes from the improved backend
         if (response.status === 409) {
           throw new Error(errorMsg);
         } else if (response.status === 503) {
@@ -135,8 +163,6 @@ export function AuthProvider({ children }) {
           throw new Error(errorMsg);
         }
       }
-
-      // Fallback: simulated local register (only if no password was provided, e.g. guest)
       if (!password) {
         const updatedUser = StorageService.updateUser({
           nombre_usuario,
@@ -144,7 +170,6 @@ export function AuthProvider({ children }) {
         });
         localStorage.removeItem("token");
         setToken(null);
-        console.log('🔑 [REGISTER] Local fallback (no JWT token stored)');
         return updatedUser;
       }
     } finally {
@@ -152,24 +177,14 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // FIX: Complete logout that clears everything and redirects
   const logout = useCallback(() => {
-    // 1. Destroy all session data from StorageService
     StorageService.destroySession();
-
-    // 2. Clear any remaining localStorage keys
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-
-    // 3. Reset React state
     setUser(null);
     setToken(null);
     setInventory([]);
-
-    // 4. Redirect to home (clean redirect without React Router dependency)
     window.location.href = "/";
-
-    console.log('🔓 [LOGOUT] Session cleaned and redirected to home');
   }, []);
 
   const updateUser = useCallback((updatedUserOrFn) => {
@@ -185,7 +200,6 @@ export function AuthProvider({ children }) {
   }, []);
 
   const sellSkin = useCallback(async (skinId) => {
-    // Try backend API first
     const token = localStorage.getItem("token");
     if (token) {
       try {
@@ -200,7 +214,6 @@ export function AuthProvider({ children }) {
         });
         if (response.ok) {
           const data = await response.json();
-          // Sync local state after successful API sell
           StorageService.sellSkin(skinId);
           return { success: true, newBalance: data.newBalance };
         }
@@ -210,14 +223,12 @@ export function AuthProvider({ children }) {
         console.warn("[SELL] API call failed, falling back to local:", err.message);
       }
     }
-    // Fallback to local
     StorageService.sellSkin(skinId);
     return { success: true };
   }, []);
 
   const sellAllSkins = useCallback(() => {
     const total = StorageService.sellAllSkins();
-    // Attempt backend sync if token exists
     const token = localStorage.getItem("token");
     if (token) {
       StorageService.getInventory().forEach(skin => {
@@ -235,9 +246,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   const withdrawSkin = useCallback(async (skinId) => {
-    // Get token from multiple possible sources
     let token = localStorage.getItem("token");
-    // Fallback: try getting token from StorageService (skinmarket_db_v1.user.token)
     if (!token) {
       try {
         const raw = localStorage.getItem("skinmarket_db_v1");
@@ -247,7 +256,6 @@ export function AuthProvider({ children }) {
         }
       } catch (e) { }
     }
-    console.log('🔑 [TOKEN CHECK]', token ? 'Token presente' : 'TOKEN MISSING');
     if (token) {
       try {
         const API = import.meta.env.VITE_API_URL || "";
@@ -259,33 +267,25 @@ export function AuthProvider({ children }) {
           },
           body: JSON.stringify({ itemId: skinId })
         });
-
         const data = await response.json();
-
         if (response.ok && data.success) {
-          // Sync local state after successful API withdraw
           StorageService.withdrawSkin(skinId);
           return { success: true, offerId: data.offerId, message: data.message || "Oferta enviada a Steam." };
         }
-
-        // Handle specific error codes from backend
         const errorCode = data.code || 'UNKNOWN_ERROR';
         const errorMessage = data.error || "Error al procesar el retiro.";
-
-        // Map backend error codes to user-friendly messages
         const errorMessages = {
           'TRADE_URL_MISSING': 'Debes configurar tu Steam Trade URL en tu perfil antes de solicitar un retiro.',
-          'ITEM_OUT_OF_STOCK': 'El bot no tiene esta skin en stock actualmente. Intenta más tarde o usa la opción de venta.',
-          'RATE_LIMIT_EXCEEDED': 'Steam está limitando las solicitudes. Espera 5 minutos e intenta de nuevo.',
-          'RATE_LIMIT_WITHDRAW': 'Has excedido el límite de retiros. Espera 1 minuto e intenta de nuevo.',
-          'BOT_UNAVAILABLE': 'El bot de intercambios no está disponible en este momento. Inténtalo más tarde.',
-          'CONFIG_MISSING': 'El bot no está configurado correctamente. Contacta al administrador.',
+          'ITEM_OUT_OF_STOCK': 'El bot no tiene esta skin en stock actualmente. Intenta mas tarde o usa la opcion de venta.',
+          'RATE_LIMIT_EXCEEDED': 'Steam esta limitando las solicitudes. Espera 5 minutos e intenta de nuevo.',
+          'RATE_LIMIT_WITHDRAW': 'Has excedido el limite de retiros. Espera 1 minuto e intenta de nuevo.',
+          'BOT_UNAVAILABLE': 'El bot de intercambios no esta disponible en este momento. Intentelo mas tarde.',
+          'CONFIG_MISSING': 'El bot no esta configurado correctamente. Contacta al administrador.',
           'BOT_ERROR': 'Error del bot al procesar el retiro. Intenta de nuevo.',
           'TRADE_ERROR': 'Error en la oferta de intercambio. La skin puede no ser intercambiable.',
-          'CONNECTION_ERROR': 'Error de conexión con Steam. Verifica tu conexión e intenta de nuevo.',
+          'CONNECTION_ERROR': 'Error de conexion con Steam. Verifica tu conexion e intenta de nuevo.',
           'TRADE_OFFER_FAILED': 'No se pudo enviar la oferta de intercambio. Intenta de nuevo.'
         };
-
         return {
           success: false,
           error: errorCode,
@@ -293,21 +293,18 @@ export function AuthProvider({ children }) {
           code: errorCode
         };
       } catch (err) {
-        console.error('[WITHDRAW] API call error:', err.message);
         return {
           success: false,
           error: 'NETWORK_ERROR',
-          message: 'Error de conexión con el servidor. Verifica tu conexión e intenta de nuevo.',
+          message: 'Error de conexion con el servidor. Verifica tu conexion e intenta de nuevo.',
           code: 'NETWORK_ERROR'
         };
       }
     }
-
-    // No token - user not logged in to backend
     return {
       success: false,
       error: 'NOT_LOGGED_IN',
-      message: 'Debes iniciar sesión para retirar skins.',
+      message: 'Debes iniciar sesion para retirar skins.',
       code: 'NOT_LOGGED_IN'
     };
   }, []);
@@ -332,18 +329,15 @@ export function AuthProvider({ children }) {
   const claimDaily = useCallback(() => {
     const currentUser = StorageService.getUser();
     if (!currentUser) {
-      return { success: false, error: "Debes iniciar sesión para reclamar la recompensa diaria." };
+      return { success: false, error: "Debes iniciar sesion para reclamar la recompensa diaria." };
     }
     const now = new Date();
     const lastClaim = currentUser.ultimo_reclamo_diario ? new Date(currentUser.ultimo_reclamo_diario) : null;
-
     if (lastClaim && now - lastClaim < 86400000) {
       const remainingMs = 86400000 - (now - lastClaim);
       const hours = Math.floor(remainingMs / (1000 * 60 * 60));
       return { success: false, error: `Debes esperar ${hours}h para reclamar de nuevo.` };
     }
-
-    // KeyDrop-style: reward basado en nivel (máx 2.00€ para cajas diarias)
     const level = currentUser.nivel || 0;
     let baseReward = 0.15;
     if (level >= 5) baseReward = 2.00;
@@ -351,7 +345,6 @@ export function AuthProvider({ children }) {
     else if (level >= 3) baseReward = 0.50;
     else if (level >= 2) baseReward = 0.25;
     else baseReward = 0.15;
-
     const reward = parseFloat((baseReward + Math.random() * baseReward).toFixed(2));
     const expReward = Math.max(15, level * 15);
     StorageService.addBalance(reward);
@@ -359,12 +352,11 @@ export function AuthProvider({ children }) {
       experiencia: (currentUser.experiencia || 0) + expReward,
       ultimo_reclamo_diario: now.toISOString()
     });
-
     return {
       success: true,
       reward,
       expReward,
-      message: `◆ ¡Recompensa diaria de €${reward} reclamada!`
+      message: `Recompensa diaria de ${reward} reclamada!`
     };
   }, []);
 
@@ -376,10 +368,9 @@ export function AuthProvider({ children }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email })
       });
-
       const data = await response.json();
       if (response.ok && data.success) {
-        return data.message || `Se ha enviado un correo de recuperación a ${email}`;
+        return data.message || `Se ha enviado un correo de recuperacion a ${email}`;
       } else {
         throw new Error(data.error || "Error al procesar la solicitud");
       }
@@ -388,7 +379,6 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // Normalize balance/saldo and merge inventory into user object
   const userWithInventory = user ? {
     ...user,
     inventory,
@@ -422,4 +412,3 @@ export function AuthProvider({ children }) {
     </AuthContext.Provider>
   );
 }
-

@@ -151,13 +151,37 @@ export default function Upgrade() {
   const [showProvablyFair, setShowProvablyFair] = useState(false);
   const itemsPerPage = 16;
 
+  // ─── KEYDROP-STYLE: Calculate total selected inventory value ──
+  const totalBetValue = useMemo(() => {
+    if (selectedIds.length === 0 || !user?.inventory) return 0;
+    return user.inventory
+      .filter((s) => selectedIds.includes(s.id))
+      .reduce((sum, s) => sum + (s.price || 0), 0);
+  }, [selectedIds, user?.inventory]);
+
+  // ─── KEYDROP-STYLE: Filter targets to ONLY show higher-value skins ──
+  // This ensures the house margin. Only skins with value >= betValue * 1.05 (5% margin) are shown
   const validTargets = useMemo(() => {
     let pool = allSkins.filter((s) => s.price > 0.5 && s.image && s.name);
-    if (searchRight) {
-      pool = pool.filter((s) => s.name.toLowerCase().includes(searchRight.toLowerCase()));
+
+    // KEYDROP-STYLE: If skins are selected, filter to only show higher-value targets
+    if (totalBetValue > 0) {
+      const minTargetValue = totalBetValue * 1.05; // 5% minimum margin for the house
+      const maxTargetValue = totalBetValue * 3.0;   // Cap at 3x to keep it reasonable
+      pool = pool.filter((s) => s.price >= minTargetValue && s.price <= maxTargetValue);
+
+      // Sort by price ascending (cheapest viable target first)
+      pool.sort((a, b) => a.price - b.price);
+    } else {
+      // No selection yet — show all available skins sorted by price
+      if (searchRight) {
+        pool = pool.filter((s) => s.name.toLowerCase().includes(searchRight.toLowerCase()));
+      }
+      pool.sort((a, b) => a.price - b.price);
     }
-    return pool.sort((a, b) => a.price - b.price);
-  }, [allSkins, searchRight]);
+
+    return pool;
+  }, [allSkins, searchRight, totalBetValue]);
 
   const paginatedTargets = useMemo(() => {
     const start = page * itemsPerPage;
@@ -187,21 +211,20 @@ export default function Upgrade() {
 
   const calculateChance = () => {
     if (selectedIds.length === 0 || targetSkins.length === 0) return 0;
-    const totalBetValue = (user?.inventory || []).filter((s) => selectedIds.includes(s.id)).reduce((sum, s) => sum + (s.price || 0), 0);
+    const totalBetValueLocal = (user?.inventory || []).filter((s) => selectedIds.includes(s.id)).reduce((sum, s) => sum + (s.price || 0), 0);
     const totalTargetValue = targetSkins.reduce((sum, s) => sum + (s.price || 0), 0);
-    if (totalTargetValue <= 0 || totalBetValue <= 0) return 0;
+    if (totalTargetValue <= 0 || totalBetValueLocal <= 0) return 0;
 
     if (reverseMode) {
-      const ratio = totalTargetValue / totalBetValue;
+      const ratio = totalTargetValue / totalBetValueLocal;
       return Math.max(Math.min(ratio * 90, 90), 0.01);
     }
 
-    const ratio = totalBetValue / totalTargetValue;
+    const ratio = totalBetValueLocal / totalTargetValue;
     return Math.max(Math.min(ratio * 95, 95), 0.01);
   };
 
   const chance = calculateChance();
-  const totalBetValue = selectedIds.length > 0 ? (user?.inventory || []).filter((s) => selectedIds.includes(s.id)).reduce((sum, s) => sum + (s.price || 0), 0) : 0;
   const totalTargetValue = targetSkins.reduce((sum, s) => sum + (s.price || 0), 0);
 
   const handleSpinClick = () => {
@@ -214,11 +237,13 @@ export default function Upgrade() {
     const winDegrees = chance * 3.6;
     const success = finalDeg <= winDegrees;
 
+    // Pre-generate unique IDs for won skins
+    const timestamp = Date.now();
     setPendingResult({
       success,
-      wonSkins: targetSkins.map((s) => ({
+      wonSkins: targetSkins.map((s, i) => ({
         ...s,
-        id: `upg_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`
+        id: `upg_${timestamp}_${Math.random().toString(36).substr(2, 4)}_${i}`
       }))
     });
   };
@@ -226,15 +251,19 @@ export default function Upgrade() {
   const handleAnimationComplete = useCallback(() => {
     setIsSpinning(false);
     if (pendingResult) {
+      // ─── KEYDROP-STYLE: DESTROY original skin(s) on BOTH success and failure ──
+      // The original skin(s) are ALWAYS consumed (removed from inventory)
       selectedIds.forEach((id) => {
         StorageService.sellSkin(id);
       });
 
       if (pendingResult.success) {
+        // ─── KEYDROP-STYLE: On SUCCESS — add the new skin to inventory ──
         sound.playWin(true);
         StorageService.addSkinsToInventory(pendingResult.wonSkins);
         setLastResult({ success: true, skins: pendingResult.wonSkins });
 
+        // Add live drop notification
         pendingResult.wonSkins.forEach((skin) => {
           StorageService.addLiveDrop({
             user: user?.nombre_usuario || "Jugador",
@@ -243,13 +272,16 @@ export default function Upgrade() {
           });
         });
       } else {
+        // ─── KEYDROP-STYLE: On FAILURE — skin is DESTROYED (already removed above)
+        // No reembolso. The skin is gone forever.
         sound.playFail();
-        setLastResult({ success: false });
+        setLastResult({ success: false, message: "MEJORA FALLIDA — SKIN DESTRUIDA" });
       }
 
       setSelectedIds([]);
       setTargetSkins([]);
       setPendingResult(null);
+      setPage(0);
     }
   }, [pendingResult, selectedIds, user?.nombre_usuario]);
 
@@ -295,8 +327,27 @@ export default function Upgrade() {
               const isSelected = selectedIds.includes(skin.id);
               const color = getRarityColor(skin.rarity);
               return (
-                <div key={`skin-${skin.id || skin._id}-${index}`} onClick={() => handleSkinClick(skin.id)} style={{ padding: "10px", background: isSelected ? "rgba(245, 172, 59, 0.2)" : "rgba(255,255,255,0.02)", borderWidth: isSelected ? "2px 2px 3px 2px" : "1px 1px 3px 1px", borderStyle: "solid", borderColor: isSelected ? `#f5ac3b #f5ac3b ${color} #f5ac3b` : `rgba(255,255,255,0.05) rgba(255,255,255,0.05) ${color} rgba(255,255,255,0.05)`, borderRadius: "14px", cursor: "pointer", textAlign: "center" }}>
-                  <img src={getSkinImageUrl(skin.name, skin.image)} alt={skin.name} onError={(e) => handleImageError(e, skin)} style={{ width: "100%", height: "60px", objectFit: "contain", opacity: skin.image ? 1 : 0.3 }} />
+                <div
+                  key={`skin-${skin.id || skin._id}-${index}`}
+                  onClick={() => handleSkinClick(skin.id)}
+                  style={{
+                    padding: "10px",
+                    background: isSelected ? "rgba(245, 172, 59, 0.2)" : "rgba(255,255,255,0.02)",
+                    borderWidth: isSelected ? "2px 2px 3px 2px" : "1px 1px 3px 1px",
+                    borderStyle: "solid",
+                    borderColor: isSelected ? `#f5ac3b #f5ac3b ${color} #f5ac3b` : `rgba(255,255,255,0.05) rgba(255,255,255,0.05) ${color} rgba(255,255,255,0.05)`,
+                    borderRadius: "14px",
+                    cursor: "pointer",
+                    textAlign: "center",
+                    opacity: isSpinning && !isSelected ? 0.5 : 1
+                  }}
+                >
+                  <img
+                    src={getSkinImageUrl(skin.name, skin.image)}
+                    alt={skin.name}
+                    onError={(e) => handleImageError(e, skin)}
+                    style={{ width: "100%", height: "60px", objectFit: "contain", opacity: skin.image ? 1 : 0.3 }}
+                  />
                   <div style={{ fontSize: "0.7rem", fontWeight: "bold", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: "5px" }}>{skin.name}</div>
                   <div style={{ fontSize: "0.85rem", color: "#f5ac3b", fontWeight: "900" }}>€{Number(skin.price || 0).toFixed(2)}</div>
                 </div>
@@ -323,8 +374,21 @@ export default function Upgrade() {
 
           {lastResult && (
             <AnimatePresence>
-              <Motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} style={{ padding: "15px 30px", borderRadius: "16px", background: lastResult.success ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)", border: `1px solid ${lastResult.success ? "#10b981" : "#ef4444"}`, color: lastResult.success ? "#10b981" : "#ef4444", fontWeight: "900", fontSize: "1.2rem" }}>
-                {lastResult.success ? "¡MEJORA EXITOSA! SKIN AÑADIDA" : "MEJORA FALLIDA"}
+              <Motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                style={{
+                  padding: "15px 30px",
+                  borderRadius: "16px",
+                  background: lastResult.success ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)",
+                  border: `1px solid ${lastResult.success ? "#10b981" : "#ef4444"}`,
+                  color: lastResult.success ? "#10b981" : "#ef4444",
+                  fontWeight: "900",
+                  fontSize: "1.2rem",
+                  textAlign: "center"
+                }}
+              >
+                {lastResult.success ? "¡MEJORA EXITOSA! SKIN AÑADIDA" : (lastResult.message || "MEJORA FALLIDA")}
               </Motion.div>
             </AnimatePresence>
           )}
@@ -333,6 +397,12 @@ export default function Upgrade() {
               ◆ VERIFICAR PROVABLY FAIR
             </button>
           )}
+
+          {totalBetValue > 0 && validTargets.length === 0 && (
+            <div style={{ padding: "12px 20px", borderRadius: "12px", background: "rgba(255, 200, 0, 0.1)", border: "1px solid rgba(255, 200, 0, 0.2)", color: "#ffcc00", fontSize: "0.8rem", fontWeight: "700", textAlign: "center" }}>
+              No hay skins disponibles con valor superior a €{totalBetValue.toFixed(2)}. Selecciona una skin de menor valor o busca en el mercado.
+            </div>
+          )}
         </div>
 
         {/* TARGET SKINS COLUMN */}
@@ -340,7 +410,14 @@ export default function Upgrade() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px" }}>
             <div>
               <h2 style={{ fontSize: "0.75rem", fontWeight: "900", color: "#3b82f6", letterSpacing: "2px", margin: 0 }}>OBJETIVO</h2>
-              <div style={{ fontSize: "1.8rem", fontWeight: "900" }}>€{totalTargetValue.toFixed(2)}</div>
+              <div style={{ fontSize: "1.8rem", fontWeight: "900", color: totalBetValue > 0 ? "#10b981" : "white" }}>
+                €{totalTargetValue.toFixed(2)}
+                {totalBetValue > 0 && (
+                  <span style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.3)", marginLeft: "8px" }}>
+                    (min: €{(totalBetValue * 1.05).toFixed(2)})
+                  </span>
+                )}
+              </div>
             </div>
             <input type="text" placeholder="Buscar..." value={searchRight} onChange={(e) => setSearchRight(e.target.value)} style={{ padding: "8px 12px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", color: "white", width: "110px", fontSize: "0.8rem" }} />
           </div>
@@ -349,10 +426,30 @@ export default function Upgrade() {
               const isSelected = !!targetSkins.find((s) => s.id === skin.id);
               const color = getRarityColor(skin.rarity);
               return (
-                <div key={`skin-${skin.id || skin._id}-${index}`} onClick={() => toggleTargetSkin(skin)} style={{ padding: "10px", background: isSelected ? "rgba(59, 130, 246, 0.2)" : "rgba(255,255,255,0.02)", borderWidth: isSelected ? "2px 2px 3px 2px" : "1px 1px 3px 1px", borderStyle: "solid", borderColor: isSelected ? `#3b82f6 #3b82f6 ${color} #3b82f6` : `rgba(255,255,255,0.05) rgba(255,255,255,0.05) ${color} rgba(255,255,255,0.05)`, borderRadius: "14px", cursor: "pointer", textAlign: "center" }}>
-                  <img src={getSkinImageUrl(skin.name, skin.image)} alt={skin.name} onError={(e) => handleImageError(e, skin)} style={{ width: "100%", height: "60px", objectFit: "contain", opacity: skin.image ? 1 : 0.3 }} />
+                <div
+                  key={`skin-${skin.id || skin._id}-${index}`}
+                  onClick={() => toggleTargetSkin(skin)}
+                  style={{
+                    padding: "10px",
+                    background: isSelected ? "rgba(59, 130, 246, 0.2)" : "rgba(255,255,255,0.02)",
+                    borderWidth: isSelected ? "2px 2px 3px 2px" : "1px 1px 3px 1px",
+                    borderStyle: "solid",
+                    borderColor: isSelected ? `#3b82f6 #3b82f6 ${color} #3b82f6` : `rgba(255,255,255,0.05) rgba(255,255,255,0.05) ${color} rgba(255,255,255,0.05)`,
+                    borderRadius: "14px",
+                    cursor: "pointer",
+                    textAlign: "center"
+                  }}
+                >
+                  <img
+                    src={getSkinImageUrl(skin.name, skin.image)}
+                    alt={skin.name}
+                    onError={(e) => handleImageError(e, skin)}
+                    style={{ width: "100%", height: "60px", objectFit: "contain", opacity: skin.image ? 1 : 0.3 }}
+                  />
                   <div style={{ fontSize: "0.7rem", fontWeight: "bold", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: "5px" }}>{skin.name}</div>
-                  <div style={{ fontSize: "0.85rem", color: "#3b82f6", fontWeight: "900" }}>€{Number(skin.price || 0).toFixed(2)}</div>
+                  <div style={{ fontSize: "0.85rem", color: totalBetValue > 0 && skin.price < totalBetValue * 1.05 ? "#ef4444" : "#3b82f6", fontWeight: "900" }}>
+                    €{Number(skin.price || 0).toFixed(2)}
+                  </div>
                 </div>
               );
             })}

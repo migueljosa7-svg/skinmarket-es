@@ -97,6 +97,36 @@ const initDb = async () => {
         ultima_apertura TIMESTAMP WITH TIME ZONE,
         nivel INTEGER DEFAULT 1,
         creado_en TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );`,
+    // ─── PROMO CODES (single-use per user) ───
+    `CREATE TABLE IF NOT EXISTS promo_codes (
+        id SERIAL PRIMARY KEY,
+        code VARCHAR(50) UNIQUE NOT NULL,
+        reward_type VARCHAR(20) NOT NULL DEFAULT 'BALANCE',
+        reward_value DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
+        max_uses_global INTEGER NOT NULL DEFAULT 1,
+        current_uses INTEGER NOT NULL DEFAULT 0,
+        active BOOLEAN NOT NULL DEFAULT true,
+        expires_at TIMESTAMP WITH TIME ZONE,
+        creado_en TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );`,
+    // ─── USER PROMO USAGE (enforces single-use per user via unique index) ───
+    `CREATE TABLE IF NOT EXISTS user_promo_usage (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES usuarios(usuario_id),
+        code_id INTEGER NOT NULL REFERENCES promo_codes(id),
+        used_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, code_id)
+    );`,
+    // ─── GIFT CODES (legacy compatibility) ───
+    `CREATE TABLE IF NOT EXISTS gift_codes (
+        code VARCHAR(50) PRIMARY KEY,
+        amount DECIMAL(15, 2) NOT NULL,
+        max_uses INTEGER NOT NULL DEFAULT 1,
+        current_uses INTEGER NOT NULL DEFAULT 0,
+        active BOOLEAN NOT NULL DEFAULT true,
+        expires_at TIMESTAMP WITH TIME ZONE,
+        creado_en TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );`
   ];
 
@@ -118,6 +148,10 @@ const initDb = async () => {
     `ALTER TABLE inventario ADD COLUMN IF NOT EXISTS assetid VARCHAR(50);`,
     `ALTER TABLE inventario ADD COLUMN IF NOT EXISTS icon_url TEXT;`,
     `ALTER TABLE inventario ADD COLUMN IF NOT EXISTS user_item_id VARCHAR(100) UNIQUE;`,
+    `ALTER TABLE inventario ADD COLUMN IF NOT EXISTS provably_fair_hash TEXT;`,
+    `ALTER TABLE inventario ADD COLUMN IF NOT EXISTS server_seed TEXT;`,
+    `ALTER TABLE inventario ADD COLUMN IF NOT EXISTS client_seed TEXT;`,
+    `ALTER TABLE inventario ADD COLUMN IF NOT EXISTS nonce BIGINT;`,
     `ALTER TABLE transacciones ALTER COLUMN monto SET DEFAULT 0.00;`
   ];
 
