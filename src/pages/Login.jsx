@@ -8,9 +8,11 @@ function validatePassword(password) {
   if (!password || password.length < 8) return { valid: false, error: "La contrasena debe tener al menos 8 caracteres" };
   if (!/[A-Z]/.test(password)) return { valid: false, error: "La contrasena debe contener al menos una mayuscula" };
   if (!/[0-9]/.test(password)) return { valid: false, error: "La contrasena debe contener al menos un numero" };
-  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(password)) return { valid: false, error: "La contrasena debe contener al menos un caracter especial" };
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?~`]/.test(password)) return { valid: false, error: "La contrasena debe contener al menos un caracter especial" };
   return { valid: true };
 }
+
+const SPECIAL_CHARS_REGEX = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?~`]/;
 
 export default function Login() {
   const [view, setView] = useState("login");
@@ -40,7 +42,6 @@ export default function Login() {
 
     if (tokenFromUrl) {
       localStorage.setItem("token", tokenFromUrl);
-      setSuccess(true);
       window.dispatchEvent(new CustomEvent("auth-token-updated", { detail: { token: tokenFromUrl } }));
 
       fetch(API_BASE + "/api/me", { headers: { Authorization: "Bearer " + tokenFromUrl } })
@@ -63,7 +64,7 @@ export default function Login() {
         .finally(function () {
           cleanOAuthParams();
           setTimeout(function () {
-            try { navigate("/dashboard"); } catch (e) { window.location.href = "/dashboard"; }
+            try { navigate("/dashboard"); } catch (_err) { window.location.href = "/dashboard"; }
           }, 500);
         });
     } else {

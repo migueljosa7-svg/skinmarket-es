@@ -1,5 +1,5 @@
 // src/components/Toast.jsx
-import { useState, useEffect, useCallback, createContext, useContext } from "react";
+import { useState, useEffect, useCallback, useMemo, createContext, useContext } from "react";
 
 const ToastContext = createContext(null);
 
@@ -24,28 +24,35 @@ export function ToastProvider({ children }) {
     [addToast]
   );
 
-  toast.success = useCallback(
+  const toastSuccess = useCallback(
     (message) => addToast(message, "success"),
     [addToast]
   );
 
-  toast.error = useCallback(
+  const toastError = useCallback(
     (message) => addToast(message, "error"),
     [addToast]
   );
 
-  toast.info = useCallback(
+  const toastInfo = useCallback(
     (message) => addToast(message, "info"),
     [addToast]
   );
 
-  toast.warning = useCallback(
+  const toastWarning = useCallback(
     (message) => addToast(message, "warning"),
     [addToast]
   );
 
+  const toastHelpers = useMemo(() => ({
+    success: toastSuccess,
+    error: toastError,
+    info: toastInfo,
+    warning: toastWarning
+  }), [toastSuccess, toastError, toastInfo, toastWarning]);
+
   return (
-    <ToastContext.Provider value={toast}>
+    <ToastContext.Provider value={{ ...toast, ...toastHelpers }}>
       {children}
       <div
         style={{

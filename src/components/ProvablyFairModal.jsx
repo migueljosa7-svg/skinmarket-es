@@ -3,18 +3,8 @@
 // Permite al usuario verificar que el resultado de su roll fue generado
 // de forma determinista y transparente mediante SHA-256
 
-import { useState, useEffect } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { motion as Motion, AnimatePresence } from "framer-motion";
-
-/**
- * Genera un hash SHA-256 de forma asíncrona en el navegador
- */
-async function sha256(message) {
-    const msgBuffer = new TextEncoder().encode(message);
-    const hashBuffer = await crypto.subtle.digest("SHA-256", msgBuffer);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-}
 
 /**
  * Calcula un resultado de roll determinista a partir de serverSeed + clientSeed + nonce
@@ -58,45 +48,38 @@ function getRarityFromRoll(roll, probabilities = { covert: 0.5, classified: 2, r
     return { name: "Mil-Spec Grade", color: "#4b69ff", emoji: "🔵" };
 }
 
-// Parse a prob from config string/object
-function parseProbabilities(probs) {
-    if (!probs) return { covert: 0.5, classified: 2, restricted: 15, mil_spec: 82.5 };
-    if (typeof probs === "string") {
-        try { return JSON.parse(probs); } catch { return { covert: 0.5, classified: 2, restricted: 15, mil_spec: 82.5 }; }
-    }
-    return probs;
-}
 
 export default function ProvablyFairModal({ isOpen, onClose, resultData }) {
-    const [serverSeedHashed, setServerSeedHashed] = useState("");
-    const [clientSeed, setClientSeed] = useState("");
-    const [nonce, setNonce] = useState(0);
-    const [serverSeedRaw, setServerSeedRaw] = useState("");
     const [revealedServerSeed, setRevealedServerSeed] = useState(false);
     const [verifiedRoll, setVerifiedRoll] = useState(null);
     const [calcHash, setCalcHash] = useState("");
     const [verificationStatus, setVerificationStatus] = useState(null); // 'idle' | 'verifying' | 'match' | 'mismatch'
     const [copied, setCopied] = useState(false);
 
-    // Pre-populate from resultData if available
-    useEffect(() => {
-        if (resultData) {
-            setServerSeedHashed(resultData.serverSeedHashed || "");
-            setClientSeed(resultData.clientSeed || "skinmarket-client-seed");
-            setNonce(resultData.nonce || 0);
-            setServerSeedRaw(resultData.serverSeedRaw || "");
-        }
+    // Pre-populate from resultData if available - useMemo to avoid setState in useEffect
+    const initialSeed = useMemo(() => {
+        if (!resultData) return null;
+        return {
+            serverSeedHashed: resultData.serverSeedHashed || "",
+            clientSeed: resultData.clientSeed || "skinmarket-client-seed",
+            nonce: resultData.nonce || 0,
+            serverSeedRaw: resultData.serverSeedRaw || ""
+        };
     }, [resultData]);
 
+    const serverSeedHashed = initialSeed?.serverSeedHashed || "";
+    const clientSeed = initialSeed?.clientSeed || "skinmarket-client-seed";
+    const nonce = initialSeed?.nonce || 0;
+    const serverSeedRaw = initialSeed?.serverSeedRaw || "";
+
     // Reset on close
-    useEffect(() => {
-        if (!isOpen) {
-            setVerifiedRoll(null);
-            setRevealedServerSeed(false);
-            setVerificationStatus(null);
-            setCopied(false);
-        }
-    }, [isOpen]);
+    const handleClose = useCallback(() => {
+        setVerifiedRoll(null);
+        setRevealedServerSeed(false);
+        setVerificationStatus(null);
+        setCopied(false);
+        onClose?.();
+    }, [onClose]);
 
     const verifyRoll = async () => {
         if (!clientSeed && nonce === undefined) return;
@@ -134,11 +117,11 @@ export default function ProvablyFairModal({ isOpen, onClose, resultData }) {
     return (
         <AnimatePresence>
             {isOpen && (
-                <Motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    onClick={onClose}
+                    <Motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={handleClose}
                     style={{
                         position: "fixed",
                         inset: 0,
@@ -170,7 +153,7 @@ export default function ProvablyFairModal({ isOpen, onClose, resultData }) {
                         }}
                     >
                         <button
-                            onClick={onClose}
+                            onClick={handleClose}
                             style={{
                                 position: "absolute",
                                 top: "30px",
