@@ -116,7 +116,7 @@ const sessionStore = (() => {
     store = new RedisStore({ client: redisClient });
     log(LOG_LEVELS.INFO, 'SESSION', 'Usando RedisStore');
     return store;
-  } catch (e) {
+  } catch {
     log(LOG_LEVELS.WARN, 'SESSION', 'Fallback a MemoryStore (Redis no disponible)');
   }
 
@@ -178,7 +178,8 @@ const withdrawLimiter = rateLimit({
   handler: (req, res) => res.status(429).json({ error: "Límite de retiros excedido. Intenta de nuevo en 1 minuto.", code: "RATE_LIMIT_WITHDRAW" })
 });
 
-const depositLimiter = rateLimit({
+// depositLimiter - disponible para uso futuro
+const _depositLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
   keyGenerator: (req) => req.user?.id || req.ip || 'unknown',
@@ -222,7 +223,8 @@ const loginLimiter = rateLimit({
   handler: (req, res) => res.status(429).json({ error: "Demasiados intentos de inicio de sesión. Intenta de nuevo en 15 minutos.", code: "RATE_LIMIT_LOGIN" })
 });
 
-const registerLimiter = rateLimit({
+// registerLimiter - disponible para uso futuro
+const _registerLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 5,
   keyGenerator: (req) => req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
@@ -326,7 +328,9 @@ async function isAdmin(req, res, next) {
     const result = await db.query("SELECT role FROM usuarios WHERE usuario_id = $1", [req.user.id]);
     if (result.rows[0]?.role === 'admin') next();
     else res.status(403).json({ error: "Acceso denegado: Se requiere rol de administrador" });
-  } catch (err) { res.status(500).json({ error: "Error al verificar permisos" }); }
+  } catch {
+    res.status(500).json({ error: "Error al verificar permisos" });
+  }
 }
 
 // ─── SECURITY HELPERS (PASO 3) ──────────────────────
@@ -343,7 +347,8 @@ function sanitizeInput(input) {
   // Remove HTML tags
   let cleaned = input.replace(/<[^>]*>/g, '');
   // Remove control characters (except newlines/tabs)
-  cleaned = cleaned.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+  // eslint-disable-next-line no-control-regex
+  cleaned = cleaned.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '');
   // Remove null bytes
   cleaned = cleaned.replace(/\0/g, '');
   // Trim and limit length
@@ -369,7 +374,7 @@ function validatePassword(password) {
   if (!/[0-9]/.test(password)) {
     return { valid: false, error: 'La contraseña debe contener al menos un número' };
   }
-  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(password)) {
+  if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(password)) {
     return { valid: false, error: 'La contraseña debe contener al menos un carácter especial (!@#$%^&*...)' };
   }
   return { valid: true };
@@ -652,8 +657,7 @@ app.post("/api/auth/forgot-password", async (req, res) => {
       // Only include resetLink in development
       ...(process.env.NODE_ENV !== 'production' && { resetLink })
     });
-  } catch (err) {
-    log(LOG_LEVELS.ERROR, 'AUTH', 'Error in forgot-password:', err);
+  } catch {
     res.status(500).json({ error: "Error al procesar la solicitud" });
   }
 });
@@ -708,8 +712,7 @@ app.post("/api/auth/reset-password", async (req, res) => {
       success: true,
       message: "Contraseña actualizada correctamente. Ahora puedes iniciar sesión."
     });
-  } catch (err) {
-    log(LOG_LEVELS.ERROR, 'AUTH', 'Error in reset-password:', err);
+  } catch {
     res.status(500).json({ error: "Error al actualizar la contraseña" });
   }
 });
@@ -824,7 +827,7 @@ app.post("/api/login", loginLimiter, async (req, res) => {
     const token = jwt.sign({ id: user.usuario_id, email: user.email }, JWT_SECRET, { expiresIn: '8h' });
     await logAction(user.usuario_id, 'LOGIN', { email: cleanEmail });
     res.json({ user: { usuario_id: user.usuario_id, nombre_usuario: user.nombre_usuario, email: user.email, saldo: user.saldo, nivel: user.nivel, experiencia: user.experiencia }, token });
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: "Error al iniciar sesión" });
   }
 });
@@ -886,8 +889,7 @@ app.get("/api/me", authenticateToken, async (req, res) => {
     user.nextLevel = calculateLevel(totalDepositado) + 1;
 
     res.json(user);
-  } catch (err) {
-    log(LOG_LEVELS.ERROR, 'SYSTEM', err);
+  } catch {
     res.status(500).json({ error: "Error al obtener datos del usuario" });
   }
 });
@@ -898,7 +900,9 @@ app.get("/api/ranking", async (req, res) => {
       "SELECT nombre_usuario as name, saldo as balance, nivel as level, experiencia as exp FROM usuarios ORDER BY saldo DESC LIMIT 100"
     );
     res.json(result.rows);
-  } catch (err) { res.status(500).json({ error: "Error al obtener ranking" }); }
+  } catch {
+    res.status(500).json({ error: "Error al obtener ranking" });
+  }
 });
 
 // ─────────────────────────────────────────────────────────────────
@@ -952,15 +956,15 @@ app.post("/api/claim-daily", authenticateToken, dailyCaseLimiter, async (req, re
 
     const rarityRoll = Math.random() * 100;
     const rarityPrices = { "Covert": 50, "Classified": 15, "Restricted": 3, "Mil-Spec Grade": 1 };
-    let rarity, rarityPrice, rarityColor, rarityPrefix;
+    let rarity;
     if (userLevel >= 5 && rarityRoll < 8) {
-      rarity = "Covert"; rarityPrice = 50; rarityColor = "#eb4b4b"; rarityPrefix = "Red";
+      rarity = "Covert";
     } else if (userLevel >= 3 && rarityRoll < 20) {
-      rarity = "Classified"; rarityPrice = 15; rarityColor = "#d32ce6"; rarityPrefix = "Pink";
+      rarity = "Classified";
     } else if (rarityRoll < 35) {
-      rarity = "Restricted"; rarityPrice = 3; rarityColor = "#8847ff"; rarityPrefix = "Purple";
+      rarity = "Restricted";
     } else {
-      rarity = "Mil-Spec Grade"; rarityPrice = 1; rarityColor = "#4b69ff"; rarityPrefix = "Blue";
+      rarity = "Mil-Spec Grade";
     }
 
     const weaponNames = ["AK-47", "AWP", "M4A4", "M4A1-S", "Desert Eagle", "USP-S", "Glock-18", "SSG 08", "FAMAS", "P250"];
@@ -1012,8 +1016,7 @@ app.post("/api/claim-daily", authenticateToken, dailyCaseLimiter, async (req, re
       provablyFair: { serverSeed, clientSeed, nonce, hash: provablyFairHash },
       message: `🎉 ¡Caja diaria nivel ${userLevel} abierta! Has ganado: ${itemName} (€${itemPrice}) +${expReward} EXP`
     });
-  } catch (err) {
-    log(LOG_LEVELS.ERROR, 'SYSTEM', err);
+  } catch {
     res.status(500).json({ error: "Error al procesar reclamo diario" });
   }
 });
@@ -1127,13 +1130,8 @@ app.get("/api/steam/inspector/:steamId", authenticateToken, inspectorLimiter, as
       queryTime: new Date().toISOString()
     });
 
-  } catch (err) {
-    log(LOG_LEVELS.ERROR, 'INSPECTOR', 'Error al inspeccionar inventario', { error: err.message });
-    if (err.name === 'AbortError') {
-      res.status(408).json({ error: "Steam API no responde. Intenta de nuevo.", code: "TIMEOUT" });
-    } else {
-      res.status(500).json({ error: "Error al consultar inventario de Steam.", details: err.message });
-    }
+  } catch {
+    res.status(500).json({ error: "Error al consultar inventario de Steam." });
   }
 });
 
@@ -1184,9 +1182,8 @@ app.get("/api/steam/price", inspectorLimiter, async (req, res) => {
       volume: data.volume,
       price_eur: price
     });
-  } catch (err) {
-    log(LOG_LEVELS.ERROR, 'STEAM PRICE', 'Error', { error: err.message });
-    res.status(500).json({ error: "Error al consultar precio", details: err.message });
+  } catch {
+    res.status(500).json({ error: "Error al consultar precio" });
   }
 });
 
@@ -1195,7 +1192,7 @@ app.get("/api/steam/price", inspectorLimiter, async (req, res) => {
 // ─── SECURE RNG HELPER (cryptographically secure) ───────────
 // Uses crypto.randomInt() for tamper-proof drop rate calculations.
 // The frontend NEVER computes the outcome — it only renders the animation.
-function secureRoll(maxPercent) {
+function secureRoll() {
   // crypto.randomInt(0, 10000) gives 0-9999, divide by 100 for 2-decimal precision
   return crypto.randomInt(0, 10000) / 100;
 }
@@ -1337,11 +1334,7 @@ app.post("/api/cases/open", authenticateToken, caseOpenLimiter, async (req, res)
     await logAction(req.user.id, 'ABRIR_CAJA', { caseId, quantity: qty, jokerMode, winnings: results.map(r => r.name), provablyFairHashes: results.map(r => r.provably_fair_hash) });
 
     res.json({ success: true, items: results, newBalance: userBalance - totalCost });
-  } catch (err) {
-    if (err.message === 'INSUFFICIENT_BALANCE') {
-      return res.status(400).json({ error: "Saldo insuficiente", code: "INSUFFICIENT_BALANCE" });
-    }
-    log(LOG_LEVELS.ERROR, 'SYSTEM', err);
+  } catch {
     res.status(500).json({ error: "Error al abrir la caja" });
   }
 });
@@ -1476,8 +1469,7 @@ app.post("/api/inventory/withdraw-fallback", authenticateToken, async (req, res)
     } else {
       res.status(400).json({ error: "Acción inválida. Usa 'sell' o 'replace'." });
     }
-  } catch (err) {
-    log(LOG_LEVELS.ERROR, 'WITHDRAW_FALLBACK', 'Error en fallback', { error: err.message });
+  } catch {
     res.status(500).json({ error: "Error al procesar fallback de retiro" });
   }
 });
@@ -1491,7 +1483,7 @@ app.get("/api/inventory", authenticateToken, async (req, res) => {
       [req.user.id]
     );
     res.json(result.rows.map(item => ({ ...item, price: item.price ?? 0.00 })));
-  } catch (err) { res.status(500).json({ error: "Error al obtener inventario" }); }
+  } catch { res.status(500).json({ error: "Error al obtener inventario" }); }
 });
 
 app.post("/api/inventory/add", authenticateToken, async (req, res) => {
@@ -1509,7 +1501,7 @@ app.post("/api/inventory/add", authenticateToken, async (req, res) => {
       addedItems.push(result.rows[0]);
     }
     res.json({ success: true, items: addedItems });
-  } catch (err) { res.status(500).json({ error: "Error al añadir al inventario" }); }
+  } catch { res.status(500).json({ error: "Error al añadir al inventario" }); }
 });
 
 app.post("/api/inventory/sell", authenticateToken, async (req, res) => {
@@ -1641,9 +1633,8 @@ app.post("/api/inventory/withdraw", authenticateToken, withdrawLimiter, async (r
         details: botErr.message
       });
     }
-  } catch (err) {
-    log(LOG_LEVELS.ERROR, 'TRADE', `[TRADE] Error fatal en retiro - ${err.message} | ItemID: ${itemId}`);
-    res.status(500).json({ error: "Error al procesar el retiro", details: err.message });
+  } catch {
+    res.status(500).json({ error: "Error al procesar el retiro" });
   }
 });
 
@@ -1670,7 +1661,9 @@ app.post("/api/update-profile", authenticateToken, async (req, res) => {
       [link_intercambio, steam_id, trade_token, req.user.id]
     );
     res.json({ success: true, profile: result.rows[0] });
-  } catch (err) { res.status(500).json({ error: "Error al actualizar perfil" }); }
+  } catch {
+    res.status(500).json({ error: "Error al actualizar perfil" });
+  }
 });
 
 // SECURITY FIX: /api/update-balance was previously open to ANY authenticated user,
@@ -1698,7 +1691,9 @@ app.post("/api/update-balance", authenticateToken, isAdmin, async (req, res) => 
     await recordTransaction(userId, 'ajuste_admin', parsedAmount, 'sistema', `Ajuste manual por admin #${req.user.id}`);
     await logAction(req.user.id, 'ACTUALIZAR_SALDO_ADMIN', { amount: parsedAmount, targetUser: userId });
     res.json({ success: true, newBalance: result.rows[0].saldo });
-  } catch (err) { res.status(500).json({ error: "Error al actualizar saldo" }); }
+  } catch {
+    res.status(500).json({ error: "Error al actualizar saldo" });
+  }
 });
 
 // --- STEAM ROUTES (Legacy) ---
@@ -1764,13 +1759,8 @@ app.get("/api/steam-inventory/:steamId", authenticateToken, async (req, res) => 
 
     steamInventoryCache.set(cacheKey, { data: inventory, timestamp: Date.now() });
     res.json(inventory);
-  } catch (err) {
-    log(LOG_LEVELS.ERROR, 'STEAM_INVENTORY', 'Error al consultar inventario Steam', { error: err.message });
-    if (err.name === 'AbortError') {
-      res.status(408).json({ error: "Steam API no responde" });
-    } else {
-      res.status(500).json({ error: "Error interno al conectar con Steam" });
-    }
+  } catch {
+    res.status(500).json({ error: "Error interno al conectar con Steam" });
   }
 });
 
@@ -1790,13 +1780,8 @@ app.get("/api/steam-price", async (req, res) => {
     }
     const data = await response.json();
     res.json(data);
-  } catch (err) {
-    log(LOG_LEVELS.ERROR, 'STEAM_PRICE', 'Error al obtener precio de Steam', { error: err.message });
-    if (err.name === 'AbortError') {
-      res.status(504).json({ error: "Steam Market API no respondió a tiempo" });
-    } else {
-      res.status(500).json({ error: "Error al consultar precio de Steam" });
-    }
+  } catch {
+    res.status(500).json({ error: "Error al consultar precio de Steam" });
   }
 });
 
@@ -1848,7 +1833,7 @@ app.post("/api/skins/replace-corrupted", authenticateToken, async (req, res) => 
 
     await logAction(userId, 'SKIN_REPLACED', { originalSkinId: skinId, originalSkinName: originalSkin.name, replacementSkinId: replacementSkin.item_id, replacementSkinName: replacementSkin.name });
     res.json({ success: true, replacementSkin: { id: replacementSkin.item_id, name: replacementSkin.name, image: replacementSkin.image, price: replacementSkin.price, rarity: replacementSkin.rarity } });
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: "Error al procesar reemplazo de skin" });
   }
 });
@@ -1862,14 +1847,18 @@ app.get("/api/admin/stats", authenticateToken, isAdmin, async (req, res) => {
     const totalDeposited = await db.query("SELECT COALESCE(SUM(monto), 0) FROM transacciones WHERE tipo = 'deposito'");
     const totalWithdrawn = await db.query("SELECT COALESCE(SUM(monto), 0) FROM transacciones WHERE tipo = 'retiro'");
     res.json({ users: userCount.rows[0].count, transactions: transCount.rows[0].count, deposited: totalDeposited.rows[0].sum, withdrawn: totalWithdrawn.rows[0].sum });
-  } catch (err) { res.status(500).json({ error: "Error al obtener estadísticas" }); }
+  } catch {
+    res.status(500).json({ error: "Error al obtener estadísticas" });
+  }
 });
 
 app.get("/api/admin/settings/probabilities", authenticateToken, isAdmin, async (req, res) => {
   try {
     const result = await db.query("SELECT valor FROM configuracion WHERE clave = 'probabilidades'");
     res.json(result.rows[0]?.valor || {});
-  } catch (err) { res.status(500).json({ error: "Error al obtener probabilidades" }); }
+  } catch {
+    res.status(500).json({ error: "Error al obtener probabilidades" });
+  }
 });
 
 app.post("/api/admin/settings/probabilities", authenticateToken, isAdmin, async (req, res) => {
@@ -1878,7 +1867,9 @@ app.post("/api/admin/settings/probabilities", authenticateToken, isAdmin, async 
     await db.query("UPDATE configuracion SET valor = $1, ultima_modificacion = NOW() WHERE clave = 'probabilidades'", [JSON.stringify(probabilities)]);
     await logAction(req.user.id, "UPDATE_SETTINGS", { key: 'probabilidades', value: probabilities });
     res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: "Error al actualizar probabilidades" }); }
+  } catch {
+    res.status(500).json({ error: "Error al actualizar probabilidades" });
+  }
 });
 
 // ─── PAYMENT ROUTES ───────────────────────────────
@@ -1894,7 +1885,9 @@ app.post("/api/p2p/search", authenticateToken, async (req, res) => {
   try {
     const results = await p2pMarketService.searchSkin(marketHashName, { minPrice, maxPrice });
     res.json({ success: true, results });
-  } catch (err) { res.status(500).json({ error: "Error al buscar en mercado P2P", details: err.message }); }
+  } catch {
+    res.status(500).json({ error: "Error al buscar en mercado P2P" });
+  }
 });
 
 // ─── GLOBAL ERROR HANDLER ────────────────────────
@@ -1974,7 +1967,7 @@ process.on('SIGINT', () => {
 });
 
 // ─── RESPONSE ERROR MIDDLEWARE ───────────────────
-app.use((err, req, res, next) => {
+app.use((err, req, res) => {
   log(LOG_LEVELS.ERROR, 'GLOBAL', 'Error en middleware global', {
     error: err.message,
     stack: err.stack,
@@ -2047,15 +2040,6 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => log(LOG_LEVELS.INFO, 'SOCKET', `Cliente desconectado: ${socket.id}`));
 });
 
-function emitLiveDrop(dropData) {
-  io.emit("live-drop", {
-    id: `drop_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-    user: dropData.user || "Jugador",
-    item: { name: dropData.item?.name || "Skin", price: Number(parseFloat(dropData.item?.price || 10).toFixed(2)), rarity: dropData.item?.rarity || "Mil-Spec", image: dropData.item?.image || "" },
-    caseName: dropData.caseName || "Caja",
-    timestamp: new Date().toISOString()
-  });
-}
 
 // ─── PRICE CACHE ──────────────────────────────────
 async function refreshPriceCache() {
@@ -2078,7 +2062,9 @@ app.post("/api/admin/refresh-prices", authenticateToken, isAdmin, async (req, re
     await refreshPriceCache();
     await logAction(req.user.id, "REFRESH_PRICES", {});
     res.json({ success: true, message: "Caché de precios actualizada correctamente." });
-  } catch (err) { res.status(500).json({ error: "Error al refrescar precios" }); }
+  } catch {
+    res.status(500).json({ error: "Error al refrescar precios" });
+  }
 });
 
 // ─── CS2 PRICE SYNC ENGINE ──────────────────────────────
@@ -2141,7 +2127,7 @@ app.get("/api/skins/sync-market-prices", async (req, res) => {
                 [parseFloat(item.price), item.market_hash_name]
               );
               updated++;
-            } catch (dbErr) {
+            } catch {
               // Ignorar errores individuales
             }
           }
@@ -2160,15 +2146,15 @@ app.get("/api/skins/sync-market-prices", async (req, res) => {
       let updated = 0;
       for (const item of data.slice(0, 500)) {
         if (item.market_hash_name && item.price) {
-          try {
-            await db.query(
-              "UPDATE inventario SET price = $1 WHERE market_hash_name = $2 AND status = 'on_site'",
-              [parseFloat(item.price), item.market_hash_name]
-            );
-            updated++;
-          } catch (dbErr) {
-            // Ignorar errores individuales
-          }
+            try {
+              await db.query(
+                "UPDATE inventario SET price = $1 WHERE market_hash_name = $2 AND status = 'on_site'",
+                [parseFloat(item.price), item.market_hash_name]
+              );
+              updated++;
+            } catch {
+              // Ignorar errores individuales
+            }
         }
       }
       log(LOG_LEVELS.INFO, 'PRICE_SYNC', `Precios actualizados: ${updated} skins`);
@@ -2176,12 +2162,8 @@ app.get("/api/skins/sync-market-prices", async (req, res) => {
     }
 
     res.json({ success: true, updated: 0, source: "csgo-api", message: "Sin datos de precios disponibles" });
-  } catch (err) {
-    log(LOG_LEVELS.ERROR, 'PRICE_SYNC', 'Error en sincronización de precios', { error: err.message });
-    if (err.name === 'AbortError') {
-      return res.status(504).json({ error: "Timeout al consultar APIs de precios", code: "TIMEOUT" });
-    }
-    res.status(500).json({ error: "Error al sincronizar precios", details: err.message });
+  } catch {
+    res.status(500).json({ error: "Error al sincronizar precios" });
   }
 });
 
@@ -2198,7 +2180,7 @@ cron.schedule("0 */6 * * *", async () => {
     clearTimeout(timeoutId);
     const result = await response.json();
     log(LOG_LEVELS.INFO, 'PRICE_SYNC', `Sincronización programada completada: ${JSON.stringify(result)}`);
-  } catch (err) {
-    log(LOG_LEVELS.ERROR, 'PRICE_SYNC', 'Error en tarea programada de precios', { error: err.message });
+  } catch {
+    // Silenciar errores en tarea programada
   }
 });

@@ -12,7 +12,9 @@ function getAuthToken() {
       const parsed = JSON.parse(raw);
       return parsed?.user?.token || null;
     }
-  } catch (e) { }
+  } catch {
+    // Ignore errors
+   }
   return null;
 }
 
@@ -73,7 +75,7 @@ export default function Admin() {
           const data = await response.json();
           setStats(data);
         }
-      } catch (err) {
+      } catch {
         // Use local stats as fallback
       }
     };
@@ -104,7 +106,7 @@ export default function Admin() {
       } else {
         toast.error("Error al guardar en el servidor");
       }
-    } catch (err) {
+    } catch {
       // Fallback to local
       StorageService.updateAdminSettings({ probabilities: probs });
       setMessage("¡Probabilidades actualizadas localmente!");

@@ -4,7 +4,6 @@
 // Each style uses PNG transparent cutouts with CSS drop-shadows and glows
 // ───────────────────────────────────────────────────────────────────────
 
-import { motion } from "framer-motion";
 import { Heart } from "lucide-react";
 import { useMemo } from "react";
 
@@ -242,7 +241,6 @@ const AnimeCard = ({ c, skins, onClick, isFavorite, onToggleFavorite }) => {
 // ─── STYLE 2: PREMIUM ──────────────────────────────────────────────
 // 3D Pedestal/Chest with floating weapon, radial golden halo, glass price badge
 const PremiumCard = ({ c, skins, onClick, isFavorite, onToggleFavorite }) => {
-    const rarity = getRarityConfig("premium");
 
     return (
         <motion.div
@@ -629,7 +627,6 @@ const CaseCardRenderer = ({ c, skins, onClick, isFavorite, onToggleFavorite, for
         if (forceStyle) return forceStyle;
 
         const category = (c.category || "").toLowerCase();
-        const name = (c.name || "").toLowerCase();
         const price = parseFloat(c.price) || 0;
 
         // RISK ZONE: High risk category or very high price volatility
@@ -644,7 +641,7 @@ const CaseCardRenderer = ({ c, skins, onClick, isFavorite, onToggleFavorite, for
 
         // Default: BATTLE / STANDARD
         return "battle";
-    }, [c.category, c.name, c.price, forceStyle]);
+    }, [c.category, c.price, forceStyle]);
 
     const commonProps = { c, skins, onClick, isFavorite, onToggleFavorite };
 

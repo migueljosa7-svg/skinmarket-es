@@ -4,14 +4,13 @@
 // Collapsible sections, search, sort, favorites, daily roulette
 // ───────────────────────────────────────────────────────────────────────
 
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { generateAllCases } from "../constants/cases.js";
 import { useFetchSkins } from "../hooks/useFetchSkins";
 import { useAuth } from "../context/useAuth";
 import { useToast } from "../components/Toast";
-import { motion, AnimatePresence } from "framer-motion";
-import { Search, Gift, ChevronDown, ChevronUp, Grid3X3, Layers, Star, Zap, Award, Heart, Eye, EyeOff, Flame, Sparkles, Shield, Sword, Gem, Skull, Gamepad2, Ticket, Crosshair, Crown, ShoppingBag, Coins, Users, Video } from "lucide-react";
+import { AnimatePresence } from "framer-motion";
+import { Search, Gift, ChevronDown, ChevronUp, Grid3X3, Layers, Star, Zap, Award, Heart, Eye, EyeOff, Flame, Sparkles, Shield, Sword, Gem, Skull, Gamepad2, Ticket, Crosshair, Crown, ShoppingBag, Coins, Users } from "lucide-react";
 import { FiGrid, FiLayers, FiStar, FiZap, FiAward, FiSearch, FiChevronDown, FiGift, FiEye, FiEyeOff, FiHeart } from "react-icons/fi";
 import CaseCardRenderer from "../components/CaseCardRenderer";
 import { getRarityColor } from "../constants/colors";
@@ -124,7 +123,7 @@ const DailyRouletteModal = ({ isOpen, onClose, rewardAmount, skinsPool }) => {
 
           <div ref={containerRef} style={{ display: "flex", gap: "10px", paddingLeft: "50%", transition: "none" }}>
             {reel.map((skin, i) => {
-              const dailyCardKey = `daily-${skin?.id || skin?.name || 'unknown'}-${i}-${Date.now()}`;
+              const dailyCardKey = `daily-${skin?.id || skin?.name || 'unknown'}-${i}`;
               return (
                 <div
                   key={dailyCardKey}
@@ -612,9 +611,6 @@ export default function Cases() {
     return cases;
   }, []);
 
-  // Also get the original generated cases for the full system
-  const originalCases = useMemo(() => generateAllCases(), []);
-
   // Merge both: use KeyDrop catalog for display, original for backend integration
   const allCases = useMemo(() => {
     return allKeyDropCases;
@@ -889,11 +885,7 @@ export default function Cases() {
               {/* Cases Grid */}
               <AnimatePresence>
                 {!isCollapsed && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.3 }}
+                  <div
                     className={`cases-grid ${isRiskZone ? "risk-grid" : ""}`}
                     style={{
                       display: "grid",
@@ -915,7 +907,7 @@ export default function Cases() {
                         forceStyle={CATEGORY_STYLE_MAP[catDef.id] || "battle"}
                       />
                     ))}
-                  </motion.div>
+                  </div>
                 )}
               </AnimatePresence>
             </div>

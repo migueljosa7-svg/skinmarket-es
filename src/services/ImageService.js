@@ -194,22 +194,7 @@ function extractSteamImageHash(url) {
  * replace special characters, format as expected by external APIs.
  * Example: "AK-47 | Redline (Field-Tested)" → "ak-47_redline"
  */
-function cleanSkinName(name) {
-  if (!name) return '';
-  // Remove parenthesized wear/quality suffixes: " (Field-Tested)", " (Minimal Wear)", etc.
-  var cleaned = name.replace(/\s*\([^)]*\)\s*/g, '');
-  // Remove leading/trailing whitespace
-  cleaned = cleaned.trim();
-  // Lowercase
-  cleaned = cleaned.toLowerCase();
-  // Replace " | " with "_"
-  cleaned = cleaned.replace(/\s*\|\s*/g, '_');
-  // Replace remaining spaces with underscores
-  cleaned = cleaned.replace(/\s+/g, '_');
-  // Remove any non-alphanumeric characters except underscores and hyphens
-  cleaned = cleaned.replace(/[^a-z0-9_-]/g, '');
-  return cleaned;
-}
+
 
 // ---------------------------------------------------------------------------
 // Public API: getSkinImageSources(skin) — returns ordered array of fallback URLs
@@ -224,10 +209,8 @@ export function getSkinImageSources(skin) {
   var sources = [];
   if (!skin) return sources;
 
-  var skinName = skin.name || '';
   var originalImage = skin.image || '';
   var hash = extractSteamImageHash(originalImage) || skin.icon_url || '';
-  var cleanName = cleanSkinName(skinName);
 
   // Validate the Steam hash before using it. Corrupted/truncated hashes that fail
   // validation will cause the browser to emit 404 console errors on first render.
@@ -447,7 +430,7 @@ export async function handleImageError(event, skin) {
   }
 
   // All CDNs exhausted: try emergency skin before SVG placeholder (sync, no HEAD)
-  var emergencyUrl = getEmergencySkinUrl(skin && skin.name);
+   emergencyUrl = getEmergencySkinUrl(skin && skin.name);
   if (emergencyUrl && !failedUrls.has(emergencyUrl)) {
     failedUrls.add(emergencyUrl);
     img.src = emergencyUrl;
@@ -475,18 +458,6 @@ export async function handleImageError(event, skin) {
  * Get current user ID from localStorage
  * @returns {string|null} User ID or null
  */
-function getCurrentUserId() {
-  try {
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      const user = JSON.parse(userData);
-      return user.usuario_id || user.id || null;
-    }
-  } catch (err) {
-    // Silent fail
-  }
-  return null;
-}
 
 // ---------------------------------------------------------------------------
 // Public API: Utility functions

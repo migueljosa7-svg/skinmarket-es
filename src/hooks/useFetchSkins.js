@@ -30,6 +30,7 @@ export const getSkins = async () => {
   // Return cached skins if we have them (with or without priceMap)
   if (cachedSkins) return cachedSkins;
 
+  // eslint-disable-next-line no-useless-catch
   try {
     const res = await fetch(SKINS_API);
     if (!res.ok) throw new Error("API de skins no respondió correctamente");
@@ -45,7 +46,7 @@ export const getSkins = async () => {
         } else {
           priceMap = {};
         }
-      } catch (e) {
+      } catch {
         priceMap = {};
       }
     }

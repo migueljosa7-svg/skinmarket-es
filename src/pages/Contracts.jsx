@@ -1,12 +1,12 @@
 // src/pages/Contracts.jsx
-import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { motion as Motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../context/useAuth";
 import { getRarityColor } from "../constants/colors.js";
 import { StorageService } from "../services/StorageService";
 import { sound } from "../utils/audio";
 import { getFloatBadgeProps } from "../utils/floatPreview";
-import { getSkinImageUrl, getPlaceholderImage, handleImageError } from "../services/ImageService";
+import { getSkinImageUrl, handleImageError } from "../services/ImageService";
 import { useToast } from "../components/Toast";
 
 /* ─────────────────────────────────────────────
@@ -297,7 +297,7 @@ export default function Contracts() {
 
       setIsFusing(false);
     }, 2000);
-  }, [selectedIds, selectedSkins, user?.nombre_usuario]);
+  }, [inventory, selectedIds, selectedSkins, toast, user?.nombre_usuario]);
 
   const handleFusionComplete = () => {
     setShowFusion(false);

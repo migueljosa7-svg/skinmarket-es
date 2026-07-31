@@ -303,7 +303,7 @@ class BotEngine {
     // ============================================================
 
     _bindEvents() {
-        this.client.on('loggedOn', (details) => {
+        this.client.on('loggedOn', () => {
             _log('[BOT ENGINE] ✅ Conectado a Steam (bajo demanda)');
             _log(`[BOT ENGINE] SteamID: ${this.client.steamID.getSteamID64()}`);
 
@@ -390,7 +390,7 @@ class BotEngine {
             });
         });
 
-        this.manager.on('sentOfferChanged', (offer, oldState) => {
+        this.manager.on('sentOfferChanged', (offer) => {
             _log(`[BOT ENGINE] 🔄 Estado de oferta #${offer.id} cambiado: ${offer.state}`);
             if (offer.state === TradeOfferManager.EOfferState.Accepted) {
                 _log(`[BOT ENGINE] ✅ Oferta #${offer.id} ACEPTADA por el usuario`);
@@ -404,7 +404,7 @@ class BotEngine {
             }
         });
 
-        this.manager.on('receivedOfferChanged', (offer, oldState) => {
+        this.manager.on('receivedOfferChanged', (offer) => {
             _log(`[BOT ENGINE] 🔄 Oferta recibida #${offer.id} estado: ${offer.state}`);
         });
     }

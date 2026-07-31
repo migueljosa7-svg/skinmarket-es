@@ -25,7 +25,9 @@ function getAuthToken() {
       const parsed = JSON.parse(raw);
       return parsed?.user?.token || null;
     }
-  } catch (e) { }
+  } catch  { 
+    // Ignore JSON parse errors
+  }
   return null;
 }
 
@@ -436,7 +438,7 @@ export default function CaseView() {
     setReel(newReel);
     setResults(savedSkins);
     setIsSpinning(true);
-  }, [user, caseData, quantity, validSkins]);
+  }, [user, toast, caseData.price, caseData.id, caseData.name, caseData.category, jokerMode, quantity, validSkins]);
 
   const handleSpinComplete = useCallback(() => {
     setIsSpinning(false);

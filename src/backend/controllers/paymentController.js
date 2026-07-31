@@ -163,7 +163,7 @@ export async function createCharge(req, res) {
           `SELECT * FROM promo_codes WHERE code = $1 AND active = true AND (expires_at IS NULL OR expires_at > NOW())`,
           [normalizedCode]
         );
-      } catch (e) {
+      } catch {
         // Fallback to gift_codes table if promo_codes doesn't exist
         giftResult = await db.query(
           "SELECT * FROM gift_codes WHERE code = $1 AND active = true AND (expires_at IS NULL OR expires_at > NOW())",
@@ -239,9 +239,9 @@ export async function createCharge(req, res) {
             "UPDATE promo_codes SET current_uses = current_uses + 1 WHERE code = $1",
             [normalizedCode]
           );
-        } catch (e) {
+        } catch {
           // Fallback to gift_codes table
-          await client.query(
+          await db.query(
             "UPDATE gift_codes SET current_uses = current_uses + 1 WHERE code = $1",
             [normalizedCode]
           );
@@ -253,7 +253,7 @@ export async function createCharge(req, res) {
             "INSERT INTO user_promo_usage (user_id, code_id, used_at) VALUES ($1, $2, NOW()) ON CONFLICT DO NOTHING",
             [userId, gift.id]
           );
-        } catch (e) {
+        } catch {
           // Table might not exist — non-critical, continue
         }
       });

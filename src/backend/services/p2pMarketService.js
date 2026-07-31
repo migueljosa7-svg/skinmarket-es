@@ -270,7 +270,7 @@ class P2PMarketService {
   /**
    * Search ShadowPay marketplace
    */
-  async _searchShadowPay(marketHashName, options) {
+  async _searchShadowPay(marketHashName) {
     const response = await this._apiRequest("get", "shadowpay", "search", {
       search: marketHashName,
       sort: "price_asc",
@@ -387,15 +387,15 @@ class P2PMarketService {
 
   // ─── Simulation Methods (REMOVED FOR PRODUCTION) ──────────────────────────
 
-  _simulateSearch(marketHashName, options) {
+  _simulateSearch() {
     throw new Error("P2P simulation no disponible en producción. Configura P2P_MARKET_API_KEY.");
   }
 
-  _simulatePurchase(listingId, marketHashName, partnerSteamID64, tradeToken, maxPrice) {
+  _simulatePurchase() {
     throw new Error("P2P simulation no disponible en producción. Configura P2P_MARKET_API_KEY.");
   }
 
-  _estimatePrice(marketHashName) {
+  _estimatePrice() {
     throw new Error("P2P price estimation no disponible en producción.");
   }
 

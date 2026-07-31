@@ -8,11 +8,11 @@ function validatePassword(password) {
   if (!password || password.length < 8) return { valid: false, error: "La contrasena debe tener al menos 8 caracteres" };
   if (!/[A-Z]/.test(password)) return { valid: false, error: "La contrasena debe contener al menos una mayuscula" };
   if (!/[0-9]/.test(password)) return { valid: false, error: "La contrasena debe contener al menos un numero" };
-  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?~`]/.test(password)) return { valid: false, error: "La contrasena debe contener al menos un caracter especial" };
+  if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(password)) return { valid: false, error: "La contraseña debe contener al menos un caracter especial" };
   return { valid: true };
 }
 
-const SPECIAL_CHARS_REGEX = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?~`]/;
+const SPECIAL_CHARS_REGEX = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/;
 
 export default function Login() {
   const [view, setView] = useState("login");
@@ -64,7 +64,7 @@ export default function Login() {
         .finally(function () {
           cleanOAuthParams();
           setTimeout(function () {
-            try { navigate("/dashboard"); } catch (_err) { window.location.href = "/dashboard"; }
+            try { navigate("/dashboard"); } catch { window.location.href = "/dashboard"; }
           }, 500);
         });
     } else {
@@ -159,7 +159,7 @@ useEffect(function () {
               setSuccess(true);
               setTimeout(function () { navigate("/dashboard"); }, 500);
             } else { setError(data.error || "Error al iniciar sesion con Google"); setSocialLoading(null); }
-          } catch (err) { setError("Error de conexion."); setSocialLoading(null); }
+          } catch { setError("Error de conexion."); setSocialLoading(null); }
         }
       });
       window.google.accounts.id.prompt(function (notification) {
@@ -168,7 +168,7 @@ useEffect(function () {
           setError("Google Sign-In cancelado.");
         }
       });
-    } catch (err) { setError("Error al inicializar Google Sign-In."); setSocialLoading(null); }
+    } catch { setError("Error al inicializar Google Sign-In."); setSocialLoading(null); }
   };
 
   return (

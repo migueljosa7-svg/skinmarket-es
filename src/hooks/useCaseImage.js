@@ -97,7 +97,6 @@ const CASE_SPECIFIC_IMAGES = {
     "ADRENALINE": "/case_knife.svg",
     "RADIANT": "/case_knife.svg",
     "LOTUS": "/case_knife.svg",
-    "FLAME": "/case_vip.svg",
     // ANIME
     "FLAMES": "/case_eco.png",
     "SKETCH": "/case_eco.png",

@@ -12,9 +12,6 @@ const footerLinkStyle = {
   padding: '4px 0',
 };
 
-const footerLinkHoverStyle = {
-  color: 'rgba(255,255,255,0.8)',
-};
 
 const columnTitleStyle = {
   color: 'white',

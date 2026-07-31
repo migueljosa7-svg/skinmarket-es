@@ -85,10 +85,12 @@ loadInitialData() {
         };
       }
       return null;
-    } catch (e) {
+    } catch {
       try {
         localStorage.removeItem(STORAGE_KEY);
-      } catch (clearErr) { }
+      } catch {
+        // Silently handle localStorage write failures
+      }
     }
     return null;
   }
@@ -96,7 +98,7 @@ loadInitialData() {
   saveDataDirect(data) {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    } catch (e) {
+    } catch  {
       // Silently handle localStorage write failures
     }
   }
@@ -106,7 +108,7 @@ loadInitialData() {
     this.listeners.forEach((listener) => {
       try {
         listener(this.data);
-      } catch (err) {
+      } catch{
         // Silently handle listener errors
       }
     });

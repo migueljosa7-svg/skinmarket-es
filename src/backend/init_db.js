@@ -8,13 +8,13 @@ const initDb = async () => {
     try {
       await db.query('SELECT 1');
       break;
-    } catch (err) {
-      if (attempt === maxRetries) {
-        process.exit(1);
-      }
-      const delay = attempt * 2000;
-      await sleep(delay);
+  } catch {
+    if (attempt === maxRetries) {
+      process.exit(1);
     }
+    const delay = attempt * 2000;
+    await sleep(delay);
+  }
   }
 
   // ── STEP 1: CREATE ALL TABLES FIRST (in order of dependencies) ──
@@ -188,7 +188,7 @@ const initDb = async () => {
       await db.query(q);
     }
     process.exit(0);
-  } catch (err) {
+  } catch {
     process.exit(1);
   }
 };
