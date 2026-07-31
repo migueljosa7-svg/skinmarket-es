@@ -118,13 +118,15 @@ useEffect(function () {
     window.location.href = API_BASE + "/api/auth/steam";
   };
 
+  const hasGoogleClientId = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
+
   const handleGoogleLogin = function () {
     setSocialLoading("google");
     var clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
     if (!clientId) {
-      setError("Google Sign-In no configurado. Contacta al administrador si el problema persiste.");
+      setError("Google Sign-In no configurado (falta VITE_GOOGLE_CLIENT_ID). Contacta al administrador.");
       setSocialLoading(null);
-      setTimeout(function () { setError(""); }, 3000);
+      setTimeout(function () { setError(""); }, 4000);
       return;
     }
     if (!window.google) {
@@ -189,8 +191,35 @@ useEffect(function () {
               <button type="button" onClick={handleSteamLogin} disabled={socialLoading !== null} style={{ width: "100%", padding: "14px", borderRadius: "12px", background: socialLoading === "steam" ? "rgba(26,46,58,0.5)" : "#1b2838", color: "white", border: "1px solid #2a475e", fontWeight: "900", fontSize: "0.9rem", cursor: socialLoading !== null ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
                 {socialLoading === "steam" ? (<><span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>⟳</span> Conectando...</>) : (<>CONTINUAR CON STEAM</>)}
               </button>
-              <button type="button" onClick={handleGoogleLogin} disabled={socialLoading !== null} style={{ width: "100%", padding: "14px", borderRadius: "12px", background: socialLoading === "google" ? "rgba(255,255,255,0.05)" : "white", color: "#1a1a1a", border: "1px solid rgba(255,255,255,0.1)", fontWeight: "900", fontSize: "0.9rem", cursor: socialLoading !== null ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
-                {socialLoading === "google" ? (<><span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>⟳</span> Conectando...</>) : (<>CONTINUAR CON GOOGLE</>)}
+              <button
+                type="button"
+                onClick={handleGoogleLogin}
+                disabled={socialLoading !== null || !hasGoogleClientId}
+                title={!hasGoogleClientId ? "Google Sign-In no configurado (falta VITE_GOOGLE_CLIENT_ID)" : "Iniciar sesion con Google"}
+                style={{
+                  width: "100%",
+                  padding: "14px",
+                  borderRadius: "12px",
+                  background: socialLoading === "google" ? "rgba(255,255,255,0.05)" : (!hasGoogleClientId ? "rgba(255,255,255,0.05)" : "white"),
+                  color: !hasGoogleClientId ? "rgba(255,255,255,0.4)" : "#1a1a1a",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  fontWeight: "900",
+                  fontSize: "0.9rem",
+                  cursor: (socialLoading !== null || !hasGoogleClientId) ? "not-allowed" : "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "10px",
+                  opacity: !hasGoogleClientId ? 0.6 : 1
+                }}
+              >
+                {socialLoading === "google" ? (
+                  <><span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>⟳</span> Conectando...</>
+                ) : !hasGoogleClientId ? (
+                  <>GOOGLE (NO CONFIGURADO)</>
+                ) : (
+                  <>CONTINUAR CON GOOGLE</>
+                )}
               </button>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "20px" }}>

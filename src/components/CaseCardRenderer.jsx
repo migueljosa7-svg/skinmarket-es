@@ -6,6 +6,7 @@
 
 import { Heart } from "lucide-react";
 import { useMemo } from "react";
+import { motion } from "framer-motion";
 
 // ─── Rarity Color Mapping for Glow Effects ──────────────────────────
 const RARITY_GLOW = {

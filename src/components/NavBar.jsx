@@ -39,18 +39,26 @@ export default function Navbar() {
 
   return (
     <>
-      <style>{`.navbar-link { color: rgba(255,255,255,0.7); transition: color 0.2s, background 0.2s; } .navbar-link:hover { color: #fff; background: rgba(255,255,255,0.05); } .icon-btn { width: 40px; height: 40px; border-radius: 12px; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; color: white; text-decoration: none; transition: all 0.2s ease; font-size: 1rem; } .icon-btn:hover { background: rgba(255,255,255,0.1); transform: translateY(-2px); } .icon-btn:active { transform: translateY(0); } .logout-btn { padding: 10px 20px; border-radius: 12px; border: none; background: rgba(255,85,85,0.1); color: #ff5555; font-weight: 900; cursor: pointer; transition: all 0.2s ease; font-family: inherit; font-size: 0.85rem; } .logout-btn:hover { background: rgba(255,85,85,0.2); transform: translateY(-2px); } .login-btn { padding: 12px 32px; border-radius: 12px; border: none; background: #f5ac3b; color: black; font-weight: 900; cursor: pointer; box-shadow: 0 4px 15px rgba(245, 172, 59, 0.3); transition: all 0.2s ease; font-family: inherit; font-size: 0.95rem; } .login-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(245, 172, 59, 0.4); } /* Mobile & Tablet responsive */ @media (max-width: 1024px) { .nav-links { display: none !important; } .mobile-toggle { display: flex !important; } .nav-icons.desktop-icons { display: none !important; } .nav-icons .icon-btn.hide-mobile { display: none !important; } .nav-icons .hide-on-tablet { display: none !important; } } @media (max-width: 768px) { nav { padding: 0 16px !important; height: 64px !important; } .nav-icons .icon-btn { width: 32px !important; height: 32px !important; } } @media (min-width: 1025px) { .mobile-toggle { display: none !important; } .mobile-menu-backdrop { display: none !important; } } @media (max-width: 1100px) and (min-width: 1025px) { .nav-links { gap: 2px; } .nav-links a { font-size: 0.8rem; padding: 6px 8px; } }`}</style>
-
-      <nav style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 40px", height: "80px", background: "#0c0d10", borderBottom: "1px solid rgba(255,255,255,0.05)", position: "sticky", top: 0, zIndex: 100, backdropFilter: "blur(20px)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "40px" }}>
-          <Link to="/" style={{ display: "inline-flex", alignItems: "center", gap: "12px", fontSize: "1.4rem", fontWeight: "900", color: "white", textDecoration: "none", letterSpacing: "-0.5px" }}>
-            <div style={{ width: "32px", height: "32px", background: "#f5ac3b", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "900", color: "black", fontSize: "1rem" }}>S</div>
-            <span>SKINMART<span style={{ color: "#f5ac3b" }}>ES</span></span>
+      <nav className="flex flex-wrap md:flex-nowrap justify-between items-center px-3 sm:px-6 lg:px-10 py-2.5 md:py-0 min-h-[64px] md:h-20 bg-[#0c0d10] border-b border-white/5 sticky top-0 z-50 backdrop-blur-xl min-w-0 overflow-visible w-full">
+        {/* Left Side: Brand & Main Navigation */}
+        <div className="flex items-center gap-3 sm:gap-6 lg:gap-10 flex-shrink-0 min-w-0 overflow-visible">
+          <Link to="/" className="inline-flex items-center gap-2 sm:gap-3 text-lg sm:text-xl lg:text-2xl font-black text-white no-underline tracking-tight flex-shrink-0">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 bg-[#f5ac3b] rounded-lg flex items-center justify-center font-black text-black text-sm sm:text-base shadow-sm">S</div>
+            <span>SKINMART<span className="text-[#f5ac3b]">ES</span></span>
           </Link>
+
           {user && (
-            <div className="nav-links" style={{ display: "flex", gap: "5px", alignItems: "center" }}>
+            <div className="hidden lg:flex items-center gap-1 xl:gap-2 flex-shrink min-w-0 overflow-visible">
               {NAV_ITEMS.map((item) => (
-                <Link key={item.to} to={item.to} className="navbar-link" style={{ textDecoration: "none", fontSize: "0.95rem", fontWeight: "600", padding: "8px 12px", borderRadius: "8px", background: location.pathname.startsWith(item.to) ? "rgba(255,255,255,0.05)" : "transparent", color: location.pathname.startsWith(item.to) ? "#fff" : "rgba(255,255,255,0.7)" }}>
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  className={`no-underline text-xs xl:text-sm font-semibold px-2.5 xl:px-3 py-2 rounded-lg transition-colors flex-shrink-0 ${
+                    location.pathname.startsWith(item.to)
+                      ? "bg-white/10 text-white font-bold"
+                      : "text-white/70 hover:text-white hover:bg-white/5"
+                  }`}
+                >
                   {item.label}
                 </Link>
               ))}
@@ -58,64 +66,136 @@ export default function Navbar() {
           )}
         </div>
 
-        <div className="nav-icons" style={{ display: "flex", gap: "20px", alignItems: "center" }}>
+        {/* Right Side: User Controls, Balance, Profile & Action Buttons */}
+        <div className="flex items-center gap-2 sm:gap-3 lg:gap-5 flex-shrink-0 min-w-0 overflow-visible">
           {user ? (
             <>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "6px 16px", background: "rgba(245, 172, 59, 0.1)", borderRadius: "12px", border: "1px solid rgba(245, 172, 59, 0.2)" }}>
-                  <GiTwoCoins style={{ color: "#f5ac3b", fontSize: "1.1rem" }} />
-                  <span style={{ fontWeight: "900", color: "#f5ac3b", fontSize: "0.95rem" }}>{Number(user?.balance ?? user?.saldo ?? 0).toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€</span>
+              {/* Balance & Recharge */}
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 bg-[#f5ac3b]/10 rounded-xl border border-[#f5ac3b]/20 flex-shrink-0">
+                  <GiTwoCoins className="text-[#f5ac3b] text-sm sm:text-base flex-shrink-0" />
+                  <span className="font-black text-[#f5ac3b] text-xs sm:text-sm whitespace-nowrap">
+                    {Number(user?.balance ?? user?.saldo ?? 0).toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
+                  </span>
                 </div>
-                <button onClick={() => setRechargeOpen(true)} className="icon-btn" style={{ width: "32px", height: "32px", background: "#f5ac3b", color: "black", border: "none", cursor: "pointer" }} title="Recargar saldo"><FaPlus /></button>
+                <button
+                  onClick={() => setRechargeOpen(true)}
+                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-[#f5ac3b] text-black border-none cursor-pointer flex items-center justify-center flex-shrink-0 hover:scale-105 active:scale-95 transition-transform"
+                  title="Recargar saldo"
+                >
+                  <FaPlus className="text-xs sm:text-sm" />
+                </button>
               </div>
 
-              <div className="desktop-icons" style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+              {/* Desktop Icon Links (Ranking, Inventory, Profile) */}
+              <div className="hidden md:flex items-center gap-2 flex-shrink-0">
                 {ICON_LINKS.map((item) => (
-                  <Link key={item.to} to={item.to} className="icon-btn" title={item.label}><item.icon /></Link>
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    className="w-8 h-8 lg:w-10 lg:h-10 rounded-xl bg-white/5 flex items-center justify-center color-white text-white no-underline hover:bg-white/10 hover:-translate-y-0.5 active:translate-y-0 transition-all text-xs lg:text-sm flex-shrink-0"
+                    title={item.label}
+                  >
+                    <item.icon />
+                  </Link>
                 ))}
               </div>
 
-              <button onClick={handleToggleMute} className="icon-btn hide-mobile" title={isMuted ? "Activar sonido" : "Silenciar sonido"} style={{ width: "32px", height: "32px", background: isMuted ? "rgba(239,68,68,0.1)" : "rgba(16,185,129,0.1)", border: "1px solid " + (isMuted ? "rgba(239,68,68,0.2)" : "rgba(16,185,129,0.2)"), color: isMuted ? "#ef4444" : "#10b981", cursor: "pointer" }}>
-                {isMuted ? <FaVolumeMute /> : <FaVolumeUp />}
+              {/* Mute Audio Toggle */}
+              <button
+                onClick={handleToggleMute}
+                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center flex-shrink-0 border cursor-pointer transition-all ${
+                  isMuted
+                    ? "bg-red-500/10 border-red-500/20 text-red-400"
+                    : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                }`}
+                title={isMuted ? "Activar sonido" : "Silenciar sonido"}
+              >
+                {isMuted ? <FaVolumeMute className="text-xs sm:text-sm" /> : <FaVolumeUp className="text-xs sm:text-sm" />}
               </button>
 
-              <button onClick={handleLogout} className="logout-btn hide-mobile" title="Cerrar sesion"><FaSignOutAlt style={{ marginRight: "6px" }} /> SALIR</button>
+              {/* Logout Button ("Salir") */}
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-1.5 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl border-none bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 font-black cursor-pointer text-xs sm:text-sm flex-shrink-0 transition-all"
+                title="Cerrar sesion"
+              >
+                <FaSignOutAlt className="text-xs sm:text-sm" />
+                <span className="hidden sm:inline">SALIR</span>
+              </button>
             </>
           ) : (
-            <Link to="/login" style={{ textDecoration: "none" }}>
-              <button className="login-btn">LOGIN</button>
+            <Link to="/login" className="no-underline flex-shrink-0">
+              <button className="px-5 sm:px-8 py-2.5 sm:py-3 rounded-xl border-none bg-[#f5ac3b] text-black font-black cursor-pointer shadow-lg shadow-[#f5ac3b]/20 hover:-translate-y-0.5 active:translate-y-0 transition-all text-xs sm:text-sm">
+                LOGIN
+              </button>
             </Link>
           )}
 
+          {/* Mobile Menu Toggle Button */}
           {user && (
-            <button className="mobile-toggle" onClick={() => setMobileOpen(!mobileOpen)} style={{ display: "none", background: "none", border: "none", color: "white", fontSize: "1.5rem", cursor: "pointer", padding: "8px", zIndex: 110 }} aria-label={mobileOpen ? "Cerrar menu" : "Abrir menu"}>
-              {mobileOpen ? <FaTimes /> : <FaBars />}
+            <button
+              className="lg:hidden flex items-center justify-center p-2 text-white bg-white/5 rounded-xl border border-white/10 cursor-pointer flex-shrink-0"
+              onClick={() => setMobileOpen(!mobileOpen)}
+              aria-label={mobileOpen ? "Cerrar menu" : "Abrir menu"}
+            >
+              {mobileOpen ? <FaTimes className="text-base sm:text-lg" /> : <FaBars className="text-base sm:text-lg" />}
             </button>
           )}
         </div>
       </nav>
 
+      {/* Mobile Menu Overlay & Drawer */}
       {mobileOpen && user && (
-        <div className="mobile-menu-backdrop" onClick={() => setMobileOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", zIndex: 98, animation: "fadeIn 0.2s ease" }} />
-      )}
+        <>
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
+            onClick={() => setMobileOpen(false)}
+          />
+          <div className="fixed top-[64px] sm:top-[80px] left-0 right-0 bg-[#0c0d10] border-b border-white/10 p-5 z-40 lg:hidden flex flex-col gap-2 shadow-2xl animate-in slide-in-from-top duration-200">
+            {/* Quick Profile & Inventory icons for mobile drawer */}
+            <div className="flex items-center justify-around pb-3 mb-2 border-b border-white/5 md:hidden">
+              {ICON_LINKS.map((item) => (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 text-white no-underline text-sm font-semibold hover:bg-white/10"
+                >
+                  <item.icon />
+                  <span>{item.label}</span>
+                </Link>
+              ))}
+            </div>
 
-      {mobileOpen && user && (
-        <div className="mobile-menu" style={{ position: "fixed", top: "80px", left: 0, right: 0, background: "#0c0d10", borderBottom: "1px solid rgba(255,255,255,0.05)", padding: "20px", zIndex: 99, display: "flex", flexDirection: "column", gap: "6px", boxShadow: "0 20px 60px rgba(0,0,0,0.5)", animation: "slideDown 0.25s ease" }}>
-          {NAV_ITEMS.map((item) => (
-            <Link key={item.to} to={item.to} onClick={() => setMobileOpen(false)} className="navbar-link" style={{ textDecoration: "none", fontSize: "1.1rem", fontWeight: "600", padding: "14px 16px", borderRadius: "12px", background: location.pathname.startsWith(item.to) ? "rgba(255,255,255,0.05)" : "transparent", color: location.pathname.startsWith(item.to) ? "#fff" : "rgba(255,255,255,0.7)", borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
-              {item.label}
-            </Link>
-          ))}
-          <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", marginTop: "10px", paddingTop: "10px" }}>
-            <button onClick={() => { setMobileOpen(false); handleLogout(); }} style={{ width: "100%", padding: "14px", borderRadius: "12px", background: "rgba(255,85,85,0.1)", color: "#ff5555", border: "1px solid rgba(255,85,85,0.2)", fontWeight: "900", fontSize: "1rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
-              <FaSignOutAlt /> CERRAR SESION
-            </button>
+            {NAV_ITEMS.map((item) => (
+              <Link
+                key={item.to}
+                to={item.to}
+                onClick={() => setMobileOpen(false)}
+                className={`no-underline text-base font-semibold px-4 py-3 rounded-xl transition-colors ${
+                  location.pathname.startsWith(item.to)
+                    ? "bg-white/10 text-white font-bold"
+                    : "text-white/70 hover:text-white hover:bg-white/5"
+                }`}
+              >
+                {item.label}
+              </Link>
+            ))}
+
+            <div className="border-t border-white/10 pt-3 mt-2">
+              <button
+                onClick={() => { setMobileOpen(false); handleLogout(); }}
+                className="w-full py-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 font-black text-sm cursor-pointer flex items-center justify-center gap-2 transition-all"
+              >
+                <FaSignOutAlt /> CERRAR SESION
+              </button>
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       <RechargeModal open={rechargeOpen} onClose={() => setRechargeOpen(false)} />
-      <style>{`@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } } @keyframes slideDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }`}</style>
     </>
   );
 }
