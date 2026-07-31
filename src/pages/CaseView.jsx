@@ -15,6 +15,10 @@ import { FiAlertTriangle, FiShield, FiLock, FiCheckCircle } from "react-icons/fi
 const API_BASE = import.meta.env.VITE_API_URL || "";
 
 function getAuthToken() {
+  // Primary: check localStorage "token" key (set by AuthContext on real login/OAuth)
+  const directToken = localStorage.getItem("token");
+  if (directToken && directToken.length > 10) return directToken;
+  // Fallback: try getting token from StorageService (skinmarket_db_v1.user.token)
   try {
     const raw = localStorage.getItem("skinmarket_db_v1");
     if (raw) {
@@ -268,13 +272,19 @@ export default function CaseView() {
   }, [allSkins, caseData]);
 
   const startSpin = useCallback(async () => {
-    if (!user || !user?.balance) return toast.error("Inicia sesión para abrir cajas");
+    // FIX: Check localStorage token as fallback if user is null in context
+    // Prevents "Debes iniciar sesión" errors after OAuth login
+    const hasToken = !!localStorage.getItem("token");
+    if (!user && !hasToken) return toast.error("Inicia sesión para abrir cajas");
+
+    // Get safe user reference - use context user or construct from StorageService
+    const safeUser = user || StorageService.getUser() || { nombre_usuario: "Jugador", stats: {} };
 
     // Joker Mode: 3x price but equalized probabilities
     const basePrice = parseFloat(caseData.price);
     const priceMultiplier = jokerMode ? 3 : 1;
     const totalCost = basePrice * priceMultiplier * quantity;
-    const userBalance = Number(user?.balance ?? user?.saldo ?? 0);
+    const userBalance = Number(safeUser?.balance ?? safeUser?.saldo ?? 0);
 
     if (userBalance < totalCost) {
       setBalanceError(`Necesitas €${(totalCost - userBalance).toFixed(2)} adicionales`);
@@ -317,18 +327,18 @@ export default function CaseView() {
             }));
 
             // Update local storage to reflect backend state
-            const newBalance = Number(data.newBalance || user.balance - totalCost);
+            const newBalance = Number(data.newBalance || safeUser.balance - totalCost);
             StorageService.updateUser({ balance: newBalance, saldo: newBalance });
             const savedSkins = StorageService.addSkinsToInventory(backendItems);
             backendItems.forEach((item) => {
               StorageService.addLiveDrop({
-                user: user.nombre_usuario,
+                user: safeUser.nombre_usuario || "Jugador",
                 item: { name: item.name, price: item.price, rarity: item.rarity, image: item.image },
                 caseName: caseData.name
               });
             });
 
-            const currentStats = user.stats || {};
+            const currentStats = safeUser.stats || {};
             const totalWon = backendItems.reduce((acc, curr) => acc + curr.price, 0);
             StorageService.updateUser({
               stats: {
@@ -391,18 +401,18 @@ export default function CaseView() {
       }
     }
 
-    // Add won items to user inventory & push to live drops
+    // Add won items to user inventory & push to live drops (using safeUser to prevent null refs)
     const savedSkins = StorageService.addSkinsToInventory(expectedResults);
     expectedResults.forEach((item) => {
       StorageService.addLiveDrop({
-        user: user.nombre_usuario,
+        user: safeUser.nombre_usuario || "Jugador",
         item: { name: item.name, price: item.price, rarity: item.rarity, image: item.image },
         caseName: caseData.name
       });
     });
 
-    // Update user stats
-    const currentStats = user.stats || {};
+    // Update user stats (using safeUser to prevent null refs)
+    const currentStats = safeUser.stats || {};
     const totalWon = expectedResults.reduce((acc, curr) => acc + curr.price, 0);
     StorageService.updateUser({
       stats: {
@@ -706,7 +716,7 @@ export default function CaseView() {
                         cursor: "pointer"
                       }}
                     >
-                    <FiShield size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} /> VERIFICAR
+                      <FiShield size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} /> VERIFICAR
                     </button>
                     <button
                       onClick={() => {
