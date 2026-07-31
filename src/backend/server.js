@@ -162,6 +162,7 @@ const limiter = rateLimit({
   keyGenerator: (req) => {
     return req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
   },
+  validate: { keyGeneratorIpFallback: false },
   handler: (req, res) => {
     console.error('[EXPRESS RATE LIMIT EXCEEDED] General - IP:', req.ip, 'URL:', req.originalUrl);
     res.status(429).json({ error: "Demasiadas peticiones desde esta IP, por favor intenta de nuevo más tarde.", code: "RATE_LIMIT_GENERAL" });
@@ -173,6 +174,7 @@ const withdrawLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
   keyGenerator: (req) => req.user?.id || req.ip || 'unknown',
+  validate: { keyGeneratorIpFallback: false },
   handler: (req, res) => res.status(429).json({ error: "Límite de retiros excedido. Intenta de nuevo en 1 minuto.", code: "RATE_LIMIT_WITHDRAW" })
 });
 
@@ -180,6 +182,7 @@ const depositLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
   keyGenerator: (req) => req.user?.id || req.ip || 'unknown',
+  validate: { keyGeneratorIpFallback: false },
   handler: (req, res) => res.status(429).json({ error: "Límite de depósitos excedido. Intenta de nuevo en 1 minuto.", code: "RATE_LIMIT_DEPOSIT" })
 });
 
@@ -187,6 +190,7 @@ const caseOpenLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 30,
   keyGenerator: (req) => req.user?.id || req.ip || 'unknown',
+  validate: { keyGeneratorIpFallback: false },
   handler: (req, res) => res.status(429).json({ error: "Límite de aperturas excedido. Intenta de nuevo en 1 minuto.", code: "RATE_LIMIT_CASE_OPEN" })
 });
 
@@ -194,6 +198,7 @@ const dailyCaseLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 5,
   keyGenerator: (req) => req.user?.id || req.ip || 'unknown',
+  validate: { keyGeneratorIpFallback: false },
   handler: (req, res) => res.status(429).json({ error: "Límite de reclamos excedido.", code: "RATE_LIMIT_DAILY" })
 });
 
@@ -201,6 +206,7 @@ const inspectorLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 30,
   keyGenerator: (req) => req.user?.id || req.ip || 'unknown',
+  validate: { keyGeneratorIpFallback: false },
   handler: (req, res) => {
     console.error('[EXPRESS RATE LIMIT EXCEEDED] Inspector - IP:', req.ip, 'URL:', req.originalUrl);
     res.status(429).json({ error: "Límite de consultas excedido.", code: "RATE_LIMIT_INSPECTOR" });
@@ -212,6 +218,7 @@ const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
   keyGenerator: (req) => req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+  validate: { keyGeneratorIpFallback: false },
   handler: (req, res) => res.status(429).json({ error: "Demasiados intentos de inicio de sesión. Intenta de nuevo en 15 minutos.", code: "RATE_LIMIT_LOGIN" })
 });
 
@@ -219,6 +226,7 @@ const registerLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 5,
   keyGenerator: (req) => req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+  validate: { keyGeneratorIpFallback: false },
   handler: (req, res) => res.status(429).json({ error: "Demasiados intentos de registro. Intenta de nuevo en 1 hora.", code: "RATE_LIMIT_REGISTER" })
 });
 
@@ -264,7 +272,7 @@ passport.deserializeUser((obj, done) => done(null, obj));
 
 if (process.env.STEAM_API_KEY) {
   try {
-    passport.use(new SteamStrategy({
+      passport.use(new SteamStrategy({
       returnUrl: `${BACKEND_URL}/api/auth/steam/return`,
       realm: `${BACKEND_URL}/`,
       apiKey: process.env.STEAM_API_KEY
@@ -272,11 +280,19 @@ if (process.env.STEAM_API_KEY) {
       try {
         const steamId = profile.id;
         const nombre = profile.displayName;
+        // Extract Steam avatar from profile photos (full-size)
+        const steamAvatar = profile.photos?.[0]?.value || profile._json?.avatarfull || null;
         let result = await db.query("SELECT * FROM usuarios WHERE steam_id = $1", [steamId]);
         if (result.rows.length === 0) {
           result = await db.query(
-            "INSERT INTO usuarios (nombre_usuario, email, password_hash, steam_id, nivel, experiencia) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
-            [nombre, `${steamId}@steam.auth`, 'steam_no_password', steamId, 0, 0]
+            "INSERT INTO usuarios (nombre_usuario, email, password_hash, steam_id, avatar, nivel, experiencia) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *",
+            [nombre, `${steamId}@steam.auth`, 'steam_no_password', steamId, steamAvatar, 0, 0]
+          );
+        } else {
+          // Update avatar on subsequent logins
+          await db.query(
+            "UPDATE usuarios SET avatar = COALESCE(NULLIF($1, ''), avatar) WHERE usuario_id = $2",
+            [steamAvatar, result.rows[0].usuario_id]
           );
         }
         return done(null, result.rows[0]);
@@ -301,6 +317,16 @@ if (googleClient) {
   log(LOG_LEVELS.INFO, 'AUTH', 'Google OAuth2 client configurado correctamente');
 } else {
   log(LOG_LEVELS.WARN, 'AUTH', 'GOOGLE_CLIENT_ID no configurada. Autenticación Google deshabilitada.');
+}
+
+// ─── IS ADMIN MIDDLEWARE (DEFINED FIRST - HOISTED VIA FUNCTION DECLARATION) ──
+// IMPORTANT: Must be defined BEFORE any endpoint that uses it (like /api/update-balance)
+async function isAdmin(req, res, next) {
+  try {
+    const result = await db.query("SELECT role FROM usuarios WHERE usuario_id = $1", [req.user.id]);
+    if (result.rows[0]?.role === 'admin') next();
+    else res.status(403).json({ error: "Acceso denegado: Se requiere rol de administrador" });
+  } catch (err) { res.status(500).json({ error: "Error al verificar permisos" }); }
 }
 
 // ─── SECURITY HELPERS (PASO 3) ──────────────────────
@@ -413,14 +439,84 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
+// ─── STEAM AUTH TIMEOUT HELPER ──────────────────────────────
+// Wraps passport.authenticate with a safety timeout to prevent
+// infinite pending when Steam OpenID validation hangs.
+// If Steam doesn't respond within STEAM_AUTH_TIMEOUT_MS (8 seconds),
+// the request is aborted with a redirect to the login page with error.
+const STEAM_AUTH_TIMEOUT_MS = 8000;
+
+function steamAuthWithTimeout(req, res, next, authCallback) {
+  let responded = false;
+  const safeRespond = (redirectUrl) => {
+    if (!responded) {
+      responded = true;
+      return res.redirect(redirectUrl);
+    }
+  };
+
+  const timeout = setTimeout(() => {
+    if (!responded) {
+      responded = true;
+      log(LOG_LEVELS.ERROR, 'AUTH', '⏱️ TIMEOUT: Steam OpenID no respondió en 8 segundos');
+      const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+      res.redirect(`${FRONTEND_URL}/login?error=steam_timeout`);
+    }
+  }, STEAM_AUTH_TIMEOUT_MS);
+
+  // Wrap the original callback to clear timeout and prevent double response
+  const wrappedCallback = (err, user) => {
+    clearTimeout(timeout);
+    if (responded) return; // Already responded via timeout
+    authCallback(err, user, safeRespond);
+  };
+
+  passport.authenticate('steam', { failureRedirect: '/login' }, wrappedCallback)(req, res, next);
+}
+
 // --- AUTH ROUTES ---
 
-app.get('/api/auth/steam', passport.authenticate('steam', { failureRedirect: '/login' }), (req, res) => { });
-app.get('/api/auth/steam/return', passport.authenticate('steam', { failureRedirect: '/login' }), (req, res) => {
-  const user = req.user;
-  const token = jwt.sign({ id: user.usuario_id, email: user.email }, JWT_SECRET, { expiresIn: '8h' });
+app.get('/api/auth/steam', (req, res, next) => {
+  steamAuthWithTimeout(req, res, next, (err, user, safeRespond) => {
+    const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+    if (err) {
+      log(LOG_LEVELS.ERROR, 'AUTH', 'Error en autenticación Steam:', err.message);
+      return safeRespond(`${FRONTEND_URL}/login?error=steam_auth_failed`);
+    }
+    if (!user) return safeRespond(`${FRONTEND_URL}/login`);
+    req.logIn(user, (loginErr) => {
+      if (loginErr) return safeRespond(`${FRONTEND_URL}/login?error=login_failed`);
+      // Proceed to the next middleware (the redirect handler below)
+      next();
+    });
+  });
+}, (req, res) => {
   const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
-  res.redirect(`${FRONTEND_URL}/login?token=${token}`);
+  res.redirect(`${FRONTEND_URL}/login`);
+});
+
+app.get('/api/auth/steam/return', (req, res, next) => {
+  steamAuthWithTimeout(req, res, next, (err, user, safeRespond) => {
+    const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+    if (err) {
+      log(LOG_LEVELS.ERROR, 'AUTH', 'Error en callback Steam:', err.message);
+      return safeRespond(`${FRONTEND_URL}/login?error=steam_callback_failed`);
+    }
+    if (!user) return safeRespond(`${FRONTEND_URL}/login`);
+    req.logIn(user, (loginErr) => {
+      if (loginErr) {
+        log(LOG_LEVELS.ERROR, 'AUTH', 'Error en login de Steam:', loginErr.message);
+        return safeRespond(`${FRONTEND_URL}/login?error=login_failed`);
+      }
+      try {
+        const token = jwt.sign({ id: user.usuario_id, email: user.email }, JWT_SECRET, { expiresIn: '8h' });
+        safeRespond(`${FRONTEND_URL}/login?token=${token}`);
+      } catch (jwtErr) {
+        log(LOG_LEVELS.ERROR, 'AUTH', 'Error generando JWT en Steam:', jwtErr.message);
+        safeRespond(`${FRONTEND_URL}/login?error=token_generation_failed`);
+      }
+    });
+  });
 });
 
 // ─── GOOGLE OAUTH ENDPOINT ─────────────────────────
@@ -1669,6 +1765,7 @@ app.get("/api/steam-inventory/:steamId", authenticateToken, async (req, res) => 
     steamInventoryCache.set(cacheKey, { data: inventory, timestamp: Date.now() });
     res.json(inventory);
   } catch (err) {
+    log(LOG_LEVELS.ERROR, 'STEAM_INVENTORY', 'Error al consultar inventario Steam', { error: err.message });
     if (err.name === 'AbortError') {
       res.status(408).json({ error: "Steam API no responde" });
     } else {
@@ -1688,10 +1785,18 @@ app.get("/api/steam-price", async (req, res) => {
       { headers: { "User-Agent": "Mozilla/5.0" }, signal: controller.signal }
     );
     clearTimeout(timeoutId);
+    if (!response.ok) {
+      return res.status(response.status).json({ error: `Steam Market respondió con error ${response.status}` });
+    }
     const data = await response.json();
     res.json(data);
   } catch (err) {
-    res.status(500).json({ error: "Error fetching price" });
+    log(LOG_LEVELS.ERROR, 'STEAM_PRICE', 'Error al obtener precio de Steam', { error: err.message });
+    if (err.name === 'AbortError') {
+      res.status(504).json({ error: "Steam Market API no respondió a tiempo" });
+    } else {
+      res.status(500).json({ error: "Error al consultar precio de Steam" });
+    }
   }
 });
 
@@ -1749,14 +1854,6 @@ app.post("/api/skins/replace-corrupted", authenticateToken, async (req, res) => 
 });
 
 // --- ADMIN ROUTES ---
-
-const isAdmin = async (req, res, next) => {
-  try {
-    const result = await db.query("SELECT role FROM usuarios WHERE usuario_id = $1", [req.user.id]);
-    if (result.rows[0]?.role === 'admin') next();
-    else res.status(403).json({ error: "Acceso denegado: Se requiere rol de administrador" });
-  } catch (err) { res.status(500).json({ error: "Error al verificar permisos" }); }
-};
 
 app.get("/api/admin/stats", authenticateToken, isAdmin, async (req, res) => {
   try {

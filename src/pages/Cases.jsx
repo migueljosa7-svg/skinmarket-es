@@ -16,6 +16,7 @@ import { FiGrid, FiLayers, FiStar, FiZap, FiAward, FiSearch, FiChevronDown, FiGi
 import CaseCardRenderer from "../components/CaseCardRenderer";
 import { getRarityColor } from "../constants/colors";
 import { handleImageError, getSkinImageUrl } from "../services/ImageService";
+import { CASE_SPECIFIC_IMAGES } from "../hooks/useCaseImage";
 
 // ─── Daily Roulette Modal ──────────────────────────────────────────
 const DailyRouletteModal = ({ isOpen, onClose, rewardAmount, skinsPool }) => {
@@ -570,18 +571,22 @@ const CATEGORY_STYLE_MAP = {
 
 // ─── Generate case objects for a category ─────────────────────────
 const generateCategoryCases = (catDef) => {
-  return catDef.cases.map((c, idx) => ({
-    id: `${catDef.id}-${idx}`,
-    name: c.name,
-    price: c.price,
-    category: catDef.id,
-    image: null,
-    imageSrc: null,
-    color: catDef.color,
-    badge: catDef.label,
-    gold: c.gold || null,
-    previewSkins: []
-  }));
+  return catDef.cases.map((c, idx) => {
+    // Assign unique image from CASE_SPECIFIC_IMAGES mapping
+    const caseImage = CASE_SPECIFIC_IMAGES[c.name] || null;
+    return {
+      id: `${catDef.id}-${idx}`,
+      name: c.name,
+      price: c.price,
+      category: catDef.id,
+      image: caseImage,
+      imageSrc: caseImage,
+      color: catDef.color,
+      badge: catDef.label,
+      gold: c.gold || null,
+      previewSkins: []
+    };
+  });
 };
 
 // ─── Main Page Component ───────────────────────────────────────────

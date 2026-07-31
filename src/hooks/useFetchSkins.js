@@ -46,7 +46,6 @@ export const getSkins = async () => {
           priceMap = {};
         }
       } catch (e) {
-        console.warn('Could not load prices:', e);
         priceMap = {};
       }
     }
@@ -83,9 +82,8 @@ export const getSkins = async () => {
         raw: skin,
       };
     });
-    return cachedSkins;
+return cachedSkins;
   } catch (err) {
-    console.error("Error cargando skins:", err);
     throw err; // Re-throw to be caught by hook
   }
 };

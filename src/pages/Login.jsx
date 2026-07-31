@@ -102,11 +102,7 @@ export default function Login() {
     }
   };
 
-  const handleGuestLogin = function () {
-    login("guest@skinmarket.es").then(function () { navigate("/dashboard"); }).catch(function () { navigate("/dashboard"); });
-  };
-
-  useEffect(function () {
+useEffect(function () {
     var handlePopState = function () {
       if (new URLSearchParams(window.location.search).has("token")) {
         window.history.replaceState({}, "", window.location.pathname + window.location.hash);
@@ -240,7 +236,6 @@ export default function Login() {
           <button type="submit" disabled={loading} style={{ padding: "16px", background: "#f5ac3b", color: "black", border: "none", borderRadius: "14px", fontWeight: "900", fontSize: "1rem", cursor: "pointer", marginTop: "10px" }}>
             {loading ? "PROCESANDO..." : view === "login" ? "ENTRAR" : view === "register" ? "REGISTRARME" : "ENVIAR ENLACE"}
           </button>
-          <button type="button" onClick={handleGuestLogin} style={{ padding: "14px", background: "rgba(255,255,255,0.05)", color: "white", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "14px", fontWeight: "bold", fontSize: "0.9rem", cursor: "pointer" }}>► Entrar como Invitado</button>
         </form>
 
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: "25px", fontSize: "0.8rem", color: "rgba(255,255,255,0.5)" }}>
