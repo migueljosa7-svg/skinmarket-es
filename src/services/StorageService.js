@@ -63,18 +63,16 @@ class StorageServiceClass {
     this.data = this.loadInitialData();
   }
 
-  loadInitialData() {
+loadInitialData() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         if (raw === 'undefined' || raw === 'null' || raw.trim() === '') {
-          console.warn("StorageService: Invalid localStorage value detected, clearing.");
           localStorage.removeItem(STORAGE_KEY);
           return null;
         }
         const parsed = JSON.parse(raw);
         if (!parsed || typeof parsed !== 'object' || parsed === null) {
-          console.warn("StorageService: Corrupted localStorage data detected, clearing.");
           localStorage.removeItem(STORAGE_KEY);
           return null;
         }
@@ -87,11 +85,12 @@ class StorageServiceClass {
         };
       }
       return null;
-    } catch (e) {
-      console.warn("StorageService: Failed to parse localStorage data, clearing corrupted data.", e);
+    } catch {
       try {
         localStorage.removeItem(STORAGE_KEY);
-      } catch (clearErr) { }
+      } catch {
+        // Silently handle localStorage write failures
+      }
     }
     return null;
   }
@@ -99,8 +98,8 @@ class StorageServiceClass {
   saveDataDirect(data) {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    } catch (e) {
-      console.error("StorageService: Failed to write to localStorage", e);
+    } catch  {
+      // Silently handle localStorage write failures
     }
   }
 
@@ -109,8 +108,8 @@ class StorageServiceClass {
     this.listeners.forEach((listener) => {
       try {
         listener(this.data);
-      } catch (err) {
-        console.error("StorageService: Listener error", err);
+      } catch{
+        // Silently handle listener errors
       }
     });
   }

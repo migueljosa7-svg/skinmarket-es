@@ -16,7 +16,9 @@ function getAuthToken() {
       const parsed = JSON.parse(raw);
       return parsed?.user?.token || null;
     }
-  } catch (e) { }
+  } catch { 
+    // ignore JSON parse errors
+  }
   return null;
 }
 
@@ -123,9 +125,6 @@ export default function RechargeModal({ open, onClose }) {
 
   const method = PAYMENT_METHODS.find(m => m.id === activeMethod) || PAYMENT_METHODS[0];
   const isCrypto = ["BTC", "ETH", "USDT"].includes(activeMethod);
-  const isCard = activeMethod === "CARD";
-  const isPsc = activeMethod === "PSC";
-  const isSkinPay = activeMethod === "SKINPAY";
   const isGift = activeMethod === "GIFT";
 
   const amountNum = parseFloat(amount) || 0;
@@ -167,7 +166,7 @@ export default function RechargeModal({ open, onClose }) {
           toast.error(result.error || "Error al crear el cargo de pago.");
         }
       }
-    } catch (err) {
+    } catch {
       if (isCrypto) {
         const fallbackAddresses = {
           BTC: "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
@@ -206,7 +205,7 @@ export default function RechargeModal({ open, onClose }) {
       } else {
         toast.error(result.error || "Código no válido");
       }
-    } catch (err) {
+    } catch {
       // Gift codes can ONLY be redeemed via backend validation (single-use enforcement)
       toast.error("❌ Servicio de canje no disponible. Intenta de nuevo más tarde.");
     }

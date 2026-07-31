@@ -4,7 +4,7 @@ import { useAuth } from "../context/useAuth";
 import { getRarityColor } from "../constants/colors.js";
 import RechargeModal from "../components/RechargeModal";
 import { StorageService } from "../services/StorageService";
-import { getPlaceholderImage, getSkinImageUrl, handleImageError } from "../services/ImageService";
+import {  getSkinImageUrl, handleImageError } from "../services/ImageService";
 import { useToast } from "../components/Toast";
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
@@ -20,7 +20,9 @@ function getAuthToken() {
       const parsed = JSON.parse(raw);
       return parsed?.user?.token || null;
     }
-  } catch (e) { }
+  } catch { 
+    //
+  }
   return null;
 }
 
@@ -58,7 +60,7 @@ const SettingsModal = ({ open, onClose }) => {
           toast.error("Error al guardar los datos.");
         }
       }
-    } catch (err) {
+    } catch {
       toast.error("Error de conexión");
     }
     setLoading(false);
@@ -169,14 +171,14 @@ function useCountdown(targetDate) {
 }
 
 export default function Dashboard() {
-  const { user, sellSkin, sellAllSkins, withdrawSkin, claimDaily } = useAuth();
+  const { user, sellSkin, sellAllSkins, claimDaily } = useAuth();
   const toast = useToast();
   const [rechargeOpen, setRechargeOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [dailyTimer, setDailyTimer] = useState(null);
   const [dailyLoading, setDailyLoading] = useState(false);
-  const [lastDailyReward, setLastDailyReward] = useState(null);
+  const [ setLastDailyReward] = useState(null);
 
   // Load daily claim status
   useEffect(() => {
@@ -199,7 +201,7 @@ export default function Dashboard() {
   const handleSellAll = useCallback(() => {
     const total = sellAllSkins();
     toast.success(`Todas las skins vendidas por €${Number(total || 0).toFixed(2)}!`);
-  }, [sellAllSkins]);
+  }, [sellAllSkins, toast]);
 
   const handleClaimDailyReward = useCallback(async () => {
     setDailyLoading(true);
@@ -247,7 +249,7 @@ export default function Dashboard() {
           toast.error(res.error);
         }
       }
-    } catch (err) {
+    } catch {
       // Local fallback
       const res = claimDaily();
       if (res.success) {
@@ -258,7 +260,7 @@ export default function Dashboard() {
       }
     }
     setDailyLoading(false);
-  }, [claimDaily, toast]);
+  }, [claimDaily, setLastDailyReward, toast]);
 
   if (!user) return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0f1115" }}>
@@ -281,7 +283,6 @@ export default function Dashboard() {
   const stats = user?.stats || {};
   const nextLevelConfig = getLevelConfig((user?.nivel || 1) + 1);
   const nextLevelDeposit = nextLevelConfig.minDeposit;
-  const currentLevelDeposit = levelConfig.minDeposit;
 
   return (
     <div style={{ minHeight: "100vh", background: "#0f1115", padding: "40px", color: "white", fontFamily: "'Inter', sans-serif" }}>

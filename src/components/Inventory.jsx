@@ -185,14 +185,14 @@ export default function Inventory() {
       sellSkin(skinId);
       toast.success("Skin vendida correctamente.");
     },
-    [sellSkin]
+    [sellSkin, toast]
   );
 
   const handleSellAll = useCallback(() => {
     if (inventory.length === 0) return;
     const total = sellAllSkins();
     toast.success(`¡Todas las skins vendidas por €${Number(total || 0).toFixed(2)}!`);
-  }, [inventory.length, sellAllSkins]);
+  }, [inventory.length, sellAllSkins, toast]);
 
   // 3-Way Withdraw: Check trade URL, then offer withdraw/exchange/pending options
   const handleWithdrawOrExchange = useCallback(async (skinId, action) => {
@@ -242,7 +242,7 @@ export default function Inventory() {
       await sellSkin(skinId); // removes skin
       toast.success(`🔄 Skin intercambiada por €${exchangeValue} en saldo (85% de valor).`);
     }
-  }, [inventory, user, withdrawSkin, sellSkin]);
+  }, [inventory, user?.link_intercambio, toast, withdrawSkin, sellSkin]);
 
   // Save trade URL from modal
   const handleSaveTradeUrl = useCallback(async (url) => {
@@ -264,7 +264,7 @@ export default function Inventory() {
       }
       setPendingWithdrawId(null);
     }
-  }, [updateProfile, user, withdrawSkin, pendingWithdrawId]);
+  }, [updateProfile, user?.steam_id, toast, pendingWithdrawId, withdrawSkin]);
 
   return (
     <div style={{ minHeight: "100vh", background: "#0f1115", padding: "50px 20px", color: "white", fontFamily: "'Inter', sans-serif" }}>

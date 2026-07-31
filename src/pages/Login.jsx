@@ -8,9 +8,11 @@ function validatePassword(password) {
   if (!password || password.length < 8) return { valid: false, error: "La contrasena debe tener al menos 8 caracteres" };
   if (!/[A-Z]/.test(password)) return { valid: false, error: "La contrasena debe contener al menos una mayuscula" };
   if (!/[0-9]/.test(password)) return { valid: false, error: "La contrasena debe contener al menos un numero" };
-  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(password)) return { valid: false, error: "La contrasena debe contener al menos un caracter especial" };
+  if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(password)) return { valid: false, error: "La contraseña debe contener al menos un caracter especial" };
   return { valid: true };
 }
+
+const SPECIAL_CHARS_REGEX = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/;
 
 export default function Login() {
   const [view, setView] = useState("login");
@@ -40,7 +42,6 @@ export default function Login() {
 
     if (tokenFromUrl) {
       localStorage.setItem("token", tokenFromUrl);
-      setSuccess(true);
       window.dispatchEvent(new CustomEvent("auth-token-updated", { detail: { token: tokenFromUrl } }));
 
       fetch(API_BASE + "/api/me", { headers: { Authorization: "Bearer " + tokenFromUrl } })
@@ -63,7 +64,7 @@ export default function Login() {
         .finally(function () {
           cleanOAuthParams();
           setTimeout(function () {
-            try { navigate("/dashboard"); } catch (e) { window.location.href = "/dashboard"; }
+            try { navigate("/dashboard"); } catch { window.location.href = "/dashboard"; }
           }, 500);
         });
     } else {
@@ -102,11 +103,7 @@ export default function Login() {
     }
   };
 
-  const handleGuestLogin = function () {
-    login("guest@skinmarket.es").then(function () { navigate("/dashboard"); }).catch(function () { navigate("/dashboard"); });
-  };
-
-  useEffect(function () {
+useEffect(function () {
     var handlePopState = function () {
       if (new URLSearchParams(window.location.search).has("token")) {
         window.history.replaceState({}, "", window.location.pathname + window.location.hash);
@@ -162,7 +159,7 @@ export default function Login() {
               setSuccess(true);
               setTimeout(function () { navigate("/dashboard"); }, 500);
             } else { setError(data.error || "Error al iniciar sesion con Google"); setSocialLoading(null); }
-          } catch (err) { setError("Error de conexion."); setSocialLoading(null); }
+          } catch { setError("Error de conexion."); setSocialLoading(null); }
         }
       });
       window.google.accounts.id.prompt(function (notification) {
@@ -171,7 +168,7 @@ export default function Login() {
           setError("Google Sign-In cancelado.");
         }
       });
-    } catch (err) { setError("Error al inicializar Google Sign-In."); setSocialLoading(null); }
+    } catch { setError("Error al inicializar Google Sign-In."); setSocialLoading(null); }
   };
 
   return (
@@ -240,7 +237,6 @@ export default function Login() {
           <button type="submit" disabled={loading} style={{ padding: "16px", background: "#f5ac3b", color: "black", border: "none", borderRadius: "14px", fontWeight: "900", fontSize: "1rem", cursor: "pointer", marginTop: "10px" }}>
             {loading ? "PROCESANDO..." : view === "login" ? "ENTRAR" : view === "register" ? "REGISTRARME" : "ENVIAR ENLACE"}
           </button>
-          <button type="button" onClick={handleGuestLogin} style={{ padding: "14px", background: "rgba(255,255,255,0.05)", color: "white", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "14px", fontWeight: "bold", fontSize: "0.9rem", cursor: "pointer" }}>► Entrar como Invitado</button>
         </form>
 
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: "25px", fontSize: "0.8rem", color: "rgba(255,255,255,0.5)" }}>

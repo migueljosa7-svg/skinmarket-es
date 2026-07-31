@@ -670,7 +670,7 @@ export const generateAllCases = () => {
 
 // ─── Generate random skin for case opening ────────────────
 // Uses the skin catalogs to create realistic CS2 skins
-export const generateRandomSkin = (caseCategory, userLevel = 0) => {
+export const generateRandomSkin = (caseCategory) => {
   const catalog = SKIN_CATALOGS[caseCategory] || SKIN_CATALOGS.económica;
   const probs = CASE_PROBABILITIES[caseCategory] || CASE_PROBABILITIES.económica;
 

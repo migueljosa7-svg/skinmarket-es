@@ -7,7 +7,7 @@ import { useFetchSkins } from "../hooks/useFetchSkins";
 import { getRarityColor } from "../constants/colors.js";
 import { StorageService } from "../services/StorageService";
 import { sound } from "../utils/audio";
-import { getPlaceholderImage, handleImageError, getSkinImageUrl } from "../services/ImageService";
+import { handleImageError, getSkinImageUrl } from "../services/ImageService";
 import ProvablyFairModal from "../components/ProvablyFairModal";
 
 const UpgradeSpinner = ({ chance, isSpinning, resultDegree, onComplete }) => {

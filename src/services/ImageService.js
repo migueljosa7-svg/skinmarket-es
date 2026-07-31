@@ -194,22 +194,7 @@ function extractSteamImageHash(url) {
  * replace special characters, format as expected by external APIs.
  * Example: "AK-47 | Redline (Field-Tested)" → "ak-47_redline"
  */
-function cleanSkinName(name) {
-  if (!name) return '';
-  // Remove parenthesized wear/quality suffixes: " (Field-Tested)", " (Minimal Wear)", etc.
-  var cleaned = name.replace(/\s*\([^)]*\)\s*/g, '');
-  // Remove leading/trailing whitespace
-  cleaned = cleaned.trim();
-  // Lowercase
-  cleaned = cleaned.toLowerCase();
-  // Replace " | " with "_"
-  cleaned = cleaned.replace(/\s*\|\s*/g, '_');
-  // Replace remaining spaces with underscores
-  cleaned = cleaned.replace(/\s+/g, '_');
-  // Remove any non-alphanumeric characters except underscores and hyphens
-  cleaned = cleaned.replace(/[^a-z0-9_-]/g, '');
-  return cleaned;
-}
+
 
 // ---------------------------------------------------------------------------
 // Public API: getSkinImageSources(skin) — returns ordered array of fallback URLs
@@ -224,10 +209,8 @@ export function getSkinImageSources(skin) {
   var sources = [];
   if (!skin) return sources;
 
-  var skinName = skin.name || '';
   var originalImage = skin.image || '';
   var hash = extractSteamImageHash(originalImage) || skin.icon_url || '';
-  var cleanName = cleanSkinName(skinName);
 
   // Validate the Steam hash before using it. Corrupted/truncated hashes that fail
   // validation will cause the browser to emit 404 console errors on first render.
@@ -324,69 +307,23 @@ export function getSkinImageUrlSilent(skinName, originalImage) {
 }
 
 // ---------------------------------------------------------------------------
-// Emergency Skin Replacement System
+// Emergency Skin Replacement System (PURE onError - NO HEAD requests)
 // ---------------------------------------------------------------------------
 
 /**
- * Try to load emergency skin from local directory
- * @param {string} skinId - The skin ID to look up
- * @returns {Promise<string|null>} Emergency image URL or null
+ * Get emergency skin URL by name (synchronous, no HTTP HEAD requests)
+ * Uses a deterministic path based on skin name hash
+ * @param {string} skinName - The skin name to generate path for
+ * @returns {string|null} Emergency image URL or null
  */
-async function loadEmergencySkinImage(skinId) {
-  try {
-    const response = await fetch(`/images/emergency-skins/${skinId}.png`);
-    if (response.ok) {
-      return `/images/emergency-skins/${skinId}.png`;
-    }
-    const responseWebp = await fetch(`/images/emergency-skins/${skinId}.webp`);
-    if (responseWebp.ok) {
-      return `/images/emergency-skins/${skinId}.webp`;
-    }
-    const responseJpg = await fetch(`/images/emergency-skins/${skinId}.jpg`);
-    if (responseJpg.ok) {
-      return `/images/emergency-skins/${skinId}.jpg`;
-    }
-  } catch (_err) {
-    // Silent fail - emergency images are optional
-  }
-  return null;
-}
-
-// ---------------------------------------------------------------------------
-// Emergency Skin Loader — tries local fallback images before SVG placeholder
-// ---------------------------------------------------------------------------
-
-/**
- * Attempt to load an emergency skin image from the local directory.
- * Tries .png, .webp, and .jpg variants based on skin name or hash.
- * @param {string} skinName - Name of the skin to look up
- * @returns {Promise<string|null>} Emergency image URL or null if none found
- */
-async function loadEmergencySkin(skinName) {
+function getEmergencySkinUrl(skinName) {
   if (!skinName) return null;
-
-  // Try multiple possible filenames: clean skin name, hash of name, etc.
-  const candidates = [
-    skinName.replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase(),
-    skinName.replace(/\s*\|\s*/g, '_').replace(/\s+/g, '_').toLowerCase(),
-    skinName.replace(/[^a-zA-Z0-9]/g, '').toLowerCase().slice(0, 30)
-  ];
-
-  const extensions = ['.png', '.webp', '.jpg'];
-
-  for (const baseName of candidates) {
-    for (const ext of extensions) {
-      try {
-        const url = `/images/emergency-skins/${baseName}${ext}`;
-        const headResponse = await fetch(url, { method: 'HEAD' });
-        if (headResponse.ok) return url;
-      } catch (_e) {
-        // Continue trying
-      }
-    }
-  }
-
-  return null;
+  // Generate a deterministic filename from skin name
+  const baseName = skinName
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .toLowerCase()
+    .slice(0, 50);
+  return `/images/emergency-skins/${baseName}.png`;
 }
 
 // ---------------------------------------------------------------------------
@@ -441,8 +378,8 @@ export async function handleImageError(event, skin) {
   // ─── ANTI-BUCLE INFINITO: Máximo 2 reintentos totales ──────────────
   var tryCount = parseInt(img.getAttribute('data-try-count'), 10) || 0;
   if (tryCount >= 2) {
-    // Before giving up entirely, try emergency skin path
-    var emergencyUrl = await loadEmergencySkin(skin && skin.name);
+    // Before giving up entirely, try emergency skin path (sync lookup, no HEAD request)
+    var emergencyUrl = getEmergencySkinUrl(skin && skin.name);
     if (emergencyUrl && !failedUrls.has(emergencyUrl)) {
       img.setAttribute('data-try-count', tryCount + 1);
       img.src = emergencyUrl;
@@ -492,8 +429,8 @@ export async function handleImageError(event, skin) {
     img.setAttribute('data-try-index', tryIndex);
   }
 
-  // All CDNs exhausted: try emergency skin before SVG placeholder
-  var emergencyUrl = await loadEmergencySkin(skin && skin.name);
+  // All CDNs exhausted: try emergency skin before SVG placeholder (sync, no HEAD)
+   emergencyUrl = getEmergencySkinUrl(skin && skin.name);
   if (emergencyUrl && !failedUrls.has(emergencyUrl)) {
     failedUrls.add(emergencyUrl);
     img.src = emergencyUrl;
@@ -521,18 +458,6 @@ export async function handleImageError(event, skin) {
  * Get current user ID from localStorage
  * @returns {string|null} User ID or null
  */
-function getCurrentUserId() {
-  try {
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      const user = JSON.parse(userData);
-      return user.usuario_id || user.id || null;
-    }
-  } catch (err) {
-    // Silent fail
-  }
-  return null;
-}
 
 // ---------------------------------------------------------------------------
 // Public API: Utility functions
@@ -554,14 +479,8 @@ export async function preloadSkinImage(skinName, originalImage) {
     img.onerror = async function () {
       failedUrls.add(url);
 
-      // Try emergency skin if original fails
-      var skin = { name: skinName, image: originalImage };
-      var emergencyUrl = await loadEmergencySkinImage(skinName);
-      if (emergencyUrl) {
-        resolve(emergencyUrl);
-      } else {
-        resolve(getSkinImageUrl(skinName, originalImage));
-      }
+      // Fallback to placeholder SVG (no HEAD request)
+      resolve(getSkinImageUrl(skinName, originalImage));
     };
     img.src = url;
   });

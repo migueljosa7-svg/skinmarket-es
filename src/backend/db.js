@@ -21,7 +21,7 @@ let databaseUrl = (process.env.DATABASE_URL || '')
 
 // Fix DNS resolution: append full domain for Render PostgreSQL hosts without dots
 if (databaseUrl && isProduction) {
-    const urlMatch = databaseUrl.match(/^postgres:\/\/([^:]+):([^@]+)@([^:\/]+)(?::(\d+))?\/\s*([^?]+)/);
+    const urlMatch = databaseUrl.match(/^postgres:\/\/([^:]+):([^@]+)@([^:/]+)(?::(\d+))?\/\s*([^?]+)/);
     if (urlMatch) {
         const host = urlMatch[3];
         // If host doesn't contain a dot, it's a short Render hostname - append full domain

@@ -69,7 +69,7 @@ class SoundEngine {
           this.ctx.resume().catch(() => {});
         }
       }
-    } catch (e) {
+    } catch {
       // Audio not supported — silently ignore
     }
   }
@@ -105,7 +105,7 @@ class SoundEngine {
               this.ctx.resume().catch(() => {});
             }
           }
-        } catch (e) {
+        } catch {
           // Audio not supported — silently ignore
         }
       };
@@ -125,7 +125,7 @@ class SoundEngine {
           }
         }
       }
-    } catch (e) {
+    } catch {
       // Will be created via the global listener on first user gesture
     }
   }

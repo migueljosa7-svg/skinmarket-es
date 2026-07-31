@@ -7,7 +7,6 @@ import { motion as Motion } from "framer-motion";
 import { getPlaceholderImage, handleImageError, getSkinImageUrl } from "../services/ImageService";
 import { useToast } from "../components/Toast";
 import { sound } from "../utils/audio";
-import { getFloatBadgeProps } from "../utils/floatPreview";
 import ProvablyFairModal from "../components/ProvablyFairModal";
 
 
@@ -757,7 +756,6 @@ export default function Battles() {
       // Sort skins by price to find the jackpot (last item)
       const sortedSkins = [...validSkins].sort((a, b) => parseFloat(a.price) - parseFloat(b.price));
       const jackpot = sortedSkins[sortedSkins.length - 1];
-      const cheapest = sortedSkins[0];
 
       // Determine difficulty from bot level
       const difficulty = getBotDifficulty(botLevel);
@@ -980,7 +978,7 @@ export default function Battles() {
 
       setAnimState({ visibleRounds: 0, hasCompleted: false });
     },
-    [allCases, getSkinsForCase, openBoxRandomly, updateUser]
+    [allCases, getBotDifficulty, getSkinsForCase, openBoxRandomly, updateUser]
   );
 
   // Otorgar loot al terminar + sound effects

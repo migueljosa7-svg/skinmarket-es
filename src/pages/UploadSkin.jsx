@@ -28,7 +28,7 @@ export default function UploadSkin() {
       setSteamInventory(MOCK_STEAM_INVENTORY);
       setLoading(false);
     }, 400);
-  }, [steamId]);
+  }, [steamId, toast]);
 
   const toggleSelectSkin = (skin) => {
     if (selectedSkins.find((s) => s.id === skin.id)) {

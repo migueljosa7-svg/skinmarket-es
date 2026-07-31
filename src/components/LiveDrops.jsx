@@ -4,7 +4,7 @@ import { motion as Motion, AnimatePresence } from "framer-motion";
 import { getRarityColor } from "../constants/colors";
 import { StorageService } from "../services/StorageService";
 import { getPlaceholderImage, handleImageError } from "../services/ImageService";
-import { getSocket, onSocketEvent } from "../services/socket";
+import {  onSocketEvent } from "../services/socket";
 
 const MAX_DROPS = 15;
 
@@ -15,7 +15,6 @@ const BOT_NAMES = [
 
 export default function LiveDrops() {
   const [drops, setDrops] = useState([]);
-  const unsubscribeRef = useRef(null);
   const intervalRef = useRef(null);
 
   useEffect(() => {

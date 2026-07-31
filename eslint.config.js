@@ -8,10 +8,8 @@ export default defineConfig([
   globalIgnores([
     'dist',
     'node_modules',
-    '*.jsx',
-    '*.js',
     'scripts/**',
-    'src/backend/**'
+    'fix_nan.js'
   ]),
   {
     files: ['src/**/*.{js,jsx}'],
