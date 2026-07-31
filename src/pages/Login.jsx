@@ -3,6 +3,9 @@ import { useAuth } from "../context/useAuth";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
+const GOOGLE_CLIENT_ID =
+  import.meta.env.VITE_GOOGLE_CLIENT_ID ||
+  "583240562119-2duavhuv66dkgnlq46pofakrc3c13nvr.apps.googleusercontent.com";
 
 function validatePassword(password) {
   if (!password || password.length < 8) return { valid: false, error: "La contrasena debe tener al menos 8 caracteres" };
@@ -118,11 +121,9 @@ useEffect(function () {
     window.location.href = API_BASE + "/api/auth/steam";
   };
 
-  const hasGoogleClientId = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
-
   const handleGoogleLogin = function () {
     setSocialLoading("google");
-    var clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    var clientId = GOOGLE_CLIENT_ID;
     if (!clientId) {
       setError("Google Sign-In no configurado (falta VITE_GOOGLE_CLIENT_ID). Contacta al administrador.");
       setSocialLoading(null);
@@ -144,9 +145,11 @@ useEffect(function () {
 
   const initGoogleSignIn = function () {
     try {
-      var clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+      var clientId = GOOGLE_CLIENT_ID;
       window.google.accounts.id.initialize({
         client_id: clientId,
+        ux_mode: "popup",
+        use_fedcm_for_prompt: true,
         callback: async function (response) {
           var idToken = response.credential;
           if (!idToken) { setError("No se pudo obtener el token de Google."); setSocialLoading(null); return; }
@@ -194,29 +197,27 @@ useEffect(function () {
               <button
                 type="button"
                 onClick={handleGoogleLogin}
-                disabled={socialLoading !== null || !hasGoogleClientId}
-                title={!hasGoogleClientId ? "Google Sign-In no configurado (falta VITE_GOOGLE_CLIENT_ID)" : "Iniciar sesion con Google"}
+                disabled={socialLoading !== null}
+                title="Iniciar sesion con Google"
                 style={{
                   width: "100%",
                   padding: "14px",
                   borderRadius: "12px",
-                  background: socialLoading === "google" ? "rgba(255,255,255,0.05)" : (!hasGoogleClientId ? "rgba(255,255,255,0.05)" : "white"),
-                  color: !hasGoogleClientId ? "rgba(255,255,255,0.4)" : "#1a1a1a",
+                  background: socialLoading === "google" ? "rgba(255,255,255,0.05)" : "white",
+                  color: "#1a1a1a",
                   border: "1px solid rgba(255,255,255,0.1)",
                   fontWeight: "900",
                   fontSize: "0.9rem",
-                  cursor: (socialLoading !== null || !hasGoogleClientId) ? "not-allowed" : "pointer",
+                  cursor: socialLoading !== null ? "not-allowed" : "pointer",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   gap: "10px",
-                  opacity: !hasGoogleClientId ? 0.6 : 1
+                  opacity: socialLoading === "google" ? 0.7 : 1
                 }}
               >
                 {socialLoading === "google" ? (
                   <><span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>⟳</span> Conectando...</>
-                ) : !hasGoogleClientId ? (
-                  <>GOOGLE (NO CONFIGURADO)</>
                 ) : (
                   <>CONTINUAR CON GOOGLE</>
                 )}

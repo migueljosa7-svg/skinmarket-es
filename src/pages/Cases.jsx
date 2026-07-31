@@ -9,7 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { useFetchSkins } from "../hooks/useFetchSkins";
 import { useAuth } from "../context/useAuth";
 import { useToast } from "../components/Toast";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence } from "framer-motion";
 import { Search, Gift, ChevronDown, ChevronUp, Grid3X3, Layers, Star, Zap, Award, Heart, Eye, EyeOff, Flame, Sparkles, Shield, Sword, Gem, Skull, Gamepad2, Ticket, Crosshair, Crown, ShoppingBag, Coins, Users } from "lucide-react";
 import { FiGrid, FiLayers, FiStar, FiZap, FiAward, FiSearch, FiChevronDown, FiGift, FiEye, FiEyeOff, FiHeart } from "react-icons/fi";
 import CaseCardRenderer from "../components/CaseCardRenderer";
@@ -568,12 +568,67 @@ const CATEGORY_STYLE_MAP = {
   youtubers_cases: "anime"
 };
 
+// ─── Deterministic hash (string → number 0..65535) ─────────────────
+const hashStr = (s) => {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) { h = ((h << 5) - h) + s.charCodeAt(i); h |= 0; }
+  return Math.abs(h);
+};
+
+// ─── Assign hero skin + 4 unique previews from allSkins ─────────
+const USED_SKIN_INDICES = new Set();
+
+const assignSkinsToCase = (caseObj, allSkins, catDef) => {
+  if (!allSkins || allSkins.length < 5) return caseObj;
+
+  const seed = hashStr(catDef.id + "-" + caseObj.name + "-" + catDef.color);
+  const total = allSkins.length;
+
+  // Pick 5 distinct indices deterministically
+  const indices = [];
+  let attempts = 0;
+  while (indices.length < 5 && attempts < total * 2) {
+    const idx = (seed + indices.length * 7919 + attempts * 104729) % total;
+    attempts++;
+    if (!indices.includes(idx) && !USED_SKIN_INDICES.has(idx)) {
+      indices.push(idx);
+    }
+  }
+  // Fallback if not enough unique found
+  while (indices.length < 5) {
+    const idx = (seed + indices.length * 31337) % total;
+    if (!indices.includes(idx)) indices.push(idx);
+  }
+
+  // First index = hero skin (featured weapon), rest = previews
+  const heroIdx = indices[0];
+  const previewIdxs = indices.slice(1, 5);
+
+  const heroSkin = allSkins[heroIdx];
+  USED_SKIN_INDICES.add(heroIdx);
+
+  const previewSkins = previewIdxs.map((pi) => {
+    USED_SKIN_INDICES.add(pi);
+    return allSkins[pi];
+  });
+
+  return {
+    ...caseObj,
+    heroSkin: heroSkin
+      ? { id: heroSkin.id, name: heroSkin.name, price: heroSkin.price, rarity: heroSkin.rarity, image: heroSkin.image }
+      : null,
+    previewSkins: previewSkins.map((s) => ({
+      id: s.id, name: s.name, price: s.price, rarity: s.rarity, image: s.image
+    }))
+  };
+};
+
 // ─── Generate case objects for a category ─────────────────────────
-const generateCategoryCases = (catDef) => {
+const generateCategoryCases = (catDef, allSkins) => {
   return catDef.cases.map((c, idx) => {
     // Assign unique image from CASE_SPECIFIC_IMAGES mapping
     const caseImage = CASE_SPECIFIC_IMAGES[c.name] || null;
-    return {
+    const caseObj = {
       id: `${catDef.id}-${idx}`,
       name: c.name,
       price: c.price,
@@ -581,10 +636,13 @@ const generateCategoryCases = (catDef) => {
       image: caseImage,
       imageSrc: caseImage,
       color: catDef.color,
+      glowColor: catDef.color,
       badge: catDef.label,
       gold: c.gold || null,
+      heroSkin: null,
       previewSkins: []
     };
+    return assignSkinsToCase(caseObj, allSkins, catDef);
   });
 };
 
@@ -605,11 +663,11 @@ export default function Cases() {
   const allKeyDropCases = useMemo(() => {
     const cases = [];
     KEYDROP_CATEGORIES.forEach((cat) => {
-      const catCases = generateCategoryCases(cat);
+      const catCases = generateCategoryCases(cat, allSkins);
       cases.push(...catCases);
     });
     return cases;
-  }, []);
+  }, [allSkins]);
 
   // Merge both: use KeyDrop catalog for display, original for backend integration
   const allCases = useMemo(() => {
