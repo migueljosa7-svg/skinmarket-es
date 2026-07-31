@@ -219,7 +219,7 @@ const Footer = () => {
         color: 'rgba(255,255,255,0.3)',
       }}>
         <div>
-          &copy; 2026 SkinMarket ES. Todos los derechos reservados.
+          &copy; 2026 SkinMarket ES. Todos los derechos reservados a mi.
         </div>
         <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
           <FiShield size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} />Usamos cookies para mejorar tu experiencia
