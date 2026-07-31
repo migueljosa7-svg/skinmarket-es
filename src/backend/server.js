@@ -232,10 +232,10 @@ const _registerLimiter = rateLimit({
   handler: (req, res) => res.status(429).json({ error: "Demasiados intentos de registro. Intenta de nuevo en 1 hora.", code: "RATE_LIMIT_REGISTER" })
 });
 
-// Configurar Sesiones
+// Configurar Sesiones (usar SESSION_SECRET con fallback seguro)
 app.use(session({
   store: sessionStore,
-  secret: JWT_SECRET,
+  secret: process.env.SESSION_SECRET || 'skinmarket_super_secret_key_998877665544',
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -253,6 +253,13 @@ const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3001';
 
 // [ON-DEMAND] Bot NO se conecta al arrancar. Solo se conecta cuando 
 // un usuario solicita un retiro (withdraw). No hay polling a Steam.
+// ─── PASSPORT INIT (must be BEFORE any /api/auth/steam routes) ──────
+app.use(passport.initialize());
+app.use(passport.session());
+
+passport.serializeUser((user, done) => done(null, user));
+passport.deserializeUser((obj, done) => done(null, obj));
+
 if (process.env.BOT_USERNAME && process.env.BOT_USERNAME !== 'tu_usuario_steam') {
   // NO llamar a botEngine.logIn() aquí - solo registrar endpoint de estado
   app.get("/api/bot/status", (req, res) => {
@@ -266,13 +273,7 @@ if (process.env.BOT_USERNAME && process.env.BOT_USERNAME !== 'tu_usuario_steam')
   });
 }
 
-// Inicializar Passport
-app.use(passport.initialize());
-app.use(passport.session());
-
-passport.serializeUser((user, done) => done(null, user));
-passport.deserializeUser((obj, done) => done(null, obj));
-
+// Steam Strategy — configurada ANTES de las rutas Steam
 if (process.env.STEAM_API_KEY) {
   try {
     const steamReturnURL = process.env.STEAM_RETURN_URL || `${BACKEND_URL}/api/auth/steam/return`;

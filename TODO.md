@@ -1,19 +1,24 @@
-# AUDIT & FIX TODO
+# TODO — Fase Visual: Cajas KeyDrop/SkinClub + Navbar Responsivo
 
-## Phase 1: Steam Auth Timeout Fix (server.js)
-- [x] Add 8-second timeout guard to `/api/auth/steam/return` callback
-- [x] Add timeout guard to `/api/auth/steam` route
-- [x] Ensure proper error redirect with descriptive error codes
+## 1. CaseCardRenderer.jsx — Rediseño "Weapon Banner" (Opción A)
+- [ ] Reescritura completa con CSS puro / Inline Styles
+- [ ] Tarjeta = banner del arma protagonista HD (drop-shadow neón)
+- [ ] Fondos temáticos con gradientes + glowColor según rareza
+- [ ] Placeholder SVG con silueta de arma (cero imágenes borrosas/cartón)
+- [ ] Badges de categoría/precio, título, favorito y franja de previews
 
-## Phase 2: Google Auth - Verified Real (No changes needed)
-- [x] Confirm: `/api/auth/google` uses real `google-auth-library` verification
-- [x] Confirm: Login.jsx uses real Google Identity Services (GIS)
-- [x] No mock traces found anywhere
+## 2. Cases.jsx — Asignación de skins protagonistas únicas
+- [ ] Hash determinista por nombre de caja
+- [ ] Hero skin + 4 previews únicos desde allSkins (pool real CS2 HD)
+- [ ] Cero repetición entre cajas (Set compartido entre categorías)
+- [ ] glowColor + bgGradient únicos por tarjeta
 
-## Phase 3: Auth Context Fix
-- [x] Fix `claimDaily` in AuthContext.jsx to call the backend API
+## 3. NavBar.jsx — Rediseño limpio y responsive (CSS puro / Media Queries)
+- [ ] Desktop (≥1024px): Logo izq → menú central → saldo + perfil + salir (1 línea)
+- [ ] Móvil (<1024px): Logo izq → saldo compacto → ☰ único → drawer lateral ordenado
+- [ ] Eliminar dependencia de clases Tailwind inertes
 
-## Phase 4: Verification
-- [x] Run linter on backend - 26 pre-existing errors (none from my changes)
-- [x] Run linter on frontend - 4 pre-existing errors (none from my changes)
-- [x] Verify all HTTP responses have proper error handling
+## 4. Verificación
+- [ ] `npm run build` sin errores
+- [ ] Actualizar este TODO y preparar push a master
+
