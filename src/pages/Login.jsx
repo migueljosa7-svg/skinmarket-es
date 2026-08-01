@@ -149,7 +149,7 @@ useEffect(function () {
       window.google.accounts.id.initialize({
         client_id: clientId,
         ux_mode: "popup",
-        use_fedcm_for_prompt: true,
+        use_fedcm_for_prompt: false,
         callback: async function (response) {
           var idToken = response.credential;
           if (!idToken) { setError("No se pudo obtener el token de Google."); setSocialLoading(null); return; }

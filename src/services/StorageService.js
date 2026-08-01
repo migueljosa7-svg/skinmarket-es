@@ -168,6 +168,31 @@ loadInitialData() {
     return newBalance;
   }
 
+  /**
+   * Award XP to the current user (local fallback).
+   * Rule: 1€ spent = 100 XP. Level N requires (N+1)*1000 XP for next level.
+   * @param {number} amount - XP to add (positive integer)
+   * @returns {number} New total XP
+   */
+  awardXP(amount) {
+    if (!this.data) return 0;
+    const xp = Math.max(0, Math.floor(parseFloat(amount) || 0));
+    if (xp === 0) return this.data.user.experiencia || 0;
+    const current = Number(this.data.user.experiencia || 0);
+    const next = current + xp;
+    this.updateUser({ experiencia: next });
+    return next;
+  }
+
+  /**
+   * Get XP value equivalent for a money amount spent.
+   * @param {number} euros - Amount spent in €
+   * @returns {number} XP earned (1€ = 100 XP)
+   */
+  xpForSpend(euros) {
+    return Math.floor((parseFloat(euros) || 0) * 100);
+  }
+
   getInventory() {
     if (!this.data) return [];
     return [...(this.data.inventory || [])];

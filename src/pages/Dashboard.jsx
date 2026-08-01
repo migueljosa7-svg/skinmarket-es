@@ -1,8 +1,9 @@
 // src/pages/Dashboard.jsx
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useAuth } from "../context/useAuth";
 import { getRarityColor } from "../constants/colors.js";
 import RechargeModal from "../components/RechargeModal";
+import LevelProgressBar from "../components/LevelProgressBar";
 import { StorageService } from "../services/StorageService";
 import {  getSkinImageUrl, handleImageError } from "../services/ImageService";
 import { useToast } from "../components/Toast";
@@ -87,8 +88,8 @@ const SettingsModal = ({ open, onClose }) => {
             placeholder="https://steamcommunity.com/tradeoffer/new/..."
             style={{ width: "100%", padding: "14px", borderRadius: "12px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", color: "white", outline: "none" }}
           />
-          <a
-            href="https://steamcommunity.com/profiles/me/tradeoffers/privacy#trade_offer_access_url"
+          
+            <a href="https://steamcommunity.com/profiles/me/tradeoffers/privacy#trade_offer_access_url"
             target="_blank"
             rel="noreferrer"
             style={{ display: "inline-block", marginTop: "8px", fontSize: "0.75rem", color: "#f5ac3b", textDecoration: "none", fontWeight: "700" }}
@@ -176,21 +177,23 @@ export default function Dashboard() {
   const [rechargeOpen, setRechargeOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [dailyTimer, setDailyTimer] = useState(null);
+  const [optimisticTimer, setOptimisticTimer] = useState(null);
   const [dailyLoading, setDailyLoading] = useState(false);
   const [ setLastDailyReward] = useState(null);
 
-  // Load daily claim status
-  useEffect(() => {
-    const currentUser = StorageService.getUser();
-    const lastClaim = currentUser?.ultimo_reclamo_diario;
-    if (lastClaim) {
-      const nextAvailable = new Date(new Date(lastClaim).getTime() + 24 * 60 * 60 * 1000);
-      setDailyTimer(nextAvailable.toISOString());
-    } else {
-      setDailyTimer(null);
-    }
+  // Daily claim status derived directly from user data (no effect needed)
+  const derivedDailyTimer = useMemo(() => {
+    const lastClaim = user?.ultimo_reclamo_diario;
+    if (!lastClaim) return null;
+    const nextAvailable = new Date(new Date(lastClaim).getTime() + 24 * 60 * 60 * 1000);
+    return nextAvailable.toISOString();
   }, [user?.ultimo_reclamo_diario]);
+
+  // Use whichever target is later — once the real user data catches up
+  // after a claim, it naturally takes over from the optimistic one.
+  const dailyTimer = optimisticTimer && (!derivedDailyTimer || optimisticTimer > derivedDailyTimer)
+    ? optimisticTimer
+    : derivedDailyTimer;
 
   const timeLeft = useCountdown(dailyTimer);
   const isDailyAvailable = !dailyTimer || timeLeft === "¡Disponible!" || timeLeft === "";
@@ -231,11 +234,11 @@ export default function Dashboard() {
           }
           toast.success(data.message);
           setLastDailyReward(data);
-          setDailyTimer(new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString());
+          setOptimisticTimer(new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString());
         } else {
           toast.error(data.error);
           if (data.remainingMs) {
-            setDailyTimer(new Date(Date.now() + data.remainingMs).toISOString());
+            setOptimisticTimer(new Date(Date.now() + data.remainingMs).toISOString());
           }
         }
       } else {
@@ -244,7 +247,7 @@ export default function Dashboard() {
         if (res.success) {
           toast.success(res.message);
           setLastDailyReward(res);
-          setDailyTimer(new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString());
+          setOptimisticTimer(new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString());
         } else {
           toast.error(res.error);
         }
@@ -254,13 +257,13 @@ export default function Dashboard() {
       const res = claimDaily();
       if (res.success) {
         toast.success(res.message);
-        setDailyTimer(new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString());
+        setOptimisticTimer(new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString());
       } else {
         toast.error(res.error);
       }
     }
     setDailyLoading(false);
-  }, [claimDaily, setLastDailyReward, toast]);
+  }, [claimDaily, toast]);
 
   if (!user) return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0f1115" }}>
@@ -444,6 +447,50 @@ export default function Dashboard() {
           <div style={{ background: "rgba(255,255,255,0.02)", padding: "20px", borderRadius: "18px", border: "1px solid rgba(255,255,255,0.05)" }}>
             <div style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.75rem", fontWeight: "bold" }}>VALOR INVENTARIO</div>
             <div style={{ fontSize: "1.8rem", fontWeight: "900", color: "#10b981", marginTop: "5px" }}>€{totalValue.toFixed(2)}</div>
+          </div>
+        </div>
+
+        {/* Nivel y Progreso Card */}
+        <div style={{
+          background: "linear-gradient(135deg, rgba(245,172,59,0.08) 0%, rgba(245,172,59,0.02) 100%)",
+          border: "1px solid rgba(245,172,59,0.15)",
+          borderRadius: "24px",
+          padding: "28px",
+          marginBottom: "40px"
+        }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "16px", marginBottom: "16px" }}>
+            <div>
+              <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.4)", fontWeight: "bold", letterSpacing: "2px", textTransform: "uppercase", marginBottom: "6px" }}>
+                ◆ NIVEL Y PROGRESO
+              </div>
+              <div style={{ fontSize: "1.6rem", fontWeight: "900", color: "#f5ac3b" }}>
+                NIVEL {user.nivel || 1}
+              </div>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.4)", fontWeight: "bold" }}>XP TOTAL</div>
+              <div style={{ fontSize: "1.4rem", fontWeight: "900" }}>
+                {Number(user.experiencia || 0).toLocaleString("es-ES")} XP
+              </div>
+            </div>
+          </div>
+
+          <LevelProgressBar
+            experiencia={user?.experiencia || 0}
+            nivel={user?.nivel || user?.level || 0}
+            showLabel={true}
+            compact={false}
+          />
+
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", marginTop: "16px" }}>
+            <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.5)" }}>
+              {nextLevelDeposit > 0
+                ? `◆ Siguiente nivel: Deposita €${(nextLevelDeposit - (user.totalDepositado || 0)).toFixed(2)} más para alcanzar el Nivel ${(user.nivel || 1) + 1}`
+                : "◆ ¡Has alcanzado el nivel máximo!"}
+            </div>
+            <div style={{ fontSize: "0.8rem", color: "#f5ac3b", fontWeight: "900" }}>
+              {Math.floor((user.experiencia || 0) % 1000).toLocaleString("es-ES")} / 1000 XP al siguiente nivel
+            </div>
           </div>
         </div>
 

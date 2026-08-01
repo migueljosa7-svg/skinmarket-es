@@ -1,15 +1,15 @@
 // src/pages/CaseView.jsx
-import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import { generateAllCases, pickWeightedSkin } from "../constants/cases.js";
 import { useFetchSkins } from "../hooks/useFetchSkins";
 import { getRarityColor } from "../constants/colors.js";
 import { StorageService } from "../services/StorageService";
-import { sound } from "../utils/audio";
-import { getPlaceholderImage, getSkinImageUrl, handleImageError } from "../services/ImageService";
+import { getSkinImageUrl, handleImageError } from "../services/ImageService";
 import { useToast } from "../components/Toast";
 import ProvablyFairModal from "../components/ProvablyFairModal";
+import SingleMultiRoulette from "../components/RouletteWheel";
 import { FiAlertTriangle, FiShield, FiLock, FiCheckCircle } from "react-icons/fi";
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
@@ -31,210 +31,11 @@ function getAuthToken() {
   return null;
 }
 
-const SingleMultiRoulette = React.memo(({ items, quantity, isSpinning, onComplete }) => {
-  const containerRef = useRef(null);
-  const onCompleteRef = useRef(onComplete);
-
-  useEffect(() => {
-    onCompleteRef.current = onComplete;
-  }, [onComplete]);
-
-  useEffect(() => {
-    if (isSpinning && containerRef.current) {
-      containerRef.current.style.transition = "none";
-      containerRef.current.style.transform = "translateX(0px)";
-
-      void containerRef.current.offsetWidth; // Force Reflow
-
-      const cardWidth = 160;
-      const winnerStartIndex = items.length - 10 - quantity;
-      const winnersCenter = winnerStartIndex * cardWidth + (quantity * cardWidth - 10) / 2;
-      const offset = winnersCenter;
-
-      sound.playTick();
-      const t1 = setTimeout(() => {
-        const randomJitter = Math.floor(Math.random() * 40) - 20;
-        containerRef.current.style.transition = "transform 5.5s cubic-bezier(0.12, 0.8, 0.15, 1)";
-        containerRef.current.style.transform = `translateX(-${offset + randomJitter}px)`;
-      }, 50);
-
-      const timer = setTimeout(() => {
-        sound.playWin(true);
-        onCompleteRef.current();
-      }, 5700);
-
-      return () => {
-        clearTimeout(t1);
-        clearTimeout(timer);
-      };
-    } else if (!isSpinning && containerRef.current) {
-      containerRef.current.style.transition = "none";
-      containerRef.current.style.transform = "translateX(0px)";
-    }
-  }, [isSpinning, items, quantity]);
-
-  const selectorWidth = quantity * 160 - 20;
-
-  return (
-    <div
-      style={{
-        position: "relative",
-        width: "100%",
-        height: "200px",
-        overflow: "hidden",
-        borderRadius: "24px"
-      }}
-    >
-      {/* Selector indicator */}
-      <div
-        style={{
-          position: "absolute",
-          left: "50%",
-          top: "10px",
-          bottom: "10px",
-          width: `${selectorWidth}px`,
-          transform: "translateX(-50%)",
-          border: "2px solid #f5ac3b",
-          borderRadius: "16px",
-          background: "rgba(245, 172, 59, 0.05)",
-          zIndex: 10,
-          pointerEvents: "none",
-          boxShadow: "0 0 40px rgba(245, 172, 59, 0.2)"
-        }}
-      >
-        <div
-          style={{
-            position: "absolute",
-            top: "-15px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            width: "0",
-            height: "0",
-            borderLeft: "10px solid transparent",
-            borderRight: "10px solid transparent",
-            borderTop: "15px solid #f5ac3b",
-            filter: "drop-shadow(0 0 10px #f5ac3b)"
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            bottom: "-15px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            width: "0",
-            height: "0",
-            borderLeft: "10px solid transparent",
-            borderRight: "10px solid transparent",
-            borderBottom: "15px solid #f5ac3b",
-            filter: "drop-shadow(0 0 10px #f5ac3b)"
-          }}
-        />
-      </div>
-
-      {/* Edge fade gradient */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          background: "linear-gradient(90deg, #0c0d10 0%, transparent 20%, transparent 80%, #0c0d10 100%)",
-          zIndex: 5,
-          pointerEvents: "none"
-        }}
-      />
-
-      {/* Reel container */}
-      <div
-        ref={containerRef}
-        style={{
-          display: "flex",
-          gap: "10px",
-          height: "100%",
-          alignItems: "center",
-          paddingLeft: "50%"
-        }}
-      >
-        {items.map((skin, idx) => {
-          const color = getRarityColor(skin.rarity);
-          // Stable + unique key: index guarantees uniqueness since skins repeat in the reel.
-          // Avoid Date.now() which forces React to remount every item on each render.
-          const uniqueKey = `reel-${idx}-${skin.id || skin._id || "skin"}`;
-          return (
-            <div
-              key={uniqueKey}
-              style={{
-                minWidth: "150px",
-                height: "160px",
-                background: "rgba(255,255,255,0.02)",
-                borderWidth: "0 0 4px 0",
-                borderStyle: "solid",
-                borderColor: color,
-                borderRadius: "16px",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "15px",
-                boxSizing: "border-box",
-                position: "relative",
-                overflow: "hidden"
-              }}
-            >
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: "-20px",
-                  width: "100%",
-                  height: "40px",
-                  background: color,
-                  filter: "blur(30px)",
-                  opacity: 0.1
-                }}
-              />
-              <img
-                src={skin.image || getPlaceholderImage(skin.name)}
-                alt={skin.name}
-                onError={(e) => handleImageError(e, skin)}
-                style={{
-                  width: "100px",
-                  height: "70px",
-                  objectFit: "contain",
-                  marginBottom: "12px",
-                  filter: "drop-shadow(0 10px 15px rgba(0,0,0,0.5))",
-                  opacity: skin.image ? 1 : 0.3
-                }}
-              />
-              <div
-              >
-                {skin.name ? skin.name.split(" | ")[0] : "SKIN"}
-              </div>
-              <div
-                style={{
-                  color: "white",
-                  fontSize: "0.75rem",
-                  textAlign: "center",
-                  width: "100%",
-                  overflow: "hidden",
-                  whiteSpace: "nowrap",
-                  textOverflow: "ellipsis",
-                  fontWeight: "bold"
-                }}
-              >
-                {skin.name ? skin.name.split(" | ")[1] || skin.name : "SKIN"}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-});
-
 export default function CaseView() {
   const { id } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
-  const { user, sellSkin, withdrawSkin } = useAuth();
+  const { user, sellSkin, withdrawSkin, awardXP } = useAuth();
   const { skins: allSkins, loading: skinsLoading } = useFetchSkins(2000, true);
 
   const [quantity, setQuantity] = useState(1);
@@ -283,7 +84,7 @@ export default function CaseView() {
     const safeUser = user || StorageService.getUser() || { nombre_usuario: "Jugador", stats: {} };
 
     // Joker Mode: 3x price but equalized probabilities
-    const basePrice = parseFloat(caseData.price);
+    const basePrice = parseFloat(caseData?.price) || 0;
     const priceMultiplier = jokerMode ? 3 : 1;
     const totalCost = basePrice * priceMultiplier * quantity;
     const userBalance = Number(safeUser?.balance ?? safeUser?.saldo ?? 0);
@@ -350,6 +151,8 @@ export default function CaseView() {
                 totalWon: Number(((currentStats.totalWon || 0) + totalWon).toFixed(2))
               }
             });
+            // XP: 1€ spent = 100 XP (mirrors server-side award in /api/cases/open)
+            awardXP(StorageService.xpForSpend(totalCost));
 
             const newReel = [];
             for (let j = 0; j < 65; j++) {
@@ -424,6 +227,8 @@ export default function CaseView() {
         totalWon: Number(((currentStats.totalWon || 0) + totalWon).toFixed(2))
       }
     });
+    // XP: 1€ spent = 100 XP (local fallback mirrors backend behavior)
+    awardXP(StorageService.xpForSpend(totalCost));
 
     // Build reel
     const newReel = [];
@@ -438,7 +243,7 @@ export default function CaseView() {
     setReel(newReel);
     setResults(savedSkins);
     setIsSpinning(true);
-  }, [user, toast, caseData.price, caseData.id, caseData.name, caseData.category, jokerMode, quantity, validSkins]);
+  }, [user, toast, awardXP, caseData.price, caseData.id, caseData.name, caseData.category, jokerMode, quantity, validSkins]);
 
   const handleSpinComplete = useCallback(() => {
     setIsSpinning(false);
@@ -852,7 +657,7 @@ export default function CaseView() {
                 animation: jokerMode ? "pulse 2s infinite" : "none"
               }}
             >
-              {skinsLoading ? "PREPARANDO..." : jokerMode ? `JOKER MODE • €${Number(parseFloat(caseData.price) * 3 * quantity).toFixed(2)}` : `ABRIR CAJAS • €${Number(parseFloat(caseData.price) * quantity).toFixed(2)}`}
+              {skinsLoading ? "PREPARANDO..." : jokerMode ? `JOKER MODE • €${Number((parseFloat(caseData?.price) || 0) * 3 * quantity).toFixed(2)}` : `ABRIR CAJAS • €${Number((parseFloat(caseData?.price) || 0) * quantity).toFixed(2)}`}
             </button>
           </div>
         )}

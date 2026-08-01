@@ -251,7 +251,7 @@ const WeaponBannerCard = ({ c, skins, onClick, isFavorite, onToggleFavorite, for
             color: c.gold ? "#ffd700" : themeColor,
             fontFamily: "'Inter', sans-serif"
           }}>
-            {c.gold ? Number(c.gold).toLocaleString("es-ES") : Number(c.price).toFixed(2)}
+            {c?.gold ? Number(c.gold).toLocaleString("es-ES") : Number(c?.price ?? 0).toFixed(2)}
           </span>
           {c.gold && <span style={{ fontSize: "0.5rem", color: "#ffd700", fontWeight: "800" }}>GOLD</span>}
         </div>
@@ -274,28 +274,30 @@ const WeaponBannerCard = ({ c, skins, onClick, isFavorite, onToggleFavorite, for
           </span>
         </div>
 
-        {/* Hero weapon image (PNG HD con drop-shadow neón) */}
-        <img
-          src={heroSrc}
-          alt={hero?.name || c.name}
-          onError={(e) => {
-            if (hero) {
-              handleImageError(e, hero);
-            } else {
-              e.currentTarget.onerror = null;
-              e.currentTarget.src = generateCasePlaceholder(c.name, themeColor);
-            }
-          }}
-          style={{
-            width: "210px",
-            height: "155px",
-            objectFit: "contain",
-            zIndex: 2,
-            filter: `drop-shadow(0 20px 38px ${hexToRgba(themeColor, 0.6)}) brightness(1.08) contrast(1.02)`,
-            transition: "transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)"
-          }}
-          className="sm-hero-img"
-        />
+        {/* Hero weapon image (PNG HD con drop-shadow neón) — BOUNCE 3D */}
+        <div className="sm-hero-3d-wrap" style={{ perspective: "900px", zIndex: 2 }}>
+          <img
+            src={heroSrc}
+            alt={hero?.name || c.name}
+            onError={(e) => {
+              if (hero) {
+                handleImageError(e, hero);
+              } else {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = generateCasePlaceholder(c.name, themeColor);
+              }
+            }}
+            style={{
+              width: "210px",
+              height: "155px",
+              objectFit: "contain",
+              transformStyle: "preserve-3d",
+              filter: `drop-shadow(0 20px 38px ${hexToRgba(themeColor, 0.6)}) brightness(1.08) contrast(1.02)`,
+              transition: "transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)"
+            }}
+            className="sm-hero-img"
+          />
+        </div>
 
         {/* Hero skin name tag */}
         {hero && (
@@ -425,19 +427,30 @@ const WeaponBannerCard = ({ c, skins, onClick, isFavorite, onToggleFavorite, for
         </div>
       </div>
 
-      {/* Floating animation */}
+      {/* BOUNCE 3D animation */}
       <style>{`
         .sm-hero-img {
-          animation: smFloat 4.5s ease-in-out infinite;
+          animation: smBounce3D 3.2s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+          transform-origin: 50% 85%;
+          will-change: transform;
+        }
+        .sm-case-card:hover .sm-hero-img {
+          animation-play-state: paused;
+          transform: scale(1.06) rotateY(8deg) rotateX(4deg);
         }
         .sm-case-card:hover {
           transform: translateY(-10px) scale(1.02);
         }
-        @keyframes smFloat {
-          0%, 100% { transform: translateY(0) rotate(-1deg) scale(1); }
-          25% { transform: translateY(-6px) rotate(1deg) scale(1.02); }
-          50% { transform: translateY(-10px) rotate(-1deg) scale(1.03); }
-          75% { transform: translateY(-5px) rotate(1.5deg) scale(1.01); }
+        @keyframes smBounce3D {
+          0%   { transform: translateY(0) rotateY(0deg) rotateX(0deg) scale(1); }
+          12%  { transform: translateY(-14px) rotateY(6deg) rotateX(-4deg) scale(1.04); }
+          24%  { transform: translateY(0) rotateY(-5deg) rotateX(3deg) scale(0.98); }
+          36%  { transform: translateY(-10px) rotateY(-3deg) rotateX(-2deg) scale(1.02); }
+          48%  { transform: translateY(0) rotateY(4deg) rotateX(-1deg) scale(0.99); }
+          62%  { transform: translateY(-5px) rotateY(2deg) rotateX(2deg) scale(1.01); }
+          76%  { transform: translateY(0) rotateY(-2deg) rotateX(0deg) scale(1); }
+          88%  { transform: translateY(-2px) rotateY(1deg) rotateX(-1deg) scale(1); }
+          100% { transform: translateY(0) rotateY(0deg) rotateX(0deg) scale(1); }
         }
       `}</style>
     </div>
