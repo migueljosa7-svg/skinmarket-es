@@ -560,29 +560,7 @@ function steamAuthWithTimeout(req, res, next, authCallback) {
 
 // Only register Steam routes if strategy is enabled
 if (steamStrategyEnabled) {
-  app.get('/api/auth/steam', (req, res, next) => {
-    steamAuthWithTimeout(req, res, next, (err, user, safeRespond) => {
-      const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
-      if (err) {
-        log(LOG_LEVELS.ERROR, 'AUTH', 'Error en autenticación Steam:', err.message);
-        return safeRespond(`${FRONTEND_URL}/login?error=steam_auth_failed`);
-      }
-      if (!user) return safeRespond(`${FRONTEND_URL}/login?error=steam_login_cancelled`);
-      req.logIn(user, (loginErr) => {
-        if (loginErr) {
-          log(LOG_LEVELS.ERROR, 'AUTH', 'Error en login de Steam:', loginErr.message);
-          return safeRespond(`${FRONTEND_URL}/login?error=login_failed`);
-        }
-        try {
-          const token = jwt.sign({ id: user.usuario_id, email: user.email }, JWT_SECRET, { expiresIn: '8h' });
-          safeRespond(`${FRONTEND_URL}/login?token=${token}`);
-        } catch (jwtErr) {
-          log(LOG_LEVELS.ERROR, 'AUTH', 'Error generando JWT en Steam:', jwtErr.message);
-          safeRespond(`${FRONTEND_URL}/login?error=token_generation_failed`);
-        }
-      });
-    });
-  });
+  app.get('/api/auth/steam', passport.authenticate('steam'));
 
   app.get('/api/auth/steam/return', (req, res, next) => {
     steamAuthWithTimeout(req, res, next, (err, user, safeRespond) => {
