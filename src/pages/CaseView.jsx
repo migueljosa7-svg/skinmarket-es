@@ -71,7 +71,11 @@ export default function CaseView() {
       return (valA % 100) - (valB % 100);
     });
 
-    return shuffled.slice(0, 10).sort((a, b) => parseFloat(a.price) - parseFloat(b.price));
+    return shuffled.slice(0, 10).sort((a, b) => {
+      const priceA = parseFloat(a?.price ?? a?.item?.price ?? 1.50);
+      const priceB = parseFloat(b?.price ?? b?.item?.price ?? 1.50);
+      return priceA - priceB;
+    });
   }, [allSkins, caseData]);
 
   const startSpin = useCallback(async () => {
@@ -124,7 +128,7 @@ export default function CaseView() {
             const backendItems = data.items.map((item) => ({
               id: item.id,
               name: item.name,
-              price: Number(item.price || 0),
+              price: Number(item.price || item?.item?.price || 1.50),
               rarity: item.rarity,
               image: item.image || item.imageHD || ""
             }));

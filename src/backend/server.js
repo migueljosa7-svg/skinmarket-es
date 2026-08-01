@@ -275,19 +275,17 @@ if (process.env.BOT_USERNAME && process.env.BOT_USERNAME !== 'tu_usuario_steam')
 }
 
 // Steam Strategy — configurada ANTES de las rutas Steam
-if (process.env.STEAM_API_KEY) {
-  try {
-    // CRITICAL FIX: Use process.env.BACKEND_URL explicitly for Steam returnURL and realm
-    // If BACKEND_URL is missing or empty, SteamStrategy will throw "OpenID return URL is required"
-    const backendUrlForSteam = process.env.BACKEND_URL || 'https://skinmarket-backend.onrender.com';
-    const steamReturnURL = `${backendUrlForSteam}/api/auth/steam/return`;
-    const steamRealm = `${backendUrlForSteam}/`;
+let steamStrategyConfigured = false;
+const steamApiKey = process.env.STEAM_API_KEY || 'B5A7EC248F64FF19CE0DE175F28792AB';
+const steamReturnURL = process.env.STEAM_RETURN_URL || 'https://skinmarket-backend.onrender.com/api/auth/steam/return';
+const steamRealm = process.env.STEAM_REALM || 'https://skinmarket-backend.onrender.com/';
 
-    passport.use(new SteamStrategy({
-      returnURL: steamReturnURL,
-      realm: steamRealm,
-      apiKey: process.env.STEAM_API_KEY
-    }, async (identifier, profile, done) => {
+try {
+  passport.use(new SteamStrategy({
+    returnURL: steamReturnURL,
+    realm: steamRealm,
+    apiKey: steamApiKey
+  }, async (identifier, profile, done) => {
       try {
         const steamId = profile.id;
         const nombre = profile.displayName;
@@ -309,12 +307,11 @@ if (process.env.STEAM_API_KEY) {
         return done(null, result.rows[0]);
       } catch (err) { return done(err); }
     }));
+    steamStrategyConfigured = true;
     log(LOG_LEVELS.INFO, 'AUTH', 'Steam Strategy configurada correctamente');
   } catch (err) {
     log(LOG_LEVELS.ERROR, 'AUTH', 'Error al configurar Steam Strategy:', err);
   }
-} else {
-  log(LOG_LEVELS.WARN, 'AUTH', 'STEAM_API_KEY no configurada. Autenticación Steam deshabilitada.');
 }
 
 // ─── GOOGLE OAUTH CLIENT ────────────────────────────
@@ -494,8 +491,11 @@ function steamAuthWithTimeout(req, res, next, authCallback) {
 // --- AUTH ROUTES ---
 
 app.get('/api/auth/steam', (req, res, next) => {
+  const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+  if (!steamStrategyConfigured) {
+    return res.redirect(`${FRONTEND_URL}/login?error=steam_disabled`);
+  }
   steamAuthWithTimeout(req, res, next, (err, user, safeRespond) => {
-    const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
     if (err) {
       log(LOG_LEVELS.ERROR, 'AUTH', 'Error en autenticación Steam:', err.message);
       return safeRespond(`${FRONTEND_URL}/login?error=steam_auth_failed`);
@@ -513,8 +513,11 @@ app.get('/api/auth/steam', (req, res, next) => {
 });
 
 app.get('/api/auth/steam/return', (req, res, next) => {
+  const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+  if (!steamStrategyConfigured) {
+    return res.redirect(`${FRONTEND_URL}/login?error=steam_disabled`);
+  }
   steamAuthWithTimeout(req, res, next, (err, user, safeRespond) => {
-    const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
     if (err) {
       log(LOG_LEVELS.ERROR, 'AUTH', 'Error en callback Steam:', err.message);
       return safeRespond(`${FRONTEND_URL}/login?error=steam_callback_failed`);

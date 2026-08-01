@@ -136,13 +136,16 @@ const WeaponBannerCard = ({ c, skins, onClick, isFavorite, onToggleFavorite, for
 
   // CS2 Official Rarity Color: use hero skin's rarity for the neon glow.
   // Falls back to category color (c.glowColor / c.color) when no hero skin rarity is available.
+  const isLimitedEdition = String(c?.category || "").toLowerCase() === "limited_edition";
   const rarityColor = hero?.rarity ? getRarityColor(hero.rarity) : null;
-  const themeColor = rarityColor || c.glowColor || c.color || "#6366f1";
+  const themeColor = isLimitedEdition ? "#FFD700" : (rarityColor || c.glowColor || c.color || "#6366f1");
+  const glowColor = isLimitedEdition ? "#FFE600" : themeColor;
   const rarityCfg = getRarityConfig(c.category);
   const themeVar = getThemeVariations(forceStyle, themeColor);
 
   // Resolve hero skin price via PriceEngine cascade (sync: cache + local matrix + rarity base)
   const heroPrice = hero ? resolvePriceSync(hero.name, hero.rarity, hero.wear) : null;
+  const heroPriceValue = Number(heroPrice?.price || hero?.price || 0);
 
   const previews = useMemo(() => {
     const pool = (skins && skins.length > 0) ? skins : (c.previewSkins || []);
@@ -234,6 +237,46 @@ const WeaponBannerCard = ({ c, skins, onClick, isFavorite, onToggleFavorite, for
         justifyContent: "center",
         overflow: "hidden"
       }}>
+        {/* Miniatura de caja inferior que sostiene la skin */}
+        <div style={{
+          position: "absolute",
+          bottom: "24px",
+          left: "50%",
+          transform: "translateX(-50%)",
+          zIndex: 1,
+          width: "200px",
+          height: "56px",
+          borderRadius: "22px",
+          background: isLimitedEdition
+            ? `linear-gradient(180deg, rgba(255,215,0,0.16), rgba(255,255,255,0.08))`
+            : "rgba(255,255,255,0.05)",
+          border: `1px solid ${hexToRgba(glowColor, 0.35)}`,
+          boxShadow: `0 0 24px ${hexToRgba(glowColor, 0.18)}`,
+          overflow: "hidden",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "6px"
+        }}>
+          <div style={{
+            width: "88%",
+            height: "100%",
+            borderRadius: "18px",
+            background: isLimitedEdition
+              ? "linear-gradient(135deg, rgba(255,215,0,0.25), rgba(255,255,255,0.08))"
+              : "rgba(255,255,255,0.1)",
+            border: `1px solid ${hexToRgba(glowColor, 0.22)}`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "6px"
+          }}>
+            <div style={{ width: "22px", height: "22px", borderRadius: "6px", background: "rgba(255,255,255,0.18)", boxShadow: `inset 0 0 10px ${hexToRgba(glowColor,0.22)}` }} />
+            <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: hexToRgba(glowColor,0.8) }} />
+            <div style={{ width: "22px", height: "10px", borderRadius: "4px", background: "rgba(255,255,255,0.18)" }} />
+          </div>
+        </div>
+
         {/* Radial halo behind weapon */}
         <div style={{
           position: "absolute",
@@ -330,7 +373,7 @@ const WeaponBannerCard = ({ c, skins, onClick, isFavorite, onToggleFavorite, for
             textOverflow: "ellipsis",
             boxShadow: "0 4px 20px rgba(0,0,0,0.4)"
           }}>
-            ⭐ {hero.name} · €{Number(heroPrice?.price || 0).toFixed(2)}
+            ⭐ {hero.name} · €{heroPriceValue.toFixed(2)}
           </div>
         )}
       </div>

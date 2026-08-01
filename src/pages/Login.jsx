@@ -149,7 +149,7 @@ useEffect(function () {
       window.google.accounts.id.initialize({
         client_id: clientId,
         ux_mode: "popup",
-        use_fedcm_for_prompt: false,
+        use_fedcm_for_prompt: true,
         callback: async function (response) {
           var idToken = response.credential;
           if (!idToken) { setError("No se pudo obtener el token de Google."); setSocialLoading(null); return; }
@@ -198,6 +198,7 @@ useEffect(function () {
                 type="button"
                 onClick={handleGoogleLogin}
                 disabled={socialLoading !== null}
+                data-use_fedcm_for_prompt="true"
                 title="Iniciar sesion con Google"
                 style={{
                   width: "100%",
