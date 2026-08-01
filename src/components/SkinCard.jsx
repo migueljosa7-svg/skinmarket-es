@@ -1,10 +1,13 @@
 import { motion as Motion } from "framer-motion";
-import { getRarityColor } from "../constants/colors";
+import { getRarityColor, resolvePriceSync } from "../services/PriceEngine.js";
 import { getSkinImageUrl, handleImageError } from "../services/ImageService";
 
 export default function SkinCard({ skin }) {
   const rarity = skin.rarity || "Mil-Spec Grade";
   const color = getRarityColor(rarity) || "#f5ac3b";
+  // Garantía cero crashes: resolvePriceSync nunca devuelve null/undefined
+  const resolvedPrice = resolvePriceSync(skin.name, rarity, skin.wear);
+  const safePrice = Number(resolvedPrice?.price) || 0;
 
   return (
     <Motion.div
@@ -112,7 +115,7 @@ onError={(e) => handleImageError(e, skin)}
         zIndex: 1
       }}>
         <div style={{ fontWeight: "900", fontSize: "1.4rem", color: '#fff' }}>
-          €{Number(skin.price || 0).toFixed(2)}
+          €{safePrice.toFixed(2)}
         </div>
 
       </div>

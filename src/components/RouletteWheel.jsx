@@ -2,7 +2,7 @@
 // Reusable single/multi roulette wheel for case opening animations.
 // Extracted from CaseView.jsx (PHASE 6.1 refactor).
 import React, { useEffect, useRef } from "react";
-import { getRarityColor } from "../constants/colors.js";
+import { getRarityColor } from "../services/PriceEngine.js";
 import { getPlaceholderImage, handleImageError } from "../services/ImageService";
 import { sound } from "../utils/audio";
 

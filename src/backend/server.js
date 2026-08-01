@@ -22,6 +22,7 @@ import { createCharge, handleWebhook, getPaymentStatus } from "./controllers/pay
 import p2pMarketService from "./services/p2pMarketService.js";
 import fs from "fs";
 import crypto from "crypto";
+import PriceEngine from "./services/PriceEngine.js";
 
 dotenv.config();
 
@@ -2478,4 +2479,37 @@ cron.schedule("0 */6 * * *", async () => {
   } catch {
     // Silenciar errores en tarea programada
   }
+});
+
+// ─── PRICE ENGINE API ENDPOINT ─────────────────────────
+// Resuelve precios de skins usando la cascada multi-fuente (KeyDrop-style)
+// Fuente 1: Caché local en memoria (<2ms)
+// Fuente 2: PriceEmpire / CSGOBackpack (API Index)
+// Fuente 3: Steam Community Market Direct (wear-specific)
+// Fuente 4: Matriz local pre-calculada (skin_prices.json)
+// Garantía final: Precio base ponderado por rareza (NUNCA null/undefined)
+app.get("/api/prices/resolve", async (req, res) => {
+  try {
+    const { market_hash_name, rarity, wear } = req.query;
+    if (!market_hash_name) {
+      return res.status(400).json({ error: "market_hash_name es obligatorio" });
+    }
+    const result = await PriceEngine.resolvePrice({
+      marketHashName: market_hash_name,
+      rarity: rarity || undefined,
+      wear: wear || undefined,
+    });
+    res.json(result);
+  } catch (err) {
+    log(LOG_LEVELS.ERROR, 'PRICE_ENGINE', 'Error en /api/prices/resolve:', err.message);
+    // Garantía cero crashes: devolver precio base por rareza
+    const { rarity, wear } = req.query;
+    const basePrice = PriceEngine.getRarityBasePrice(rarity || "Mil-Spec Grade", wear || null);
+    res.json({ price: basePrice, source: "rarity_base", error: err.message });
+  }
+});
+
+// Endpoint para estadísticas de caché de precios
+app.get("/api/prices/cache-stats", (req, res) => {
+  res.json(PriceEngine.getCacheStats());
 });

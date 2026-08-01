@@ -11,6 +11,7 @@
 import { Heart } from "lucide-react";
 import { useMemo } from "react";
 import { getSkinImageUrl, handleImageError } from "../services/ImageService";
+import { getRarityColor, resolvePriceSync } from "../services/PriceEngine.js";
 
 // ─── Color Helpers ──────────────────────────────────────────────────
 const hexToRgba = (hex, alpha = 1) => {
@@ -131,11 +132,18 @@ const glassBadgeBase = {
 
 // ─── MAIN CARD — WEAPON BANNER (Opción A) ───────────────────────────
 const WeaponBannerCard = ({ c, skins, onClick, isFavorite, onToggleFavorite, forceStyle }) => {
-  const themeColor = c.glowColor || c.color || "#6366f1";
+  const hero = c.heroSkin || null;
+
+  // CS2 Official Rarity Color: use hero skin's rarity for the neon glow.
+  // Falls back to category color (c.glowColor / c.color) when no hero skin rarity is available.
+  const rarityColor = hero?.rarity ? getRarityColor(hero.rarity) : null;
+  const themeColor = rarityColor || c.glowColor || c.color || "#6366f1";
   const rarityCfg = getRarityConfig(c.category);
   const themeVar = getThemeVariations(forceStyle, themeColor);
 
-  const hero = c.heroSkin || null;
+  // Resolve hero skin price via PriceEngine cascade (sync: cache + local matrix + rarity base)
+  const heroPrice = hero ? resolvePriceSync(hero.name, hero.rarity, hero.wear) : null;
+
   const previews = useMemo(() => {
     const pool = (skins && skins.length > 0) ? skins : (c.previewSkins || []);
     return pool.slice(0, 4);
@@ -299,7 +307,7 @@ const WeaponBannerCard = ({ c, skins, onClick, isFavorite, onToggleFavorite, for
           />
         </div>
 
-        {/* Hero skin name tag */}
+        {/* Hero skin name tag — shows resolved PriceEngine price */}
         {hero && (
           <div style={{
             position: "absolute",
@@ -322,7 +330,7 @@ const WeaponBannerCard = ({ c, skins, onClick, isFavorite, onToggleFavorite, for
             textOverflow: "ellipsis",
             boxShadow: "0 4px 20px rgba(0,0,0,0.4)"
           }}>
-            ⭐ {hero.name}
+            ⭐ {hero.name} · €{Number(heroPrice?.price || 0).toFixed(2)}
           </div>
         )}
       </div>
