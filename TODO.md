@@ -32,7 +32,7 @@
 - [x] 6.3 Extract DailyRouletteModal → src/components/DailyRouletteModal.jsx
 
 ## PHASE 7: BUILD & GIT PUSH
-- [ ] 7.1 Validate backend: node --check src/backend/server.js
-- [ ] 7.2 Build frontend: npm run build
-- [ ] 7.3 git add . && git commit && git push origin master
+- [x] 7.1 Validate backend: node --check src/backend/server.js
+- [x] 7.2 Build frontend: npm run build
+- [x] 7.3 git add . && git commit && git push origin master
 

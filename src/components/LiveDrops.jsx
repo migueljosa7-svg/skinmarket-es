@@ -59,15 +59,7 @@ export default function LiveDrops() {
     // 3. Background community drop generator (simulated for demo)
     intervalRef.current = setInterval(() => {
       const randomUser = BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)];
-      const sampleSkins = [
-        { name: "M4A1-S | Printstream", price: 145.00, rarity: "Covert" },
-        { name: "Desert Eagle | Printstream", price: 65.00, rarity: "Covert" },
-        { name: "AK-47 | Inheritance", price: 120.00, rarity: "Covert" },
-        { name: "AWP | Chromatic Aberration", price: 38.00, rarity: "Classified" },
-        { name: "USP-S | Printstream", price: 85.00, rarity: "Covert" },
-        { name: "★ Specialist Gloves | Fade", price: 850.00, rarity: "Extraordinary" }
-      ];
-      const picked = sampleSkins[Math.floor(Math.random() * sampleSkins.length)];
+      const picked = SAMPLE_SKINS[Math.floor(Math.random() * SAMPLE_SKINS.length)];
       StorageService.addLiveDrop({
         user: randomUser,
         item: { ...picked, image: "" },

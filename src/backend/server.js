@@ -859,17 +859,26 @@ const LEVEL_THRESHOLDS = [
   { level: 360, minDeposit: 200000, dailyCaseId: "daily-360", caseLabel: "VIP SUPREME", reward: 50.00 },
 ];
 
+// Pre-computed lookup map for O(1) level → daily case resolution
+const DAILY_CASE_BY_LEVEL_MAP = new Map(LEVEL_THRESHOLDS.map(t => [t.level, t]));
+
+// Binary search for O(log n) level calculation (vs previous O(n) linear scan)
 function calculateLevel(totalDeposited) {
-  let maxLevel = 0;
-  for (const t of LEVEL_THRESHOLDS) {
-    if (totalDeposited >= t.minDeposit) maxLevel = t.level;
+  let lo = 0, hi = LEVEL_THRESHOLDS.length - 1, result = 0;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (totalDeposited >= LEVEL_THRESHOLDS[mid].minDeposit) {
+      result = LEVEL_THRESHOLDS[mid].level;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
   }
-  return maxLevel;
+  return result;
 }
 
 function getDailyCaseForLevel(level) {
-  for (const t of LEVEL_THRESHOLDS) { if (t.level === level) return t; }
-  return LEVEL_THRESHOLDS[0];
+  return DAILY_CASE_BY_LEVEL_MAP.get(level) || LEVEL_THRESHOLDS[0];
 }
 
 // ─── GET USER /api/me ────────────────────
@@ -1200,6 +1209,39 @@ app.get("/api/steam/price", inspectorLimiter, async (req, res) => {
 
 // ─── CASE OPENING (with atomic transactions) ─────────────
 
+// Module-level case price lookup table — avoids recreating the object on every request.
+// Maps caseId to real price from the frontend case definitions.
+// Updated economic balance:
+// - Económica: €0.50 - €2.50
+// - Intermedia: €5.00 - €25.00
+// - Premium: €50.00 - €300.00
+// - Limited: €50.00 - €300.00
+// - Risk Zone: €10.00 - €150.00
+const CASE_PRICES = {
+  "econ-0": 0.50, "econ-1": 0.75, "econ-2": 1.00, "econ-3": 1.25,
+  "econ-4": 1.50, "econ-5": 1.75, "econ-6": 2.00, "econ-7": 2.25,
+  "econ-8": 2.50, "econ-9": 2.50, "econ-10": 2.50, "econ-11": 2.50,
+  // Legacy eco IDs for backward compatibility
+  "eco-0": 0.50, "eco-1": 0.75, "eco-2": 1.00, "eco-3": 1.25, "eco-4": 1.50,
+  "eco-5": 1.75, "eco-6": 2.00, "eco-7": 2.25, "eco-8": 2.50, "eco-9": 2.75,
+  "eco-10": 3.00, "eco-11": 3.50,
+  // Intermedia: €5.00 - €25.00
+  "inter-0": 5.00, "inter-1": 5.50, "inter-2": 6.00, "inter-3": 7.00,
+  "inter-4": 8.00, "inter-5": 9.00, "inter-6": 10.00, "inter-7": 12.00,
+  "inter-8": 14.00, "inter-9": 16.00, "inter-10": 18.00, "inter-11": 20.00,
+  "inter-12": 22.00, "inter-13": 25.00,
+  // Premium: €50.00 - €300.00
+  "prem-0": 50.00, "prem-1": 60.00, "prem-2": 75.00, "prem-3": 90.00,
+  "prem-4": 100.00, "prem-5": 120.00, "prem-6": 150.00, "prem-7": 180.00,
+  "prem-8": 200.00, "prem-9": 220.00, "prem-10": 250.00, "prem-11": 300.00,
+  // Limited: €50.00 - €300.00
+  "limit-0": 50.00, "limit-1": 75.00, "limit-2": 100.00, "limit-3": 125.00,
+  "limit-4": 150.00, "limit-5": 175.00, "limit-6": 200.00, "limit-7": 300.00,
+  // Risk Zone: €10.00 - €150.00
+  "risk-0": 10.00, "risk-1": 15.00, "risk-2": 20.00, "risk-3": 30.00,
+  "risk-4": 50.00, "risk-5": 75.00, "risk-6": 100.00, "risk-7": 150.00
+};
+
 // ─── SECURE RNG HELPER (cryptographically secure) ───────────
 // Uses crypto.randomInt() for tamper-proof drop rate calculations.
 // The frontend NEVER computes the outcome — it only renders the animation.
@@ -1220,38 +1262,7 @@ app.post("/api/cases/open", authenticateToken, caseOpenLimiter, async (req, res)
     // Validate quantity (prevent abuse)
     const qty = Math.min(Math.max(parseInt(quantity) || 1, 1), 5);
 
-    // Case price lookup — maps caseId to real price from the frontend case definitions
-    // Updated economic balance:
-    // - Económica: €0.50 - €2.50
-    // - Intermedia: €5.00 - €25.00
-    // - Premium: €50.00 - €300.00
-    // - Limited: €50.00 - €300.00
-    // - Risk Zone: €10.00 - €150.00
-    const casePrices = {
-      "econ-0": 0.50, "econ-1": 0.75, "econ-2": 1.00, "econ-3": 1.25,
-      "econ-4": 1.50, "econ-5": 1.75, "econ-6": 2.00, "econ-7": 2.25,
-      "econ-8": 2.50, "econ-9": 2.50, "econ-10": 2.50, "econ-11": 2.50,
-      // Legacy eco IDs for backward compatibility
-      "eco-0": 0.50, "eco-1": 0.75, "eco-2": 1.00, "eco-3": 1.25, "eco-4": 1.50,
-      "eco-5": 1.75, "eco-6": 2.00, "eco-7": 2.25, "eco-8": 2.50, "eco-9": 2.75,
-      "eco-10": 3.00, "eco-11": 3.50,
-      // Intermedia: €5.00 - €25.00
-      "inter-0": 5.00, "inter-1": 5.50, "inter-2": 6.00, "inter-3": 7.00,
-      "inter-4": 8.00, "inter-5": 9.00, "inter-6": 10.00, "inter-7": 12.00,
-      "inter-8": 14.00, "inter-9": 16.00, "inter-10": 18.00, "inter-11": 20.00,
-      "inter-12": 22.00, "inter-13": 25.00,
-      // Premium: €50.00 - €300.00
-      "prem-0": 50.00, "prem-1": 60.00, "prem-2": 75.00, "prem-3": 90.00,
-      "prem-4": 100.00, "prem-5": 120.00, "prem-6": 150.00, "prem-7": 180.00,
-      "prem-8": 200.00, "prem-9": 220.00, "prem-10": 250.00, "prem-11": 300.00,
-      // Limited: €50.00 - €300.00
-      "limit-0": 50.00, "limit-1": 75.00, "limit-2": 100.00, "limit-3": 125.00,
-      "limit-4": 150.00, "limit-5": 175.00, "limit-6": 200.00, "limit-7": 300.00,
-      // Risk Zone: €10.00 - €150.00
-      "risk-0": 10.00, "risk-1": 15.00, "risk-2": 20.00, "risk-3": 30.00,
-      "risk-4": 50.00, "risk-5": 75.00, "risk-6": 100.00, "risk-7": 150.00
-    };
-    const casePrice = casePrices[caseId] || 2.50;
+    const casePrice = CASE_PRICES[caseId] || 2.50;
     const priceMultiplier = jokerMode ? 3 : 1;
     const totalCost = casePrice * priceMultiplier * qty;
 
@@ -2246,7 +2257,9 @@ process.on('SIGINT', () => {
 });
 
 // ─── RESPONSE ERROR MIDDLEWARE ───────────────────
-app.use((err, req, res) => {
+// Express requires exactly 4 args (err, req, res, next) to identify error handlers.
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
   log(LOG_LEVELS.ERROR, 'GLOBAL', 'Error en middleware global', {
     error: err.message,
     stack: err.stack,
@@ -2318,6 +2331,9 @@ io.on("connection", (socket) => {
   log(LOG_LEVELS.INFO, 'SOCKET', `Cliente conectado: ${socket.id}`);
   socket.on("disconnect", () => log(LOG_LEVELS.INFO, 'SOCKET', `Cliente desconectado: ${socket.id}`));
 });
+
+// Expose io to Express so route handlers can emit socket events (e.g. withdrawal_update)
+app.set('io', io);
 
 
 // ─── PRICE CACHE ──────────────────────────────────

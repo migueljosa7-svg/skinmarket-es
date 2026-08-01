@@ -1,5 +1,5 @@
 // src/context/AuthContext.jsx
-import { createContext, useEffect, useState, useCallback } from "react";
+import { createContext, useEffect, useState, useCallback, useMemo } from "react";
 import { StorageService } from "../services/StorageService";
 
 export const AuthContext = createContext(null);
@@ -389,12 +389,14 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  const userWithInventory = user ? {
+  // Memoize the merged user+inventory object to prevent unnecessary re-renders
+  // of all consumers when only internal state references change.
+  const userWithInventory = useMemo(() => user ? {
     ...user,
     inventory,
     balance: Number(user.balance ?? user.saldo ?? 0),
     saldo: Number(user.saldo ?? user.balance ?? 0)
-  } : null;
+  } : null, [user, inventory]);
 
   return (
     <AuthContext.Provider
