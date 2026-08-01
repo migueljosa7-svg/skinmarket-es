@@ -27,7 +27,7 @@ export default function Login() {
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [recoveryMessage, setRecoveryMessage] = useSadtate("");
+  const [recoveryMessage, setRecoveryMessage] = useState("");
   const [socialLoading, setSocialLoading] = useState(null);
   const [rememberMe, setRememberMe] = useState(false);
   const googleInitializedRef = useRef(false);
