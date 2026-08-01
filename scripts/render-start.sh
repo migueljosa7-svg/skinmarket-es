@@ -126,6 +126,11 @@ echo "  ✓ DATABASE_URL parseada correctamente: $PARSED"
 # ── 5. Start the backend server ───────────────────
 echo ""
 echo "[5/5] Iniciando servidor Node.js..."
+if [ -z "$PORT" ]; then
+  echo "  ⚠️  PORT no está definido. Render debe inyectarlo automáticamente en el entorno."
+  echo "     Usando fallback local 3001 para continuar en modo de desarrollo."
+fi
+
 echo "  → Puerto: ${PORT:-3001}"
 echo "  → Modo: ${NODE_ENV:-production}"
 echo "  → WebSockets: activos"

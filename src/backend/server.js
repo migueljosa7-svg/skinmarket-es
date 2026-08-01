@@ -105,6 +105,10 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET;
 
+if (!process.env.PORT) {
+  log(LOG_LEVELS.WARN, 'SYSTEM', 'PORT no definido en el entorno. Usando fallback local 3001. Render necesita inyectar PORT.');
+}
+
 // ─── Session Store ──────
 const sessionStore = (() => {
   let store;

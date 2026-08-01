@@ -55,8 +55,9 @@ services:
       # ── Node Environment ──
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: "3001"
+
+      # Render injects the runtime PORT automatically. Do not hardcode it here.
+      # The app also falls back to 3001 for local development.
 
       # ── Backend / Frontend URLs ──
       - key: BACKEND_URL
