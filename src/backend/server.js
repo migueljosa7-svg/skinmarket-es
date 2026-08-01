@@ -25,8 +25,6 @@ import PriceEngine from "./services/PriceEngine.js";
 
 const envPath = path.resolve(process.cwd(), '.env');
 dotenv.config({ path: envPath, override: true });
-
-const envPath = path.resolve(process.cwd(), '.env');
 if (!fs.existsSync(envPath)) {
   console.warn('[SYSTEM] .env file not found in project root. Copy .env.example to .env and configure STEAM_API_KEY, JWT_SECRET, DATABASE_URL, BACKEND_URL, FRONTEND_URL, etc.');
 }

@@ -1,7 +1,10 @@
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
-const LOG_FILE = path.resolve(process.cwd(), 'steam_callback.log');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const LOG_FILE = path.resolve(__dirname, 'steam_callback.log');
 
 function ensureLogFile() {
   try {

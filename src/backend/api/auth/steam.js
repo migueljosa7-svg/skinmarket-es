@@ -10,18 +10,9 @@ function normalizeUrl(rawUrl, needsTrailingSlash = false) {
   return needsTrailingSlash ? `${trimmed.replace(/\/$/, '')}/` : trimmed.replace(/\/$/, '');
 }
 
-function normalizeSteamRealm(steamRealm, backendUrl) {
+function normalizeSteamRealm(steamRealm) {
   if (!steamRealm || typeof steamRealm !== 'string') return steamRealm;
-  const normalized = normalizeUrl(steamRealm, true);
-  try {
-    const url = new URL(normalized);
-    if (url.hostname === 'localhost') {
-      return `${url.protocol}//${url.hostname}/`;
-    }
-  } catch {
-    return normalized;
-  }
-  return normalized;
+  return normalizeUrl(steamRealm, true);
 }
 
 function buildSteamUrls(env, log) {
@@ -29,22 +20,9 @@ function buildSteamUrls(env, log) {
   const steamReturnURL = env.STEAM_RETURN_URL
     ? normalizeUrl(env.STEAM_RETURN_URL)
     : `${backendUrl}/api/auth/steam/return`;
-
-  let steamRealm = env.STEAM_REALM
-    ? normalizeSteamRealm(env.STEAM_REALM, backendUrl)
+  const steamRealm = env.STEAM_REALM
+    ? normalizeSteamRealm(env.STEAM_REALM)
     : `${backendUrl}/`;
-
-  if (!env.STEAM_REALM) {
-    try {
-      const backendUrlObj = new URL(backendUrl);
-      if (backendUrlObj.hostname === 'localhost') {
-        steamRealm = `${backendUrlObj.protocol}//${backendUrlObj.hostname}/`;
-        log('INFO', 'AUTH', `Usando Steam realm local sin puerto: ${steamRealm}`);
-      }
-    } catch (err) {
-      // ignore malformed backendUrl
-    }
-  }
 
   if (!env.STEAM_API_KEY) {
     log('WARN', 'AUTH', 'STEAM_API_KEY no configurada. Copia .env.example a .env y configura STEAM_API_KEY. Autenticación Steam deshabilitada.');
@@ -147,14 +125,15 @@ export function registerSteamRoutes(app, passport, db, log, logAction, jwtSecret
 
     app.get('/api/auth/steam/return', (req, res, next) => {
       captureSteamCallback(req);
+      log('INFO', 'AUTH', 'Steam callback received', JSON.stringify({ query: req.query, body: req.body }));
       passport.authenticate('steam', { session: false }, (err, user, info) => {
         if (err) {
-          log('ERROR', 'AUTH', 'Error en callback Steam:', err.message || err, 'info=', info);
+          log('ERROR', 'AUTH', 'Error en callback Steam:', JSON.stringify({ error: err.message || err, info }));
           return res.redirect(`${frontendUrl}/login?error=steam_callback_failed`);
         }
 
         if (!user) {
-          log('WARN', 'AUTH', 'Callback Steam recibido sin usuario válido', 'info=', info);
+          log('WARN', 'AUTH', 'Callback Steam recibido sin usuario válido', JSON.stringify({ info, query: req.query }));
           return res.redirect(`${frontendUrl}/login?error=steam_login_cancelled`);
         }
 
