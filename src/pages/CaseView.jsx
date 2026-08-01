@@ -31,6 +31,24 @@ function getAuthToken() {
   return null;
 }
 
+function getSafeSkinData(skin) {
+  const safeName = skin?.name || skin?.item?.name || "Skin desconocida";
+  const safeRarity = skin?.rarity || skin?.item?.rarity || "Mil-Spec Grade";
+  const safeWear = skin?.wear || skin?.item?.wear || null;
+  const safePriceValue = Number(
+    skin?.price ?? skin?.item?.price ?? resolvePriceSync(safeName, safeRarity, safeWear)?.price ?? 1.50
+  );
+  const price = Number.isFinite(safePriceValue) && safePriceValue > 0 ? safePriceValue : 1.50;
+  return {
+    id: skin?.id || skin?.item?.id || `skin_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    name: safeName,
+    rarity: safeRarity,
+    wear: safeWear,
+    price,
+    image: skin?.image || skin?.imageHD || skin?.item?.image || ""
+  };
+}
+
 export default function CaseView() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -125,13 +143,17 @@ export default function CaseView() {
         if (response.ok) {
           const data = await response.json();
           if (data.success && data.items && data.items.length > 0) {
-            const backendItems = data.items.map((item) => ({
-              id: item.id,
-              name: item.name,
-              price: Number(item.price || item?.item?.price || 1.50),
-              rarity: item.rarity,
-              image: item.image || item.imageHD || ""
-            }));
+            const backendItems = data.items.map((item) => {
+              const safeItem = getSafeSkinData(item);
+              return {
+                id: safeItem.id,
+                name: safeItem.name,
+                price: safeItem.price,
+                rarity: safeItem.rarity,
+                wear: safeItem.wear,
+                image: safeItem.image
+              };
+            });
 
             // Update local storage to reflect backend state
             const newBalance = Number(data.newBalance || safeUser.balance - totalCost);
@@ -189,27 +211,16 @@ export default function CaseView() {
     const expectedResults = [];
     for (let i = 0; i < quantity; i++) {
       const chosenSkin = pickWeightedSkin(validSkins, caseData.category || "económica");
-      if (!chosenSkin) {
-        // Fallback to cheapest skin if pickWeightedSkin returns null
-        const fallbackSkin = validSkins[0];
-        expectedResults.push({
-          id: `won_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 4)}`,
-          name: fallbackSkin.name,
-          price: Number(fallbackSkin.price),
-          rarity: fallbackSkin.rarity,
-          image: fallbackSkin.image
-        });
-      } else {
-        expectedResults.push({
-          id: `won_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 4)}`,
-          name: chosenSkin.name,
-          price: Number(chosenSkin.price),
-          rarity: chosenSkin.rarity,
-          image: chosenSkin.image
-        });
-      }
-    }
-
+      const fallback = chosenSkin || validSkins[0] || {};
+      const safeSkin = getSafeSkinData(fallback);
+      expectedResults.push({
+        id: `won_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 4)}`,
+        name: safeSkin.name,
+        price: safeSkin.price,
+        rarity: safeSkin.rarity,
+        wear: safeSkin.wear,
+        image: safeSkin.image
+      });
     // Add won items to user inventory & push to live drops (using safeUser to prevent null refs)
     const savedSkins = StorageService.addSkinsToInventory(expectedResults);
     expectedResults.forEach((item) => {
@@ -270,7 +281,7 @@ export default function CaseView() {
       </div>
     );
 
-  const totalResultsValue = results.reduce((acc, s) => acc + Number(s.price || 0), 0);
+  const totalResultsValue = results.reduce((acc, s) => acc + Number(s?.price || 0), 0);
 
   return (
     <div style={{ minHeight: "100vh", background: "#0f1115", paddingBottom: "100px" }}>
@@ -412,7 +423,7 @@ export default function CaseView() {
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "25px", justifyContent: "center", marginBottom: "50px" }}>
                   {results.filter(Boolean).map((skin, idx) => {
                     const skinName = skin?.name || "Skin desconocida";
-                    const skinRarity = skin?.rarity || "Unknown";
+                    const skinRarity = skin?.rarity || "Mil-Spec Grade";
                     const safePrice = Number(resolvePriceSync(skinName, skinRarity, skin?.wear)?.price || skin?.price || 0).toFixed(2);
                     const color = getRarityColor(skinRarity);
                     return (
@@ -445,7 +456,7 @@ export default function CaseView() {
                           }}
                         />
                         <div style={{ color: color, fontSize: "0.7rem", fontWeight: "900", marginBottom: "5px" }}>
-                          {skin.rarity.toUpperCase()}
+                          {skinRarity.toUpperCase()}
                         </div>
                         <div style={{ color: "white", fontSize: "1rem", fontWeight: "bold", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {skinName}
