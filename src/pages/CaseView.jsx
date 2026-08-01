@@ -424,13 +424,12 @@ export default function CaseView() {
 
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "25px", justifyContent: "center", marginBottom: "50px" }}>
                   {results.filter(Boolean).map((skin, idx) => {
-                    const skinName = skin?.name || "Skin desconocida";
-                    const skinRarity = skin?.rarity || "Mil-Spec Grade";
-                    const safePrice = Number(skin?.price ?? resolvePriceSync(skinName, skinRarity, skin?.wear)?.price ?? 0).toFixed(2);
-                    const color = getRarityColor(skinRarity);
+                    const safeSkin = getSafeSkinData(skin);
+                    const safePrice = Number(safeSkin.price).toFixed(2);
+                    const color = getRarityColor(safeSkin.rarity);
                     return (
                       <div
-                        key={`result-${idx}-${skin?.id || skin?._id || "skin"}`}
+                        key={`result-${idx}-${safeSkin.id}`}
                         style={{
                           width: "220px",
                           background: "rgba(255,255,255,0.03)",
@@ -445,23 +444,23 @@ export default function CaseView() {
                         }}
                       >
                         <img
-                          src={getSkinImageUrl(skin.name, skin.image)}
-                          alt={skin.name}
-                          onError={(e) => handleImageError(e, skin)}
+                          src={getSkinImageUrl(safeSkin.name, safeSkin.image)}
+                          alt={safeSkin.name}
+                          onError={(e) => handleImageError(e, safeSkin)}
                           style={{
                             width: "100%",
                             height: "120px",
                             objectFit: "contain",
                             marginBottom: "20px",
                             filter: "drop-shadow(0 15px 25px rgba(0,0,0,0.5))",
-                            opacity: skin.image ? 1 : 0.3
+                            opacity: safeSkin.image ? 1 : 0.3
                           }}
                         />
                         <div style={{ color: color, fontSize: "0.7rem", fontWeight: "900", marginBottom: "5px" }}>
-                          {skinRarity.toUpperCase()}
+                          {safeSkin.rarity.toUpperCase()}
                         </div>
                         <div style={{ color: "white", fontSize: "1rem", fontWeight: "bold", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {skinName}
+                          {safeSkin.name}
                         </div>
                         <div style={{ fontSize: "1.6rem", fontWeight: "900", color: "#fff", marginTop: "10px" }}>
                           €{safePrice}
@@ -687,10 +686,11 @@ export default function CaseView() {
           <h3 style={{ fontSize: "1.5rem", fontWeight: "900", marginBottom: "25px" }}>CONTENIDO DE LA CAJA</h3>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "20px" }}>
             {validSkins.map((skin, idx) => {
-              const color = getRarityColor(skin.rarity);
+              const safeSkin = getSafeSkinData(skin);
+              const color = getRarityColor(safeSkin.rarity);
               return (
                 <div
-                  key={`skin-${idx}-${skin.id || skin._id || "skin"}`}
+                  key={`skin-${idx}-${safeSkin.id}`}
                   style={{
                     background: "rgba(255,255,255,0.02)",
                     borderRadius: "20px",
@@ -702,22 +702,22 @@ export default function CaseView() {
                   }}
                 >
                   <img
-                    src={getSkinImageUrl(skin.name, skin.image)}
-                    alt={skin.name}
-                    onError={(e) => handleImageError(e, skin)}
+                    src={getSkinImageUrl(safeSkin.name, safeSkin.image)}
+                    alt={safeSkin.name}
+                    onError={(e) => handleImageError(e, safeSkin)}
                     style={{
                       width: "100%",
                       height: "100px",
                       objectFit: "contain",
                       marginBottom: "15px",
-                      opacity: skin.image ? 1 : 0.3
+                      opacity: safeSkin.image ? 1 : 0.3
                     }}
                   />
-                  <div style={{ color: color, fontSize: "0.65rem", fontWeight: "900", marginBottom: "5px" }}>{skin.rarity.toUpperCase()}</div>
+                  <div style={{ color: color, fontSize: "0.65rem", fontWeight: "900", marginBottom: "5px" }}>{safeSkin.rarity.toUpperCase()}</div>
                   <div style={{ color: "white", fontSize: "0.85rem", fontWeight: "bold", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {skin.name}
+                    {safeSkin.name}
                   </div>
-                  <div style={{ color: "#fff", fontWeight: "900", fontSize: "1.1rem", marginTop: "8px" }}>€{Number(skin.price ?? resolvePriceSync(skin.name, skin.rarity, skin.wear)?.price ?? 0).toFixed(2)}</div>
+                  <div style={{ color: "#fff", fontWeight: "900", fontSize: "1.1rem", marginTop: "8px" }}>€{Number(safeSkin.price).toFixed(2)}</div>
                 </div>
               );
             })}
