@@ -8,30 +8,27 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
     const token = localStorage.getItem("token");
     if (token && token.length > 10) {
-      // JWT token exists — attempt to load cached user data
       const storedUser = StorageService.getUser();
       if (storedUser && storedUser.email && storedUser.email !== "guest@skinmarket.es") {
         return storedUser;
       }
-      // Return a minimal auth placeholder — full data fetched via /api/me
-      return {
-        id: "pending",
-        nombre_usuario: "Cargando...",
-        email: "pending@auth",
-        balance: 0,
-        saldo: 0,
-        nivel: 0,
-        experiencia: 0,
-        steam_id: null,
-        link_intercambio: null,
-        role: "user",
-        inventory: []
-      };
+      return null;
+    }
+    const guestMode = localStorage.getItem("guest_mode") === "true";
+    if (guestMode) {
+      const storedUser = StorageService.getUser();
+      if (storedUser && storedUser.email === "guest@skinmarket.es") {
+        return storedUser;
+      }
     }
     return null;
   });
   const [inventory, setInventory] = useState(() => {
     if (StorageService.hasSession()) {
+      return StorageService.getInventory();
+    }
+    const guestMode = localStorage.getItem("guest_mode") === "true";
+    if (guestMode) {
       return StorageService.getInventory();
     }
     return [];
@@ -66,20 +63,29 @@ export function AuthProvider({ children }) {
           }
         })
         .catch(() => {
-          // Token exists but backend fetch failed — user stays with placeholder data
+          // Token exists but backend fetch failed — user stays unauthenticated
+          localStorage.removeItem('token');
+          setTokenState(null);
+          setUser(null);
         });
     }
   }, []);
 
   useEffect(() => {
     const unsubscribe = StorageService.subscribe((data) => {
-      if (data) {
-        setUser(data.user);
-        setInventory(data.inventory);
-      } else {
+      if (!data) {
         setUser(null);
         setInventory([]);
+        return;
       }
+
+      const guestMode = localStorage.getItem("guest_mode") === "true";
+      if (data.user?.email === "guest@skinmarket.es" && !guestMode) {
+        return;
+      }
+
+      setUser(data.user);
+      setInventory(data.inventory);
     });
     return () => unsubscribe();
   }, []);
@@ -101,6 +107,7 @@ export function AuthProvider({ children }) {
         throw new Error(errData.error || "Credenciales inválidas");
       }
       const data = await response.json();
+      localStorage.removeItem("guest_mode");
       localStorage.setItem("token", data.token);
       setTokenState(data.token);
       StorageService.updateUser({
@@ -132,6 +139,9 @@ export function AuthProvider({ children }) {
       });
       const data = await response.json();
       if (response.ok && data.success) {
+        localStorage.removeItem("guest_mode");
+        localStorage.removeItem("guest_mode");
+        localStorage.removeItem("guest_mode");
         localStorage.setItem("token", data.token);
         setTokenState(data.token);
         StorageService.updateUser({
@@ -163,6 +173,7 @@ export function AuthProvider({ children }) {
   const logout = useCallback(() => {
     StorageService.destroySession();
     localStorage.removeItem('token');
+    localStorage.removeItem('guest_mode');
     localStorage.removeItem('user');
     setUser(null);
     setTokenState(null);

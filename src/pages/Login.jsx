@@ -5,6 +5,16 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 const API_BASE = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || import.meta.env.VITE_CLIENT_ID || "";
 
+const OAUTH_ERROR_MESSAGES = {
+  steam_callback_failed: "Error en callback de Steam. Intenta de nuevo.",
+  steam_not_configured: "Steam no está configurado en el servidor.",
+  steam_auth_failed: "Autenticación de Steam fallida.",
+  steam_timeout: "Tiempo de espera de Steam agotado. Intenta de nuevo.",
+  token_generation_failed: "No se pudo generar el token de sesión.",
+  login_failed: "Error al iniciar sesión con Steam.",
+  steam_login_cancelled: "Inicio de sesión de Steam cancelado.",
+};
+
 function validatePassword(password) {
   if (!password || password.length < 8) return { valid: false, error: "La contrasena debe tener al menos 8 caracteres" };
   if (!/[A-Z]/.test(password)) return { valid: false, error: "La contrasena debe contener al menos una mayuscula" };
@@ -21,7 +31,10 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState(() => {
+    const errorFromUrl = new URLSearchParams(window.location.search).get("error");
+    return errorFromUrl ? OAUTH_ERROR_MESSAGES[errorFromUrl] || "Error desconocido de autenticación." : "";
+  });
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -35,39 +48,58 @@ export default function Login() {
 
   useEffect(() => {
     const tokenFromUrl = searchParams.get("token");
+    const errorFromUrl = searchParams.get("error");
+
     const cleanOAuthParams = () => {
       if (window.location.search.includes("token=") || window.location.search.includes("error=")) {
         window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
       }
     };
 
-    if (tokenFromUrl) {
-      localStorage.setItem("token", tokenFromUrl);
-      window.dispatchEvent(new CustomEvent("auth-token-updated", { detail: { token: tokenFromUrl } }));
+    if (errorFromUrl) {
+      // Error message already set from initial component mount.
+    }
 
-      fetch(API_BASE + "/api/me", { headers: { Authorization: "Bearer " + tokenFromUrl } })
-        .then(function (res) { if (!res.ok) throw new Error("Failed"); return res.json(); })
-        .then(async function (userData) {
-          if (userData) {
-            var mod = await import("../services/StorageService");
-            mod.StorageService.updateUser({
-              nombre_usuario: userData.nombre_usuario || userData.name,
-              email: userData.email,
-              saldo: userData.saldo || 0,
-              balance: userData.saldo || userData.balance || 0,
-              nivel: userData.nivel || 0,
-              experiencia: userData.experiencia || 0,
-              steam_id: userData.steam_id || null
-            });
+    if (tokenFromUrl) {
+      const handleLoginCallback = async () => {
+        setLoading(true);
+        try {
+          const res = await fetch(API_BASE + "/api/me", {
+            headers: { Authorization: "Bearer " + tokenFromUrl }
+          });
+          if (!res.ok) {
+            throw new Error("No autorizado");
           }
-        })
-        .catch(function () { })
-        .finally(function () {
-          cleanOAuthParams();
+          const userData = await res.json();
+          if (!userData || !userData.email) {
+            throw new Error("No se recibieron datos de usuario.");
+          }
+          localStorage.removeItem("guest_mode");
+          localStorage.setItem("token", tokenFromUrl);
+          window.dispatchEvent(new CustomEvent("auth-token-updated", { detail: { token: tokenFromUrl } }));
+          const mod = await import("../services/StorageService");
+          mod.StorageService.updateUser({
+            nombre_usuario: userData.nombre_usuario || userData.name,
+            email: userData.email,
+            saldo: userData.saldo || 0,
+            balance: userData.saldo || userData.balance || 0,
+            nivel: userData.nivel || 0,
+            experiencia: userData.experiencia || 0,
+            steam_id: userData.steam_id || null
+          });
+          setSuccess(true);
           setTimeout(function () {
             try { navigate("/dashboard"); } catch { window.location.href = "/dashboard"; }
           }, 500);
-        });
+        } catch (err) {
+          setError(err.message || "Error al validar el token de Steam.");
+          localStorage.removeItem("token");
+        } finally {
+          cleanOAuthParams();
+          setLoading(false);
+        }
+      };
+      handleLoginCallback();
     } else {
       cleanOAuthParams();
     }
@@ -124,10 +156,11 @@ useEffect(function () {
     setSuccess(false);
     setLoading(true);
     try {
-      localStorage.removeItem("token");
-      window.dispatchEvent(new CustomEvent("auth-token-updated", { detail: { token: null } }));
       const mod = await import("../services/StorageService");
       mod.StorageService.destroySession();
+      localStorage.setItem("guest_mode", "true");
+      localStorage.removeItem("token");
+      window.dispatchEvent(new CustomEvent("auth-token-updated", { detail: { token: null } }));
       mod.StorageService.updateUser({
         nombre_usuario: "Invitado",
         email: "guest@skinmarket.es",
@@ -137,7 +170,7 @@ useEffect(function () {
         experiencia: 0,
         steam_id: null,
         link_intercambio: null,
-        role: "user"
+        role: "guest"
       });
       setSuccess(true);
       setTimeout(function () { navigate("/dashboard"); }, 500);
@@ -184,13 +217,17 @@ useEffect(function () {
             var res = await fetch(API_BASE + "/api/auth/google", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ idToken: idToken }) });
             var data = await res.json();
             if (res.ok && data.token) {
+              localStorage.removeItem("guest_mode");
               localStorage.setItem("token", data.token);
               window.dispatchEvent(new CustomEvent("auth-token-updated", { detail: { token: data.token } }));
               var mod = await import("../services/StorageService");
               mod.StorageService.updateUser({ nombre_usuario: data.user.nombre_usuario, email: data.user.email, saldo: data.user.saldo, balance: data.user.saldo, nivel: data.user.nivel || 0, experiencia: data.user.experiencia || 0 });
               setSuccess(true);
               setTimeout(function () { navigate("/dashboard"); }, 500);
-            } else { setError(data.error || "Error al iniciar sesion con Google"); setSocialLoading(null); }
+            } else {
+              setError(data.error || "Error al iniciar sesion con Google");
+              setSocialLoading(null);
+            }
           } catch { setError("Error de conexion."); setSocialLoading(null); }
         }
       });
