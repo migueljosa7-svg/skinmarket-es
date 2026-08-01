@@ -20,6 +20,7 @@ import { fileURLToPath } from "url";
 import cron from "node-cron";
 import { createCharge, handleWebhook, getPaymentStatus } from "./controllers/paymentController.js";
 import p2pMarketService from "./services/p2pMarketService.js";
+import { captureSteamCallback } from "./steam/steamCallbackLogger.js";
 import fs from "fs";
 import crypto from "crypto";
 import PriceEngine from "./services/PriceEngine.js";
@@ -513,9 +514,8 @@ const authenticateToken = (req, res, next) => {
 // ─── STEAM AUTH TIMEOUT HELPER ──────────────────────────────
 // Wraps passport.authenticate with a safety timeout to prevent
 // infinite pending when Steam OpenID validation hangs.
-// If Steam doesn't respond within STEAM_AUTH_TIMEOUT_MS (8 seconds),
-// the request is aborted with a redirect to the login page with error.
-const STEAM_AUTH_TIMEOUT_MS = 8000;
+// Steam profile verification may take longer on cloud hosts, so allow more time.
+const STEAM_AUTH_TIMEOUT_MS = 20000;
 
 function steamAuthWithTimeout(req, res, next, authCallback) {
   let responded = false;
@@ -544,7 +544,7 @@ function steamAuthWithTimeout(req, res, next, authCallback) {
 
   // Wrap passport.authenticate in try-catch to handle missing strategy gracefully
   try {
-    passport.authenticate('steam', { failureRedirect: '/login' }, wrappedCallback)(req, res, next);
+    passport.authenticate('steam', { session: false }, wrappedCallback)(req, res, next);
   } catch (err) {
     clearTimeout(timeout);
     if (!responded) {
@@ -563,26 +563,24 @@ if (steamStrategyEnabled) {
   app.get('/api/auth/steam', passport.authenticate('steam'));
 
   app.get('/api/auth/steam/return', (req, res, next) => {
+    captureSteamCallback(req);
     steamAuthWithTimeout(req, res, next, (err, user, safeRespond) => {
       const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
       if (err) {
-        log(LOG_LEVELS.ERROR, 'AUTH', 'Error en callback Steam:', err.message);
+        log(LOG_LEVELS.ERROR, 'AUTH', 'Error en callback Steam:', err);
         return safeRespond(`${FRONTEND_URL}/login?error=steam_callback_failed`);
       }
-      if (!user) return safeRespond(`${FRONTEND_URL}/login?error=steam_login_cancelled`);
-      req.logIn(user, (loginErr) => {
-        if (loginErr) {
-          log(LOG_LEVELS.ERROR, 'AUTH', 'Error en login de Steam:', loginErr.message);
-          return safeRespond(`${FRONTEND_URL}/login?error=login_failed`);
-        }
-        try {
-          const token = jwt.sign({ id: user.usuario_id, email: user.email }, JWT_SECRET, { expiresIn: '8h' });
-          safeRespond(`${FRONTEND_URL}/login?token=${token}`);
-        } catch (jwtErr) {
-          log(LOG_LEVELS.ERROR, 'AUTH', 'Error generando JWT en Steam:', jwtErr.message);
-          safeRespond(`${FRONTEND_URL}/login?error=token_generation_failed`);
-        }
-      });
+      if (!user) {
+        log(LOG_LEVELS.WARN, 'AUTH', 'Callback Steam recibido sin usuario válido');
+        return safeRespond(`${FRONTEND_URL}/login?error=steam_login_cancelled`);
+      }
+      try {
+        const token = jwt.sign({ id: user.usuario_id, email: user.email }, JWT_SECRET, { expiresIn: '8h' });
+        safeRespond(`${FRONTEND_URL}/login?token=${token}`);
+      } catch (jwtErr) {
+        log(LOG_LEVELS.ERROR, 'AUTH', 'Error generando JWT en Steam:', jwtErr);
+        safeRespond(`${FRONTEND_URL}/login?error=token_generation_failed`);
+      }
     });
   });
 } else {
