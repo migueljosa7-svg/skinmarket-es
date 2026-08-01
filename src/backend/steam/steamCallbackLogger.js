@@ -1,7 +1,17 @@
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
-const LOG_FILE = path.resolve(new URL('../../steam_callback.log', import.meta.url).pathname);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const LOG_FILE = path.resolve(__dirname, '..', '..', 'steam_callback.log');
+
+try {
+  fs.mkdirSync(path.dirname(LOG_FILE), { recursive: true });
+  fs.openSync(LOG_FILE, 'a');
+} catch (err) {
+  console.error('[STEAM CALLBACK LOGGER] Error al crear el archivo de log:', err.message);
+}
 
 function serializeRequest(req) {
   return {
