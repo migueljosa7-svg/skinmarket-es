@@ -297,15 +297,22 @@ if (process.env.STEAM_API_KEY) {
       : `${backendUrlForSteam.replace(/\/+$/, '')}/`;
 
     passport.use(new SteamStrategy({
-      returnURL: steamReturnURL,
+      returnUrl: steamReturnURL,
       realm: steamRealm,
-      apiKey: process.env.STEAM_API_KEY
-    }, async (identifier, profile, done) => {
+      apiKey: process.env.STEAM_API_KEY,
+      fetchUserProfile: true,
+      fetchSteamLevel: false
+    }, async (steamData, done) => {
       try {
-        const steamId = profile.id;
-        const nombre = profile.displayName;
-        // Extract Steam avatar from profile photos (full-size)
-        const steamAvatar = profile.photos?.[0]?.value || profile._json?.avatarfull || null;
+        const steamId = steamData?.SteamID?.getSteamID64?.() || steamData?.id || null;
+        const profile = steamData?.profile || {};
+        const nombre = profile.personaname || profile.displayName || 'Steam User';
+        const steamAvatar = profile.avatarfull || profile.avatarUrl || profile.avatar || null;
+
+        if (!steamId) {
+          return done(null, false, { message: 'No se pudo resolver el SteamID del usuario' });
+        }
+
         let result = await db.query("SELECT * FROM usuarios WHERE steam_id = $1", [steamId]);
         if (result.rows.length === 0) {
           result = await db.query(
@@ -313,14 +320,16 @@ if (process.env.STEAM_API_KEY) {
             [nombre, `${steamId}@steam.auth`, 'steam_no_password', steamId, steamAvatar, 0, 0]
           );
         } else {
-          // Update avatar on subsequent logins
           await db.query(
             "UPDATE usuarios SET avatar = COALESCE(NULLIF($1, ''), avatar) WHERE usuario_id = $2",
             [steamAvatar, result.rows[0].usuario_id]
           );
         }
         return done(null, result.rows[0]);
-      } catch (err) { return done(err); }
+      } catch (err) {
+        log(LOG_LEVELS.ERROR, 'AUTH', 'Error al crear/actualizar usuario desde Steam:', err.message);
+        return done(err);
+      }
     }));
     steamStrategyEnabled = true;
     log(LOG_LEVELS.INFO, 'AUTH', 'Steam Strategy configurada correctamente');
@@ -491,7 +500,7 @@ function steamAuthWithTimeout(req, res, next, authCallback) {
       responded = true;
       log(LOG_LEVELS.ERROR, 'AUTH', '⏱️ TIMEOUT: Steam OpenID no respondió en 8 segundos');
       const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
-      res.redirect(`${FRONTEND_URL}/login?error=steam_timeout`);
+      safeRespond(`${FRONTEND_URL}/login?error=steam_timeout`);
     }
   }, STEAM_AUTH_TIMEOUT_MS);
 
