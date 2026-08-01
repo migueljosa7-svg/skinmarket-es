@@ -221,6 +221,8 @@ export default function CaseView() {
         wear: safeSkin.wear,
         image: safeSkin.image
       });
+    }
+
     // Add won items to user inventory & push to live drops (using safeUser to prevent null refs)
     const savedSkins = StorageService.addSkinsToInventory(expectedResults);
     expectedResults.forEach((item) => {
