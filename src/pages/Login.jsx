@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/useAuth";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -27,13 +27,111 @@ export default function Login() {
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [recoveryMessage, setRecoveryMessage] = useState("");
+  const [recoveryMessage, setRecoveryMessage] = useSadtate("");
   const [socialLoading, setSocialLoading] = useState(null);
   const [rememberMe, setRememberMe] = useState(false);
+  const googleInitializedRef = useRef(false);
+  const googleScriptPromiseRef = useRef(null);
 
   const { login, register, recoverPassword } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
+  const loadGoogleScript = () => {
+    if (window.google) {
+      return Promise.resolve();
+    }
+    if (googleScriptPromiseRef.current) {
+      return googleScriptPromiseRef.current;
+    }
+    const existing = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
+    googleScriptPromiseRef.current = new Promise((resolve, reject) => {
+      if (window.google) {
+        return resolve();
+      }
+      const onLoad = () => {
+        if (window.google) {
+          resolve();
+        } else {
+          reject(new Error('Google Sign-In no se inicializó correctamente.'));
+        }
+      };
+      const onError = () => reject(new Error('Error al cargar Google Sign-In.'));
+      if (existing) {
+        existing.addEventListener('load', onLoad);
+        existing.addEventListener('error', onError);
+      } else {
+        const script = document.createElement('script');
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.async = true;
+        script.defer = true;
+        script.addEventListener('load', onLoad);
+        script.addEventListener('error', onError);
+        document.head.appendChild(script);
+      }
+    });
+    return googleScriptPromiseRef.current;
+  };
+
+  const initGoogleSignIn = async () => {
+    try {
+      await loadGoogleScript();
+      if (!window.google || !window.google.accounts || !window.google.accounts.id) {
+        throw new Error('Google Sign-In no está disponible.');
+      }
+      if (!googleInitializedRef.current) {
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          ux_mode: 'popup',
+          cancel_on_tap_outside: true,
+          use_fedcm_for_prompt: true,
+          callback: async function (response) {
+            var idToken = response?.credential;
+            if (!idToken) {
+              setError('No se pudo obtener el token de Google.');
+              setSocialLoading(null);
+              return;
+            }
+            try {
+              var res = await fetch(API_BASE + '/api/auth/google', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ idToken: idToken })
+              });
+              var data = await res.json();
+              if (res.ok && data.token) {
+                localStorage.setItem('token', data.token);
+                window.dispatchEvent(new CustomEvent('auth-token-updated', { detail: { token: data.token } }));
+                var mod = await import('../services/StorageService');
+                mod.StorageService.updateUser({
+                  nombre_usuario: data.user.nombre_usuario,
+                  email: data.user.email,
+                  saldo: data.user.saldo,
+                  balance: data.user.saldo,
+                  nivel: data.user.nivel || 0,
+                  experiencia: data.user.experiencia || 0
+                });
+                setSuccess(true);
+                setTimeout(function () { navigate('/dashboard'); }, 500);
+              } else {
+                setError(data.error || 'Error al iniciar sesion con Google');
+                setSocialLoading(null);
+              }
+            } catch {
+              setError('Error de conexion.');
+              setSocialLoading(null);
+            }
+          }
+        });
+        googleInitializedRef.current = true;
+      }
+      window.google.accounts.id.prompt();
+      setSocialLoading(null);
+    } catch (err) {
+      setError(err.message || 'Error al inicializar Google Sign-In.');
+      setSocialLoading(null);
+    }
+  };
 
   useEffect(() => {
     const tokenFromUrl = searchParams.get("token");
@@ -130,50 +228,7 @@ useEffect(function () {
       setTimeout(function () { setError(""); }, 4000);
       return;
     }
-    if (!window.google) {
-      var script = document.createElement("script");
-      script.src = "https://accounts.google.com/gsi/client";
-      script.async = true;
-      script.defer = true;
-      script.onload = initGoogleSignIn;
-      script.onerror = function () { setError("Error al cargar Google Sign-In. Verifica tu conexion."); setSocialLoading(null); };
-      document.head.appendChild(script);
-    } else {
-      initGoogleSignIn();
-    }
-  };
-
-  const initGoogleSignIn = function () {
-    try {
-      var clientId = GOOGLE_CLIENT_ID;
-      window.google.accounts.id.initialize({
-        client_id: clientId,
-        ux_mode: "popup",
-        use_fedcm_for_prompt: true,
-        callback: async function (response) {
-          var idToken = response.credential;
-          if (!idToken) { setError("No se pudo obtener el token de Google."); setSocialLoading(null); return; }
-          try {
-            var res = await fetch(API_BASE + "/api/auth/google", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ idToken: idToken }) });
-            var data = await res.json();
-            if (res.ok && data.token) {
-              localStorage.setItem("token", data.token);
-              window.dispatchEvent(new CustomEvent("auth-token-updated", { detail: { token: data.token } }));
-              var mod = await import("../services/StorageService");
-              mod.StorageService.updateUser({ nombre_usuario: data.user.nombre_usuario, email: data.user.email, saldo: data.user.saldo, balance: data.user.saldo, nivel: data.user.nivel || 0, experiencia: data.user.experiencia || 0 });
-              setSuccess(true);
-              setTimeout(function () { navigate("/dashboard"); }, 500);
-            } else { setError(data.error || "Error al iniciar sesion con Google"); setSocialLoading(null); }
-          } catch { setError("Error de conexion."); setSocialLoading(null); }
-        }
-      });
-      window.google.accounts.id.prompt(function (notification) {
-        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-          setSocialLoading(null);
-          setError("Google Sign-In cancelado.");
-        }
-      });
-    } catch { setError("Error al inicializar Google Sign-In."); setSocialLoading(null); }
+    initGoogleSignIn();
   };
 
   return (
