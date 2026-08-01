@@ -71,10 +71,25 @@ export default function CaseView() {
       return (valA % 100) - (valB % 100);
     });
 
-    return shuffled.slice(0, 10).sort((a, b) => parseFloat(a.price) - parseFloat(b.price));
+    return shuffled
+      .filter((skin) => Number(skin.price) > 0)
+      .slice(0, 10)
+      .sort((a, b) => parseFloat(a.price) - parseFloat(b.price));
   }, [allSkins, caseData]);
 
   const startSpin = useCallback(async () => {
+    const replaceUnfundedItem = (item) => {
+      const fallbackPool = validSkins.filter((skin) => Number(skin.price) > 0);
+      const replacement = fallbackPool[Math.floor(Math.random() * fallbackPool.length)];
+      return {
+        id: `repl_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        name: replacement?.name || item.name,
+        price: Number(replacement?.price || 0.10),
+        rarity: replacement?.rarity || item.rarity || "Mil-Spec Grade",
+        image: replacement?.image || item.image || "",
+      };
+    };
+
     // FIX: Check localStorage token as fallback if user is null in context
     // Prevents "Debes iniciar sesión" errors after OAuth login
     const hasToken = !!localStorage.getItem("token");

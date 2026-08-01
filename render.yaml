@@ -58,6 +58,12 @@ services:
       - key: PORT
         value: "3001"
 
+      # ── Backend / Frontend URLs ──
+      - key: BACKEND_URL
+        value: "https://your-backend-service.onrender.com"
+      - key: FRONTEND_URL
+        value: "https://your-frontend-service.onrender.com"
+
       # ── Database (auto-linked from skinmarket-db) ──
       - key: DATABASE_URL
         fromDatabase:
@@ -67,6 +73,12 @@ services:
       # ── Security ──
       - key: JWT_SECRET
         generateValue: true
+
+      # ── Google OAuth ──
+      - key: GOOGLE_CLIENT_ID
+        value: "your-google-client-id.apps.googleusercontent.com"
+      - key: VITE_GOOGLE_CLIENT_ID
+        value: "your-google-client-id.apps.googleusercontent.com"
 
       # ── Steam Credentials (Configurar en el Dashboard de Render) ──
       - key: STEAM_API_KEY
@@ -104,6 +116,10 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_URL
-        sync: false
+        value: "https://your-backend-service.onrender.com"
       - key: VITE_WS_URL
-        sync: false
+        value: "https://your-backend-service.onrender.com"
+      - key: VITE_BACKEND_URL
+        value: "https://your-backend-service.onrender.com"
+      - key: VITE_GOOGLE_CLIENT_ID
+        value: "your-google-client-id.apps.googleusercontent.com"
