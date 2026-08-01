@@ -4,7 +4,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import { generateAllCases, pickWeightedSkin } from "../constants/cases.js";
 import { useFetchSkins } from "../hooks/useFetchSkins";
-import { getRarityColor } from "../constants/colors.js";
+import { getRarityColor, resolvePriceSync } from "../services/PriceEngine.js";
 import { StorageService } from "../services/StorageService";
 import { getSkinImageUrl, handleImageError } from "../services/ImageService";
 import { useToast } from "../components/Toast";
@@ -444,7 +444,7 @@ export default function CaseView() {
                           {skin.name}
                         </div>
                         <div style={{ fontSize: "1.6rem", fontWeight: "900", color: "#fff", marginTop: "10px" }}>
-                          €{Number(skin.price || 0).toFixed(2)}
+                          €{Number(resolvePriceSync(skin.name, skin.rarity, skin.wear)?.price || skin.price || 0).toFixed(2)}
                         </div>
                       </div>
                     );
@@ -697,7 +697,7 @@ export default function CaseView() {
                   <div style={{ color: "white", fontSize: "0.85rem", fontWeight: "bold", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {skin.name}
                   </div>
-                  <div style={{ color: "#fff", fontWeight: "900", fontSize: "1.1rem", marginTop: "8px" }}>€{Number(skin.price || 0).toFixed(2)}</div>
+                  <div style={{ color: "#fff", fontWeight: "900", fontSize: "1.1rem", marginTop: "8px" }}>€{Number(resolvePriceSync(skin.name, skin.rarity, skin.wear)?.price || skin.price || 0).toFixed(2)}</div>
                 </div>
               );
             })}
