@@ -283,6 +283,7 @@ if (process.env.BOT_USERNAME && process.env.BOT_USERNAME !== 'tu_usuario_steam')
 }
 
 // Steam Strategy — configurada ANTES de las rutas Steam
+let steamStrategyEnabled = false;
 if (process.env.STEAM_API_KEY) {
   try {
     // CRITICAL FIX: Use process.env.BACKEND_URL explicitly for Steam returnURL and realm
@@ -321,6 +322,7 @@ if (process.env.STEAM_API_KEY) {
         return done(null, result.rows[0]);
       } catch (err) { return done(err); }
     }));
+    steamStrategyEnabled = true;
     log(LOG_LEVELS.INFO, 'AUTH', 'Steam Strategy configurada correctamente');
   } catch (err) {
     log(LOG_LEVELS.ERROR, 'AUTH', 'Error al configurar Steam Strategy:', err);
@@ -500,53 +502,80 @@ function steamAuthWithTimeout(req, res, next, authCallback) {
     authCallback(err, user, safeRespond);
   };
 
-  passport.authenticate('steam', { failureRedirect: '/login' }, wrappedCallback)(req, res, next);
+  // Wrap passport.authenticate in try-catch to handle missing strategy gracefully
+  try {
+    passport.authenticate('steam', { failureRedirect: '/login' }, wrappedCallback)(req, res, next);
+  } catch (err) {
+    clearTimeout(timeout);
+    if (!responded) {
+      responded = true;
+      log(LOG_LEVELS.ERROR, 'AUTH', 'Error en autenticación Steam:', err.message);
+      const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+      safeRespond(`${FRONTEND_URL}/login?error=steam_auth_failed`);
+    }
+  }
 }
 
 // --- AUTH ROUTES ---
 
-app.get('/api/auth/steam', (req, res, next) => {
-  steamAuthWithTimeout(req, res, next, (err, user, safeRespond) => {
-    const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
-    if (err) {
-      log(LOG_LEVELS.ERROR, 'AUTH', 'Error en autenticación Steam:', err.message);
-      return safeRespond(`${FRONTEND_URL}/login?error=steam_auth_failed`);
-    }
-    if (!user) return safeRespond(`${FRONTEND_URL}/login`);
-    req.logIn(user, (loginErr) => {
-      if (loginErr) return safeRespond(`${FRONTEND_URL}/login?error=login_failed`);
-      // Proceed to the next middleware (the redirect handler below)
-      next();
+// Only register Steam routes if strategy is enabled
+if (steamStrategyEnabled) {
+  app.get('/api/auth/steam', (req, res, next) => {
+    steamAuthWithTimeout(req, res, next, (err, user, safeRespond) => {
+      const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+      if (err) {
+        log(LOG_LEVELS.ERROR, 'AUTH', 'Error en autenticación Steam:', err.message);
+        return safeRespond(`${FRONTEND_URL}/login?error=steam_auth_failed`);
+      }
+      if (!user) return safeRespond(`${FRONTEND_URL}/login`);
+      req.logIn(user, (loginErr) => {
+        if (loginErr) return safeRespond(`${FRONTEND_URL}/login?error=login_failed`);
+        // Proceed to the next middleware (the redirect handler below)
+        next();
+      });
     });
+  }, (req, res) => {
+    const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+    res.redirect(`${FRONTEND_URL}/login`);
   });
-}, (req, res) => {
-  const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
-  res.redirect(`${FRONTEND_URL}/login`);
-});
 
-app.get('/api/auth/steam/return', (req, res, next) => {
-  steamAuthWithTimeout(req, res, next, (err, user, safeRespond) => {
-    const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
-    if (err) {
-      log(LOG_LEVELS.ERROR, 'AUTH', 'Error en callback Steam:', err.message);
-      return safeRespond(`${FRONTEND_URL}/login?error=steam_callback_failed`);
-    }
-    if (!user) return safeRespond(`${FRONTEND_URL}/login`);
-    req.logIn(user, (loginErr) => {
-      if (loginErr) {
-        log(LOG_LEVELS.ERROR, 'AUTH', 'Error en login de Steam:', loginErr.message);
-        return safeRespond(`${FRONTEND_URL}/login?error=login_failed`);
+  app.get('/api/auth/steam/return', (req, res, next) => {
+    steamAuthWithTimeout(req, res, next, (err, user, safeRespond) => {
+      const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+      if (err) {
+        log(LOG_LEVELS.ERROR, 'AUTH', 'Error en callback Steam:', err.message);
+        return safeRespond(`${FRONTEND_URL}/login?error=steam_callback_failed`);
       }
-      try {
-        const token = jwt.sign({ id: user.usuario_id, email: user.email }, JWT_SECRET, { expiresIn: '8h' });
-        safeRespond(`${FRONTEND_URL}/login?token=${token}`);
-      } catch (jwtErr) {
-        log(LOG_LEVELS.ERROR, 'AUTH', 'Error generando JWT en Steam:', jwtErr.message);
-        safeRespond(`${FRONTEND_URL}/login?error=token_generation_failed`);
-      }
+      if (!user) return safeRespond(`${FRONTEND_URL}/login`);
+      req.logIn(user, (loginErr) => {
+        if (loginErr) {
+          log(LOG_LEVELS.ERROR, 'AUTH', 'Error en login de Steam:', loginErr.message);
+          return safeRespond(`${FRONTEND_URL}/login?error=login_failed`);
+        }
+        try {
+          const token = jwt.sign({ id: user.usuario_id, email: user.email }, JWT_SECRET, { expiresIn: '8h' });
+          safeRespond(`${FRONTEND_URL}/login?token=${token}`);
+        } catch (jwtErr) {
+          log(LOG_LEVELS.ERROR, 'AUTH', 'Error generando JWT en Steam:', jwtErr.message);
+          safeRespond(`${FRONTEND_URL}/login?error=token_generation_failed`);
+        }
+      });
     });
   });
-});
+} else {
+  // Provide fallback routes that return clear error messages
+  app.get('/api/auth/steam', (req, res) => {
+    const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+    log(LOG_LEVELS.WARN, 'AUTH', 'Intento de autenticación Steam pero no está configurada');
+    res.redirect(`${FRONTEND_URL}/login?error=steam_not_configured`);
+  });
+
+  app.get('/api/auth/steam/return', (req, res) => {
+    const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+    log(LOG_LEVELS.WARN, 'AUTH', 'Callback Steam recibido pero autenticación no está configurada');
+    res.redirect(`${FRONTEND_URL}/login?error=steam_not_configured`);
+  });
+}
 
 // ─── GOOGLE OAUTH ENDPOINT ─────────────────────────
 // Verifies the Google ID token server-side using the official Google library.
