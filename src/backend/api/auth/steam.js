@@ -10,20 +10,47 @@ function normalizeUrl(rawUrl, needsTrailingSlash = false) {
   return needsTrailingSlash ? `${trimmed.replace(/\/$/, '')}/` : trimmed.replace(/\/$/, '');
 }
 
+function normalizeSteamRealm(steamRealm, backendUrl) {
+  if (!steamRealm || typeof steamRealm !== 'string') return steamRealm;
+  const normalized = normalizeUrl(steamRealm, true);
+  try {
+    const url = new URL(normalized);
+    if (url.hostname === 'localhost') {
+      return `${url.protocol}//${url.hostname}/`;
+    }
+  } catch {
+    return normalized;
+  }
+  return normalized;
+}
+
 function buildSteamUrls(env, log) {
   const backendUrl = normalizeUrl(env.BACKEND_URL || 'http://localhost:3001');
   const steamReturnURL = env.STEAM_RETURN_URL
     ? normalizeUrl(env.STEAM_RETURN_URL)
     : `${backendUrl}/api/auth/steam/return`;
-  const steamRealm = env.STEAM_REALM
-    ? normalizeUrl(env.STEAM_REALM, true)
+
+  let steamRealm = env.STEAM_REALM
+    ? normalizeSteamRealm(env.STEAM_REALM, backendUrl)
     : `${backendUrl}/`;
 
-  if (!env.STEAM_API_KEY) {
-    log('WARN', 'AUTH', 'STEAM_API_KEY no configurada. Autenticación Steam deshabilitada.');
+  if (!env.STEAM_REALM) {
+    try {
+      const backendUrlObj = new URL(backendUrl);
+      if (backendUrlObj.hostname === 'localhost') {
+        steamRealm = `${backendUrlObj.protocol}//${backendUrlObj.hostname}/`;
+        log('INFO', 'AUTH', `Usando Steam realm local sin puerto: ${steamRealm}`);
+      }
+    } catch (err) {
+      // ignore malformed backendUrl
+    }
   }
 
-  return { steamReturnURL, steamRealm };
+  if (!env.STEAM_API_KEY) {
+    log('WARN', 'AUTH', 'STEAM_API_KEY no configurada. Copia .env.example a .env y configura STEAM_API_KEY. Autenticación Steam deshabilitada.');
+  }
+
+  return { steamReturnURL, steamRealm, backendUrl };
 }
 
 function createJwtToken(user, jwtSecret) {
@@ -111,44 +138,6 @@ export function setupSteamStrategy(passport, db, log, logAction, jwtSecret, env)
   return true;
 }
 
-const STEAM_AUTH_TIMEOUT_MS = 20000;
-
-function steamAuthWithTimeout(req, res, next, authCallback, frontendUrl, log, passport) {
-  let responded = false;
-
-  const safeRespond = (redirectUrl) => {
-    if (!responded) {
-      responded = true;
-      return res.redirect(redirectUrl);
-    }
-  };
-
-  const timeout = setTimeout(() => {
-    if (!responded) {
-      responded = true;
-      log('ERROR', 'AUTH', '⏱️ TIMEOUT: Steam OpenID no respondió en 20 segundos');
-      safeRespond(`${frontendUrl}/login?error=steam_timeout`);
-    }
-  }, STEAM_AUTH_TIMEOUT_MS);
-
-  const wrappedCallback = (err, user) => {
-    clearTimeout(timeout);
-    if (responded) return;
-    authCallback(err, user, safeRespond);
-  };
-
-  try {
-    passport.authenticate('steam', { session: false }, wrappedCallback)(req, res, next);
-  } catch (err) {
-    clearTimeout(timeout);
-    if (!responded) {
-      responded = true;
-      log('ERROR', 'AUTH', 'Error en autenticación Steam:', err.message || err);
-      safeRespond(`${frontendUrl}/login?error=steam_auth_failed`);
-    }
-  }
-}
-
 export function registerSteamRoutes(app, passport, db, log, logAction, jwtSecret, env) {
   const strategyEnabled = setupSteamStrategy(passport, db, log, logAction, jwtSecret, env);
   const frontendUrl = env.FRONTEND_URL || 'http://localhost:5173';
@@ -158,23 +147,25 @@ export function registerSteamRoutes(app, passport, db, log, logAction, jwtSecret
 
     app.get('/api/auth/steam/return', (req, res, next) => {
       captureSteamCallback(req);
-      steamAuthWithTimeout(req, res, next, (err, user, safeRespond) => {
+      passport.authenticate('steam', { session: false }, (err, user, info) => {
         if (err) {
-          log('ERROR', 'AUTH', 'Error en callback Steam:', err);
-          return safeRespond(`${frontendUrl}/login?error=steam_callback_failed`);
+          log('ERROR', 'AUTH', 'Error en callback Steam:', err.message || err, 'info=', info);
+          return res.redirect(`${frontendUrl}/login?error=steam_callback_failed`);
         }
+
         if (!user) {
-          log('WARN', 'AUTH', 'Callback Steam recibido sin usuario válido');
-          return safeRespond(`${frontendUrl}/login?error=steam_login_cancelled`);
+          log('WARN', 'AUTH', 'Callback Steam recibido sin usuario válido', 'info=', info);
+          return res.redirect(`${frontendUrl}/login?error=steam_login_cancelled`);
         }
+
         try {
           const token = createJwtToken(user, jwtSecret);
-          safeRespond(`${frontendUrl}/login?token=${token}`);
+          return res.redirect(`${frontendUrl}/login?token=${token}`);
         } catch (jwtErr) {
-          log('ERROR', 'AUTH', 'Error generando JWT en Steam:', jwtErr);
-          safeRespond(`${frontendUrl}/login?error=token_generation_failed`);
+          log('ERROR', 'AUTH', 'Error generando JWT en Steam:', jwtErr.message || jwtErr);
+          return res.redirect(`${frontendUrl}/login?error=token_generation_failed`);
         }
-      }, frontendUrl, log, passport);
+      })(req, res, next);
     });
   } else {
     app.get('/api/auth/steam', (req, res) => {

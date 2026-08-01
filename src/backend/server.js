@@ -23,7 +23,13 @@ import fs from "fs";
 import crypto from "crypto";
 import PriceEngine from "./services/PriceEngine.js";
 
-dotenv.config();
+const envPath = path.resolve(process.cwd(), '.env');
+dotenv.config({ path: envPath, override: true });
+
+const envPath = path.resolve(process.cwd(), '.env');
+if (!fs.existsSync(envPath)) {
+  console.warn('[SYSTEM] .env file not found in project root. Copy .env.example to .env and configure STEAM_API_KEY, JWT_SECRET, DATABASE_URL, BACKEND_URL, FRONTEND_URL, etc.');
+}
 
 // ─────────────────────────────────────────────────
 // LOGGING SYSTEM (MUST BE FIRST - BEFORE ANY USAGE)
@@ -287,6 +293,19 @@ if (process.env.BOT_USERNAME && process.env.BOT_USERNAME !== 'tu_usuario_steam')
 
 // ─── AUTH ROUTES ───────────────────────────────────
 registerAuthRoutes({ app, passport, db, log, logAction, JWT_SECRET, env: process.env });
+
+// Debug endpoint for Steam URL configuration
+app.get('/api/debug/steam-urls', (req, res) => {
+  res.json({
+    backendUrl: process.env.BACKEND_URL || 'http://localhost:3001',
+    frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
+    steamRealm: process.env.STEAM_REALM || 'http://localhost:3001/',
+    steamReturnUrl: process.env.STEAM_RETURN_URL || 'http://localhost:3001/api/auth/steam/return',
+    viteApiUrl: process.env.VITE_API_URL || null,
+    viteBackendUrl: process.env.VITE_BACKEND_URL || null,
+    viteWsUrl: process.env.VITE_WS_URL || null
+  });
+});
 
 // ─── IS ADMIN MIDDLEWARE (DEFINED FIRST - HOISTED VIA FUNCTION DECLARATION) ──
 // IMPORTANT: Must be defined BEFORE any endpoint that uses it (like /api/update-balance)
