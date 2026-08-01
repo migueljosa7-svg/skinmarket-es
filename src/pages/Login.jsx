@@ -84,7 +84,7 @@ export default function Login() {
           client_id: GOOGLE_CLIENT_ID,
           ux_mode: 'popup',
           cancel_on_tap_outside: true,
-          use_fedcm_for_prompt: true,
+          use_fedcm_for_prompt: false,
           callback: async function (response) {
             var idToken = response?.credential;
             if (!idToken) {
@@ -253,7 +253,7 @@ useEffect(function () {
                 type="button"
                 onClick={handleGoogleLogin}
                 disabled={socialLoading !== null}
-                data-use_fedcm_for_prompt="true"
+                data-use_fedcm_for_prompt="false"
                 title="Iniciar sesion con Google"
                 style={{
                   width: "100%",
@@ -297,7 +297,7 @@ useEffect(function () {
           {view === "register" && (
             <div>
               <label style={{ fontSize: "0.7rem", fontWeight: "900", color: "rgba(255,255,255,0.4)", display: "block", marginBottom: "6px" }}>NOMBRE DE USUARIO</label>
-              <input type="text" placeholder="Tu apodo (3-30 caracteres)" value={nombreUsuario} onChange={function (e) { setNombreUsuario(e.target.value); }} maxLength={30} style={{ width: "100%", padding: "14px", borderRadius: "12px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", color: "white", outline: "none" }} />
+              <input autoComplete="username" type="text" placeholder="Tu apodo (3-30 caracteres)" value={nombreUsuario} onChange={function (e) { setNombreUsuario(e.target.value); }} maxLength={30} style={{ width: "100%", padding: "14px", borderRadius: "12px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", color: "white", outline: "none" }} />
             </div>
           )}
           <div>

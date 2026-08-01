@@ -135,7 +135,12 @@ export function AuthProvider({ children }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nombre_usuario, email, password })
       });
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (err) {
+        data = { error: `Server error (status ${response.status})` };
+      }
       if (response.ok && data.success) {
         localStorage.setItem("token", data.token);
         setTokenState(data.token);
