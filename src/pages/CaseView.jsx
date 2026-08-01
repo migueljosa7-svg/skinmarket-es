@@ -410,11 +410,14 @@ export default function CaseView() {
                 <h2 style={{ fontSize: "2.5rem", fontWeight: "900", margin: "0 0 40px 0" }}>¡ENHORABUENA!</h2>
 
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "25px", justifyContent: "center", marginBottom: "50px" }}>
-                  {results.map((skin, idx) => {
-                    const color = getRarityColor(skin.rarity);
+                  {results.filter(Boolean).map((skin, idx) => {
+                    const skinName = skin?.name || "Skin desconocida";
+                    const skinRarity = skin?.rarity || "Unknown";
+                    const safePrice = Number(resolvePriceSync(skinName, skinRarity, skin?.wear)?.price || skin?.price || 0).toFixed(2);
+                    const color = getRarityColor(skinRarity);
                     return (
                       <div
-                        key={`result-${idx}-${skin.id || skin._id || "skin"}`}
+                        key={`result-${idx}-${skin?.id || skin?._id || "skin"}`}
                         style={{
                           width: "220px",
                           background: "rgba(255,255,255,0.03)",
@@ -445,10 +448,10 @@ export default function CaseView() {
                           {skin.rarity.toUpperCase()}
                         </div>
                         <div style={{ color: "white", fontSize: "1rem", fontWeight: "bold", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {skin.name}
+                          {skinName}
                         </div>
                         <div style={{ fontSize: "1.6rem", fontWeight: "900", color: "#fff", marginTop: "10px" }}>
-                          €{Number(resolvePriceSync(skin.name, skin.rarity, skin.wear)?.price || skin.price || 0).toFixed(2)}
+                          €{safePrice}
                         </div>
                       </div>
                     );

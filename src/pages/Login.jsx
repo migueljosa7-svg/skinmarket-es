@@ -247,13 +247,13 @@ useEffect(function () {
           )}
           <div>
             <label style={{ fontSize: "0.7rem", fontWeight: "900", color: "rgba(255,255,255,0.4)", display: "block", marginBottom: "6px" }}>CORREO ELECTRONICO</label>
-            <input type="email" placeholder="tu@email.com" value={email} onChange={function (e) { setEmail(e.target.value); }} maxLength={254} style={{ width: "100%", padding: "14px", borderRadius: "12px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", color: "white", outline: "none" }} />
+            <input autoComplete="email" type="email" placeholder="tu@email.com" value={email} onChange={function (e) { setEmail(e.target.value); }} maxLength={254} style={{ width: "100%", padding: "14px", borderRadius: "12px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", color: "white", outline: "none" }} />
           </div>
           {view !== "recover" && (
             <div>
               <label style={{ fontSize: "0.7rem", fontWeight: "900", color: "rgba(255,255,255,0.4)", display: "block", marginBottom: "6px" }}>CONTRASENA</label>
               <div style={{ position: "relative" }}>
-                <input type={showPassword ? "text" : "password"} placeholder="********" value={password} onChange={function (e) { setPassword(e.target.value); }} style={{ width: "100%", padding: "14px", borderRadius: "12px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", color: "white", outline: "none" }} />
+                <input autoComplete={view === "login" ? "current-password" : "new-password"} type={showPassword ? "text" : "password"} placeholder="********" value={password} onChange={function (e) { setPassword(e.target.value); }} style={{ width: "100%", padding: "14px", borderRadius: "12px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", color: "white", outline: "none" }} />
                 <button type="button" onClick={function () { setShowPassword(!showPassword); }} style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: "0.8rem" }}>{showPassword ? "Ocultar" : "Ver"}</button>
               </div>
               {view === "register" && <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.3)", marginTop: "6px" }}>Minimo 8 caracteres, 1 mayuscula, 1 numero y 1 caracter especial.</div>}
@@ -262,7 +262,7 @@ useEffect(function () {
           {view === "register" && (
             <div>
               <label style={{ fontSize: "0.7rem", fontWeight: "900", color: "rgba(255,255,255,0.4)", display: "block", marginBottom: "6px" }}>CONFIRMAR CONTRASENA</label>
-              <input type="password" placeholder="********" value={confirmPassword} onChange={function (e) { setConfirmPassword(e.target.value); }} style={{ width: "100%", padding: "14px", borderRadius: "12px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", color: "white", outline: "none" }} />
+              <input autoComplete="new-password" type="password" placeholder="********" value={confirmPassword} onChange={function (e) { setConfirmPassword(e.target.value); }} style={{ width: "100%", padding: "14px", borderRadius: "12px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", color: "white", outline: "none" }} />
             </div>
           )}
           <button type="submit" disabled={loading} style={{ padding: "16px", background: "#f5ac3b", color: "black", border: "none", borderRadius: "14px", fontWeight: "900", fontSize: "1rem", cursor: "pointer", marginTop: "10px" }}>
