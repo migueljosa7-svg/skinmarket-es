@@ -312,7 +312,6 @@ try {
   } catch (err) {
     log(LOG_LEVELS.ERROR, 'AUTH', 'Error al configurar Steam Strategy:', err);
   }
-}
 
 // ─── GOOGLE OAUTH CLIENT ────────────────────────────
 // Initialize Google OAuth2 client for verifying Google ID tokens server-side.
