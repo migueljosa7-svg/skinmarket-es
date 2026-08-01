@@ -119,6 +119,35 @@ useEffect(function () {
     window.location.href = API_BASE + "/api/auth/steam";
   };
 
+  const handleGuestLogin = async function () {
+    setError("");
+    setSuccess(false);
+    setLoading(true);
+    try {
+      localStorage.removeItem("token");
+      window.dispatchEvent(new CustomEvent("auth-token-updated", { detail: { token: null } }));
+      const mod = await import("../services/StorageService");
+      mod.StorageService.destroySession();
+      mod.StorageService.updateUser({
+        nombre_usuario: "Invitado",
+        email: "guest@skinmarket.es",
+        saldo: 0,
+        balance: 0,
+        nivel: 0,
+        experiencia: 0,
+        steam_id: null,
+        link_intercambio: null,
+        role: "user"
+      });
+      setSuccess(true);
+      setTimeout(function () { navigate("/dashboard"); }, 500);
+    } catch (err) {
+      setError(err.message || "Error al entrar como invitado");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleGoogleLogin = function () {
     setSocialLoading("google");
     var clientId = GOOGLE_CLIENT_ID;
@@ -191,6 +220,24 @@ useEffect(function () {
             <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "20px" }}>
               <button type="button" onClick={handleSteamLogin} disabled={socialLoading !== null} style={{ width: "100%", padding: "14px", borderRadius: "12px", background: socialLoading === "steam" ? "rgba(26,46,58,0.5)" : "#1b2838", color: "white", border: "1px solid #2a475e", fontWeight: "900", fontSize: "0.9rem", cursor: socialLoading !== null ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
                 {socialLoading === "steam" ? (<><span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>⟳</span> Conectando...</>) : (<>CONTINUAR CON STEAM</>)}
+              </button>
+              <button
+                type="button"
+                onClick={handleGuestLogin}
+                disabled={loading}
+                style={{
+                  width: "100%",
+                  padding: "14px",
+                  borderRadius: "12px",
+                  background: "rgba(255,255,255,0.06)",
+                  color: "white",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  fontWeight: "900",
+                  fontSize: "0.9rem",
+                  cursor: loading ? "not-allowed" : "pointer"
+                }}
+              >
+                {loading ? "PROCESANDO..." : "ENTRAR COMO INVITADO"}
               </button>
               <button
                 type="button"

@@ -305,8 +305,9 @@ if (process.env.STEAM_API_KEY) {
     }, async (steamData, done) => {
       try {
         const steamId = steamData?.SteamID?.getSteamID64?.() || steamData?.id || null;
-        const profile = steamData?.profile || {};
-        const nombre = profile.personaname || profile.displayName || 'Steam User';
+        const profile = steamData?.profile || steamData || {};
+        const rawName = profile.personaname || profile.displayName || profile.nickname || `Steam_${steamId?.slice(-6) || 'user'}`;
+        const nombre = sanitizeInput(rawName) || `Steam_${steamId?.slice(-6) || 'user'}`;
         const steamAvatar = profile.avatarfull || profile.avatarUrl || profile.avatar || null;
 
         if (!steamId) {
@@ -315,16 +316,46 @@ if (process.env.STEAM_API_KEY) {
 
         let result = await db.query("SELECT * FROM usuarios WHERE steam_id = $1", [steamId]);
         if (result.rows.length === 0) {
-          result = await db.query(
-            "INSERT INTO usuarios (nombre_usuario, email, password_hash, steam_id, avatar, nivel, experiencia) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *",
-            [nombre, `${steamId}@steam.auth`, 'steam_no_password', steamId, steamAvatar, 0, 0]
-          );
+          const usernameBase = nombre.replace(/[^a-zA-Z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '').slice(0, 24) || `steam_${steamId.slice(-6)}`;
+          let createdUser = null;
+          let attempt = 0;
+
+          while (!createdUser && attempt < 5) {
+            const suffix = attempt === 0 ? '' : `${attempt + 1}`;
+            const candidateName = `${usernameBase}${suffix}`;
+            const candidateEmail = `${candidateName.toLowerCase()}@steam.auth`;
+            const generatedPassword = `${steamId}_${crypto.randomBytes(8).toString('hex')}`;
+            const hashedPassword = await bcrypt.hash(generatedPassword, 12);
+
+            try {
+              result = await db.query(
+                "INSERT INTO usuarios (nombre_usuario, email, password_hash, steam_id, avatar, nivel, experiencia) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *",
+                [candidateName, candidateEmail, hashedPassword, steamId, steamAvatar, 0, 0]
+              );
+              createdUser = result.rows[0];
+              log(LOG_LEVELS.INFO, 'AUTH', `Cuenta Steam creada automáticamente para ${steamId}`);
+            } catch (insertErr) {
+              if (insertErr.code === '23505') {
+                attempt += 1;
+                continue;
+              }
+              throw insertErr;
+            }
+          }
+
+          if (!createdUser) {
+            throw new Error('No se pudo crear la cuenta Steam por conflicto de nombre o email');
+          }
+
+          result = { rows: [createdUser] };
         } else {
           await db.query(
             "UPDATE usuarios SET avatar = COALESCE(NULLIF($1, ''), avatar) WHERE usuario_id = $2",
             [steamAvatar, result.rows[0].usuario_id]
           );
         }
+
+        await logAction(result.rows[0].usuario_id, 'LOGIN_STEAM', { steamId, email: result.rows[0].email });
         return done(null, result.rows[0]);
       } catch (err) {
         log(LOG_LEVELS.ERROR, 'AUTH', 'Error al crear/actualizar usuario desde Steam:', err.message);
