@@ -27,8 +27,28 @@ services:
     rootDir: .
     region: frankfurt # EU region for low latency to Steam
     plan: free
-    buildCommand: cd src/backend && npm install
-    startCommand: bash scripts/render-start.sh
+    buildCommand: |
+      if [ -f backend/package.json ]; then
+        cd backend && npm install
+      elif [ -f src/backend/package.json ]; then
+        cd src/backend && npm install
+      elif [ -f ../src/backend/package.json ]; then
+        cd ../src/backend && npm install
+      else
+        echo "ERROR: Cannot find backend package.json"
+        exit 1
+      fi
+    startCommand: |
+      if [ -f scripts/render-start.sh ]; then
+        bash scripts/render-start.sh
+      elif [ -f ../scripts/render-start.sh ]; then
+        bash ../scripts/render-start.sh
+      elif [ -f ../../scripts/render-start.sh ]; then
+        bash ../../scripts/render-start.sh
+      else
+        echo "ERROR: render-start.sh not found"
+        exit 1
+      fi
     healthCheckPath: /api/bot/status
     autoDeploy: true
     envVars:
@@ -67,7 +87,15 @@ services:
     name: skinmarket-frontend
     env: static
     rootDir: .
-    buildCommand: npm install && npm run build
+    buildCommand: |
+      if [ -f package.json ]; then
+        npm install && npm run build
+      elif [ -f ../package.json ]; then
+        cd .. && npm install && npm run build
+      else
+        echo "ERROR: Cannot find root package.json"
+        exit 1
+      fi
     staticPublishPath: ./dist
     autoDeploy: true
     routes:

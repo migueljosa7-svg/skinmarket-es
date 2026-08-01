@@ -141,10 +141,11 @@ app.use(hpp());
 
 const allowedOrigins = [
   "https://skinmarket-frontend.onrender.com",
-  process.env.FRONTEND_URL
+  process.env.FRONTEND_URL,
+  process.env.BACKEND_URL
 ].filter(Boolean);
 
-const localHostPattern = /^http:\/\/localhost(:\d+)?$/;
+const localHostPattern = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
 app.use(cors({
   origin: function (origin, callback) {
@@ -285,10 +286,10 @@ if (process.env.BOT_USERNAME && process.env.BOT_USERNAME !== 'tu_usuario_steam')
 if (process.env.STEAM_API_KEY) {
   try {
     // CRITICAL FIX: Use process.env.BACKEND_URL explicitly for Steam returnURL and realm
-    // If BACKEND_URL is missing or empty, SteamStrategy will throw "OpenID return URL is required"
-    const backendUrlForSteam = process.env.BACKEND_URL || 'https://skinmarket-backend.onrender.com';
-    const steamReturnURL = `${backendUrlForSteam}/api/auth/steam/return`;
-    const steamRealm = `${backendUrlForSteam}/`;
+    // Fall back to local development if BACKEND_URL is missing or empty.
+    const backendUrlForSteam = (process.env.BACKEND_URL && process.env.BACKEND_URL.trim()) || 'http://localhost:3001';
+    const steamReturnURL = `${backendUrlForSteam.replace(/\/+$/, '')}/api/auth/steam/return`;
+    const steamRealm = `${backendUrlForSteam.replace(/\/+$/, '')}/`;
 
     passport.use(new SteamStrategy({
       returnURL: steamReturnURL,
