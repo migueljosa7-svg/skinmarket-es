@@ -4,13 +4,23 @@ import { motion as Motion, AnimatePresence } from "framer-motion";
 import { getRarityColor } from "../constants/colors";
 import { StorageService } from "../services/StorageService";
 import { getPlaceholderImage, handleImageError } from "../services/ImageService";
-import {  onSocketEvent } from "../services/socket";
+import { onSocketEvent } from "../services/socket";
 
 const MAX_DROPS = 15;
 
 const BOT_NAMES = [
   "CSGO_Pro", "CryptoKing", "SkinHunter", "Viper", "Zeus",
   "Shadow_Ninja", "LuckyStrike", "NeonRider", "Phoenix_ES", "AlphaGamer"
+];
+
+// Module-level constant — avoids recreating the array every 8s inside the interval
+const SAMPLE_SKINS = [
+  { name: "M4A1-S | Printstream", price: 145.00, rarity: "Covert" },
+  { name: "Desert Eagle | Printstream", price: 65.00, rarity: "Covert" },
+  { name: "AK-47 | Inheritance", price: 120.00, rarity: "Covert" },
+  { name: "AWP | Chromatic Aberration", price: 38.00, rarity: "Classified" },
+  { name: "USP-S | Printstream", price: 85.00, rarity: "Covert" },
+  { name: "★ Specialist Gloves | Fade", price: 850.00, rarity: "Extraordinary" }
 ];
 
 export default function LiveDrops() {
