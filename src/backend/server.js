@@ -22,7 +22,6 @@ import { createCharge, handleWebhook, getPaymentStatus } from "./controllers/pay
 import p2pMarketService from "./services/p2pMarketService.js";
 import fs from "fs";
 import crypto from "crypto";
-import PriceEngine from "./services/PriceEngine.js";
 
 dotenv.config();
 
@@ -233,10 +232,10 @@ const _registerLimiter = rateLimit({
   handler: (req, res) => res.status(429).json({ error: "Demasiados intentos de registro. Intenta de nuevo en 1 hora.", code: "RATE_LIMIT_REGISTER" })
 });
 
-// Configurar Sesiones (usar SESSION_SECRET con fallback seguro)
+// Configurar Sesiones
 app.use(session({
   store: sessionStore,
-  secret: process.env.SESSION_SECRET || 'skinmarket_super_secret_key_998877665544',
+  secret: JWT_SECRET,
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -271,13 +270,6 @@ let DB_AVAILABLE = true;
 
 // [ON-DEMAND] Bot NO se conecta al arrancar. Solo se conecta cuando 
 // un usuario solicita un retiro (withdraw). No hay polling a Steam.
-// ─── PASSPORT INIT (must be BEFORE any /api/auth/steam routes) ──────
-app.use(passport.initialize());
-app.use(passport.session());
-
-passport.serializeUser((user, done) => done(null, user));
-passport.deserializeUser((obj, done) => done(null, obj));
-
 if (process.env.BOT_USERNAME && process.env.BOT_USERNAME !== 'tu_usuario_steam') {
   // NO llamar a botEngine.logIn() aquí - solo registrar endpoint de estado
   app.get("/api/bot/status", (req, res) => {
@@ -291,6 +283,24 @@ if (process.env.BOT_USERNAME && process.env.BOT_USERNAME !== 'tu_usuario_steam')
   });
 }
 
+<<<<<<< HEAD
+// Inicializar Passport
+app.use(passport.initialize());
+app.use(passport.session());
+
+passport.serializeUser((user, done) => done(null, user));
+passport.deserializeUser((obj, done) => done(null, obj));
+
+if (process.env.STEAM_API_KEY) {
+  try {
+    const steamReturnURL = process.env.STEAM_RETURN_URL || `${BACKEND_URL}/api/auth/steam/return`;
+    const steamRealm = process.env.STEAM_REALM || (BACKEND_URL.endsWith('/') ? BACKEND_URL : `${BACKEND_URL}/`);
+
+    passport.use(new SteamStrategy({
+      returnURL: steamReturnURL,
+      realm: steamRealm,
+      apiKey: process.env.STEAM_API_KEY
+=======
 // Steam Strategy — configurada ANTES de las rutas Steam
 let steamStrategyConfigured = false;
 const steamApiKey = process.env.STEAM_API_KEY;
@@ -305,6 +315,7 @@ if (!steamApiKey) {
       returnURL: steamReturnURL,
       realm: steamRealm,
       apiKey: steamApiKey
+>>>>>>> 7617dd94fbdbb3144495d8461be1583c8fddcacd
     }, async (identifier, profile, done) => {
       try {
         const steamId = profile.id;
@@ -327,11 +338,15 @@ if (!steamApiKey) {
         return done(null, result.rows[0]);
       } catch (err) { return done(err); }
     }));
-    steamStrategyConfigured = true;
     log(LOG_LEVELS.INFO, 'AUTH', 'Steam Strategy configurada correctamente');
   } catch (err) {
     log(LOG_LEVELS.ERROR, 'AUTH', 'Error al configurar Steam Strategy:', err);
   }
+<<<<<<< HEAD
+} else {
+  log(LOG_LEVELS.WARN, 'AUTH', 'STEAM_API_KEY no configurada. Autenticación Steam deshabilitada.');
+=======
+>>>>>>> 7617dd94fbdbb3144495d8461be1583c8fddcacd
 }
 
 // ─── GOOGLE OAUTH CLIENT ────────────────────────────
@@ -511,11 +526,8 @@ function steamAuthWithTimeout(req, res, next, authCallback) {
 // --- AUTH ROUTES ---
 
 app.get('/api/auth/steam', (req, res, next) => {
-  const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
-  if (!steamStrategyConfigured) {
-    return res.redirect(`${FRONTEND_URL}/login?error=steam_disabled`);
-  }
   steamAuthWithTimeout(req, res, next, (err, user, safeRespond) => {
+    const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
     if (err) {
       log(LOG_LEVELS.ERROR, 'AUTH', 'Error en autenticación Steam:', err.message);
       return safeRespond(`${FRONTEND_URL}/login?error=steam_auth_failed`);
@@ -533,11 +545,8 @@ app.get('/api/auth/steam', (req, res, next) => {
 });
 
 app.get('/api/auth/steam/return', (req, res, next) => {
-  const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
-  if (!steamStrategyConfigured) {
-    return res.redirect(`${FRONTEND_URL}/login?error=steam_disabled`);
-  }
   steamAuthWithTimeout(req, res, next, (err, user, safeRespond) => {
+    const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
     if (err) {
       log(LOG_LEVELS.ERROR, 'AUTH', 'Error en callback Steam:', err.message);
       return safeRespond(`${FRONTEND_URL}/login?error=steam_callback_failed`);
@@ -932,26 +941,17 @@ const LEVEL_THRESHOLDS = [
   { level: 360, minDeposit: 200000, dailyCaseId: "daily-360", caseLabel: "VIP SUPREME", reward: 50.00 },
 ];
 
-// Pre-computed lookup map for O(1) level → daily case resolution
-const DAILY_CASE_BY_LEVEL_MAP = new Map(LEVEL_THRESHOLDS.map(t => [t.level, t]));
-
-// Binary search for O(log n) level calculation (vs previous O(n) linear scan)
 function calculateLevel(totalDeposited) {
-  let lo = 0, hi = LEVEL_THRESHOLDS.length - 1, result = 0;
-  while (lo <= hi) {
-    const mid = (lo + hi) >> 1;
-    if (totalDeposited >= LEVEL_THRESHOLDS[mid].minDeposit) {
-      result = LEVEL_THRESHOLDS[mid].level;
-      lo = mid + 1;
-    } else {
-      hi = mid - 1;
-    }
+  let maxLevel = 0;
+  for (const t of LEVEL_THRESHOLDS) {
+    if (totalDeposited >= t.minDeposit) maxLevel = t.level;
   }
-  return result;
+  return maxLevel;
 }
 
 function getDailyCaseForLevel(level) {
-  return DAILY_CASE_BY_LEVEL_MAP.get(level) || LEVEL_THRESHOLDS[0];
+  for (const t of LEVEL_THRESHOLDS) { if (t.level === level) return t; }
+  return LEVEL_THRESHOLDS[0];
 }
 
 // ─── GET USER /api/me ────────────────────
@@ -1292,39 +1292,6 @@ app.get("/api/steam/price", inspectorLimiter, async (req, res) => {
 
 // ─── CASE OPENING (with atomic transactions) ─────────────
 
-// Module-level case price lookup table — avoids recreating the object on every request.
-// Maps caseId to real price from the frontend case definitions.
-// Updated economic balance:
-// - Económica: €0.50 - €2.50
-// - Intermedia: €5.00 - €25.00
-// - Premium: €50.00 - €300.00
-// - Limited: €50.00 - €300.00
-// - Risk Zone: €10.00 - €150.00
-const CASE_PRICES = {
-  "econ-0": 0.50, "econ-1": 0.75, "econ-2": 1.00, "econ-3": 1.25,
-  "econ-4": 1.50, "econ-5": 1.75, "econ-6": 2.00, "econ-7": 2.25,
-  "econ-8": 2.50, "econ-9": 2.50, "econ-10": 2.50, "econ-11": 2.50,
-  // Legacy eco IDs for backward compatibility
-  "eco-0": 0.50, "eco-1": 0.75, "eco-2": 1.00, "eco-3": 1.25, "eco-4": 1.50,
-  "eco-5": 1.75, "eco-6": 2.00, "eco-7": 2.25, "eco-8": 2.50, "eco-9": 2.75,
-  "eco-10": 3.00, "eco-11": 3.50,
-  // Intermedia: €5.00 - €25.00
-  "inter-0": 5.00, "inter-1": 5.50, "inter-2": 6.00, "inter-3": 7.00,
-  "inter-4": 8.00, "inter-5": 9.00, "inter-6": 10.00, "inter-7": 12.00,
-  "inter-8": 14.00, "inter-9": 16.00, "inter-10": 18.00, "inter-11": 20.00,
-  "inter-12": 22.00, "inter-13": 25.00,
-  // Premium: €50.00 - €300.00
-  "prem-0": 50.00, "prem-1": 60.00, "prem-2": 75.00, "prem-3": 90.00,
-  "prem-4": 100.00, "prem-5": 120.00, "prem-6": 150.00, "prem-7": 180.00,
-  "prem-8": 200.00, "prem-9": 220.00, "prem-10": 250.00, "prem-11": 300.00,
-  // Limited: €50.00 - €300.00
-  "limit-0": 50.00, "limit-1": 75.00, "limit-2": 100.00, "limit-3": 125.00,
-  "limit-4": 150.00, "limit-5": 175.00, "limit-6": 200.00, "limit-7": 300.00,
-  // Risk Zone: €10.00 - €150.00
-  "risk-0": 10.00, "risk-1": 15.00, "risk-2": 20.00, "risk-3": 30.00,
-  "risk-4": 50.00, "risk-5": 75.00, "risk-6": 100.00, "risk-7": 150.00
-};
-
 // ─── SECURE RNG HELPER (cryptographically secure) ───────────
 // Uses crypto.randomInt() for tamper-proof drop rate calculations.
 // The frontend NEVER computes the outcome — it only renders the animation.
@@ -1345,12 +1312,59 @@ app.post("/api/cases/open", authenticateToken, caseOpenLimiter, async (req, res)
     // Validate quantity (prevent abuse)
     const qty = Math.min(Math.max(parseInt(quantity) || 1, 1), 5);
 
-    const casePrice = CASE_PRICES[caseId] || 2.50;
+    // Case price lookup — maps caseId to real price from the frontend case definitions
+    // Updated economic balance:
+    // - Económica: €0.50 - €2.50
+    // - Intermedia: €5.00 - €25.00
+    // - Premium: €50.00 - €300.00
+    // - Limited: €50.00 - €300.00
+    // - Risk Zone: €10.00 - €150.00
+    const casePrices = {
+      "econ-0": 0.50, "econ-1": 0.75, "econ-2": 1.00, "econ-3": 1.25,
+      "econ-4": 1.50, "econ-5": 1.75, "econ-6": 2.00, "econ-7": 2.25,
+      "econ-8": 2.50, "econ-9": 2.50, "econ-10": 2.50, "econ-11": 2.50,
+      // Legacy eco IDs for backward compatibility
+      "eco-0": 0.50, "eco-1": 0.75, "eco-2": 1.00, "eco-3": 1.25, "eco-4": 1.50,
+      "eco-5": 1.75, "eco-6": 2.00, "eco-7": 2.25, "eco-8": 2.50, "eco-9": 2.75,
+      "eco-10": 3.00, "eco-11": 3.50,
+      // Intermedia: €5.00 - €25.00
+      "inter-0": 5.00, "inter-1": 5.50, "inter-2": 6.00, "inter-3": 7.00,
+      "inter-4": 8.00, "inter-5": 9.00, "inter-6": 10.00, "inter-7": 12.00,
+      "inter-8": 14.00, "inter-9": 16.00, "inter-10": 18.00, "inter-11": 20.00,
+      "inter-12": 22.00, "inter-13": 25.00,
+      // Premium: €50.00 - €300.00
+      "prem-0": 50.00, "prem-1": 60.00, "prem-2": 75.00, "prem-3": 90.00,
+      "prem-4": 100.00, "prem-5": 120.00, "prem-6": 150.00, "prem-7": 180.00,
+      "prem-8": 200.00, "prem-9": 220.00, "prem-10": 250.00, "prem-11": 300.00,
+      // Limited: €50.00 - €300.00
+      "limit-0": 50.00, "limit-1": 75.00, "limit-2": 100.00, "limit-3": 125.00,
+      "limit-4": 150.00, "limit-5": 175.00, "limit-6": 200.00, "limit-7": 300.00,
+      // Risk Zone: €10.00 - €150.00
+      "risk-0": 10.00, "risk-1": 15.00, "risk-2": 20.00, "risk-3": 30.00,
+      "risk-4": 50.00, "risk-5": 75.00, "risk-6": 100.00, "risk-7": 150.00
+    };
+    const casePrice = casePrices[caseId] || 2.50;
     const priceMultiplier = jokerMode ? 3 : 1;
     const totalCost = casePrice * priceMultiplier * qty;
 
     // Atomic balance check + deduction in a single transaction
     let userBalance;
+<<<<<<< HEAD
+    await db.withTransaction(async (client) => {
+      const userResult = await client.query(
+        "SELECT saldo FROM usuarios WHERE usuario_id = $1 FOR UPDATE",
+        [req.user.id]
+      );
+      if (!userResult.rows[0] || userResult.rows[0].saldo < totalCost) {
+        throw new Error('INSUFFICIENT_BALANCE');
+      }
+      userBalance = userResult.rows[0].saldo;
+      await client.query(
+        "UPDATE usuarios SET saldo = saldo - $1 WHERE usuario_id = $2",
+        [totalCost, req.user.id]
+      );
+    });
+=======
     if (!DB_AVAILABLE) {
       // In-memory balance check/deduction
       const memUser = IN_MEMORY_USERS_BY_ID.get(req.user.id);
@@ -1375,6 +1389,7 @@ app.post("/api/cases/open", authenticateToken, caseOpenLimiter, async (req, res)
         );
       });
     }
+>>>>>>> 7617dd94fbdbb3144495d8461be1583c8fddcacd
 
     // Import case configuration for realistic skins
     const { CASE_PROBABILITIES, SKIN_CATALOGS } = await import("../constants/cases.js");
@@ -2026,274 +2041,6 @@ app.post("/api/p2p/search", authenticateToken, async (req, res) => {
   }
 });
 
-// ─────────────────────────────────────────────────
-// BATTLES PRIVADAS — Salas en memoria con TTL
-// ─────────────────────────────────────────────────
-// Las salas viven en memoria (Map) con expiración automática (TTL).
-// El creador paga su entrada (y opcionalmente un % de la entrada de los
-// rivales vía "préstamo"). Al unirse, cada jugador paga su entrada de
-// forma atómica (SELECT ... FOR UPDATE). Los endpoints responden a la UI.
-// ─────────────────────────────────────────────────
-
-const BATTLE_ROOM_TTL_MS = 30 * 60 * 1000; // 30 minutos de vida por sala
-const battleRooms = new Map(); // roomCode -> { ...room, expiresAt }
-
-function generateBattleCode() {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  let code;
-  do {
-    code = "";
-    for (let i = 0; i < 8; i++) {
-      code += chars[Math.floor(Math.random() * chars.length)];
-    }
-  } while (battleRooms.has(code));
-  return code;
-}
-
-// Limpiar salas expiradas periódicamente
-setInterval(() => {
-  const now = Date.now();
-  for (const [code, room] of battleRooms.entries()) {
-    if (room.expiresAt < now) {
-      battleRooms.delete(code);
-      log(LOG_LEVELS.INFO, 'BATTLES', `Sala ${code} expirada y eliminada (TTL)`);
-    }
-  }
-}, 60 * 1000).unref?.();
-
-// Helper: deducción atómica de saldo (con FOR UPDATE) + otorga XP (1€ = 100 XP)
-// Lanza Error('INSUFFICIENT_BALANCE') si no hay saldo suficiente.
-async function atomicDeductBalanceAndAwardXP(usuario_id, monto) {
-  const amount = Math.max(0, parseFloat(monto) || 0);
-  let userBalance;
-  await db.withTransaction(async (client) => {
-    const userResult = await client.query(
-      "SELECT saldo FROM usuarios WHERE usuario_id = $1 FOR UPDATE",
-      [usuario_id]
-    );
-    if (!userResult.rows[0] || Number(userResult.rows[0].saldo) < amount) {
-      throw new Error('INSUFFICIENT_BALANCE');
-    }
-    userBalance = Number(userResult.rows[0].saldo);
-    const expGain = Math.floor(amount * 100); // $1 = 100 XP
-    await client.query(
-      "UPDATE usuarios SET saldo = saldo - $1, experiencia = experiencia + $2 WHERE usuario_id = $3",
-      [amount, expGain, usuario_id]
-    );
-  });
-  return { newBalance: userBalance - amount, expGain: Math.floor(amount * 100) };
-}
-
-// POST /api/battles/create — El creador paga entrada + préstamo y crea la sala
-app.post("/api/battles/create", authenticateToken, async (req, res) => {
-  const {
-    gameMode = "classic",
-    playerCount = 2,
-    totalCost = 0,
-    loanPercent = 0,
-    caseIds = [],
-    inviteCode = null
-  } = req.body || {};
-
-  try {
-    const entry = parseFloat(totalCost) || 0;
-    const loanMultiplier = (parseInt(loanPercent, 10) || 0) / 100;
-    const opponentCount = Math.max(0, (parseInt(playerCount, 10) || 2) - 1);
-    const loanCost = loanMultiplier > 0 ? entry * opponentCount * loanMultiplier : 0;
-    const totalToPay = entry + loanCost;
-
-    if (entry <= 0 || !Array.isArray(caseIds) || caseIds.length === 0) {
-      return res.status(400).json({ error: "Datos de batalla inválidos. Entrada y cajas son obligatorias.", code: "INVALID_BATTLE_DATA" });
-    }
-    if (totalToPay > 10000) {
-      return res.status(400).json({ error: "El coste de la batalla supera el límite permitido.", code: "BATTLE_TOO_EXPENSIVE" });
-    }
-
-    // Deducción atómica del saldo del creador (entrada + préstamo)
-    let deduction;
-    try {
-      deduction = await atomicDeductBalanceAndAwardXP(req.user.id, totalToPay);
-    } catch (err) {
-      if (err.message === 'INSUFFICIENT_BALANCE') {
-        return res.status(400).json({ error: "Saldo insuficiente para crear la batalla.", code: "INSUFFICIENT_BALANCE", required: totalToPay });
-      }
-      throw err;
-    }
-
-    const code = inviteCode || generateBattleCode();
-    // Si el código ya existe, regenerar
-    const finalCode = battleRooms.has(code) ? generateBattleCode() : code;
-
-    const room = {
-      code: finalCode,
-      ownerId: req.user.id,
-      ownerName: (req.body && req.body.ownerName) || "Jugador",
-      gameMode,
-      playerCount: parseInt(playerCount, 10) || 2,
-      entry: entry,
-      loanPercent: parseInt(loanPercent, 10) || 0,
-      loanCost,
-      caseIds,
-      status: "waiting",
-      createdAt: new Date().toISOString(),
-      expiresAt: Date.now() + BATTLE_ROOM_TTL_MS,
-      players: [{
-        userId: req.user.id,
-        name: (req.body && req.body.ownerName) || "Jugador",
-        paid: totalToPay,
-        isOwner: true,
-        joinedAt: new Date().toISOString()
-      }]
-    };
-
-    battleRooms.set(finalCode, room);
-
-    await recordTransaction(req.user.id, 'batalla', totalToPay, 'saldo_sitio', `Creación de batalla privada #${finalCode} (entrada ${entry}€ + préstamo ${loanCost}€)`);
-    await logAction(req.user.id, 'BATALLA_CREAR', { code: finalCode, gameMode, playerCount, entry, loanPercent, loanCost, caseIds });
-
-    log(LOG_LEVELS.INFO, 'BATTLES', `Sala ${finalCode} creada por usuario ${req.user.id} (coste ${totalToPay}€)`);
-
-    res.status(201).json({
-      success: true,
-      code: finalCode,
-      room: {
-        code: finalCode,
-        gameMode,
-        playerCount,
-        entry,
-        loanPercent,
-        caseIds,
-        status: "waiting",
-        players: room.players,
-        inviteUrl: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/battles?invite=${finalCode}`
-      },
-      newBalance: deduction.newBalance,
-      expGain: deduction.expGain,
-      message: `✅ Batalla privada #${finalCode} creada. Comparte el enlace de invitación.`
-    });
-  } catch (err) {
-    log(LOG_LEVELS.ERROR, 'BATTLES', 'Error al crear batalla:', err.message);
-    res.status(500).json({ error: "Error al crear la batalla.", code: "BATTLE_CREATE_ERROR" });
-  }
-});
-
-// POST /api/battles/join — Un jugador se une a una sala existente pagando su entrada
-app.post("/api/battles/join", authenticateToken, async (req, res) => {
-  const { inviteCode, playerName } = req.body || {};
-
-  try {
-    if (!inviteCode) {
-      return res.status(400).json({ error: "Código de invitación obligatorio.", code: "INVITE_CODE_REQUIRED" });
-    }
-
-    const code = String(inviteCode).toUpperCase().trim();
-    const room = battleRooms.get(code);
-
-    if (!room) {
-      return res.status(404).json({ error: "La batalla no existe o ha expirado.", code: "BATTLE_NOT_FOUND" });
-    }
-    if (room.status !== "waiting") {
-      return res.status(409).json({ error: "La batalla ya ha comenzado o ha finalizado.", code: "BATTLE_ALREADY_STARTED" });
-    }
-    if (room.expiresAt < Date.now()) {
-      battleRooms.delete(code);
-      return res.status(404).json({ error: "La batalla ha expirado.", code: "BATTLE_EXPIRED" });
-    }
-    if (room.players.some((p) => p.userId === req.user.id)) {
-      return res.status(409).json({ error: "Ya estás dentro de esta batalla.", code: "ALREADY_JOINED" });
-    }
-    if (room.players.length >= room.playerCount) {
-      return res.status(409).json({ error: "La batalla está completa.", code: "BATTLE_FULL" });
-    }
-
-    // El jugador que se une paga su propia entrada (sin préstamo)
-    const joinCost = room.entry;
-
-    // Deducción atómica del saldo del que se une
-    let deduction;
-    try {
-      deduction = await atomicDeductBalanceAndAwardXP(req.user.id, joinCost);
-    } catch (err) {
-      if (err.message === 'INSUFFICIENT_BALANCE') {
-        return res.status(400).json({ error: "Saldo insuficiente para unirte a la batalla.", code: "INSUFFICIENT_BALANCE", required: joinCost });
-      }
-      throw err;
-    }
-
-    room.players.push({
-      userId: req.user.id,
-      name: playerName || "Jugador",
-      paid: joinCost,
-      isOwner: false,
-      joinedAt: new Date().toISOString()
-    });
-
-    // Si la sala está llena, marcarla como lista
-    const isFull = room.players.length >= room.playerCount;
-    if (isFull) {
-      room.status = "ready";
-    }
-
-    await recordTransaction(req.user.id, 'batalla', joinCost, 'saldo_sitio', `Unión a batalla privada #${code} (entrada ${joinCost}€)`);
-    await logAction(req.user.id, 'BATALLA_UNIRSE', { code, playerCount: room.players.length });
-
-    log(LOG_LEVELS.INFO, 'BATTLES', `Usuario ${req.user.id} se unió a la sala ${code} (${room.players.length}/${room.playerCount})`);
-
-    res.json({
-      success: true,
-      code,
-      room: {
-        code,
-        gameMode: room.gameMode,
-        playerCount: room.playerCount,
-        entry: room.entry,
-        loanPercent: room.loanPercent,
-        caseIds: room.caseIds,
-        status: room.status,
-        players: room.players
-      },
-      newBalance: deduction.newBalance,
-      expGain: deduction.expGain,
-      isReady: isFull,
-      message: isFull
-        ? `🎉 ¡Batalla #${code} completa! Puede comenzar.`
-        : `✅ Te has unido a la batalla #${code}. Esperando a más jugadores (${room.players.length}/${room.playerCount}).`
-    });
-  } catch (err) {
-    log(LOG_LEVELS.ERROR, 'BATTLES', 'Error al unirse a batalla:', err.message);
-    res.status(500).json({ error: "Error al unirse a la batalla.", code: "BATTLE_JOIN_ERROR" });
-  }
-});
-
-// GET /api/battles/:code — Consultar el estado de una sala
-app.get("/api/battles/:code", authenticateToken, async (req, res) => {
-  const code = String(req.params.code || "").toUpperCase().trim();
-  const room = battleRooms.get(code);
-
-  if (!room || room.expiresAt < Date.now()) {
-    if (room) battleRooms.delete(code);
-    return res.status(404).json({ error: "La batalla no existe o ha expirado.", code: "BATTLE_NOT_FOUND" });
-  }
-
-  res.json({
-    success: true,
-    room: {
-      code,
-      gameMode: room.gameMode,
-      playerCount: room.playerCount,
-      entry: room.entry,
-      loanPercent: room.loanPercent,
-      loanCost: room.loanCost,
-      caseIds: room.caseIds,
-      status: room.status,
-      ownerName: room.ownerName,
-      createdAt: room.createdAt,
-      expiresAt: room.expiresAt,
-      players: room.players
-    }
-  });
-});
-
 // ─── GLOBAL ERROR HANDLER ────────────────────────
 process.on('unhandledRejection', (reason, promise) => {
   log(LOG_LEVELS.ERROR, 'GLOBAL', '❌ Unhandled Promise Rejection', {
@@ -2371,9 +2118,7 @@ process.on('SIGINT', () => {
 });
 
 // ─── RESPONSE ERROR MIDDLEWARE ───────────────────
-// Express requires exactly 4 args (err, req, res, next) to identify error handlers.
-// eslint-disable-next-line no-unused-vars
-app.use((err, req, res, next) => {
+app.use((err, req, res) => {
   log(LOG_LEVELS.ERROR, 'GLOBAL', 'Error en middleware global', {
     error: err.message,
     stack: err.stack,
@@ -2445,9 +2190,6 @@ io.on("connection", (socket) => {
   log(LOG_LEVELS.INFO, 'SOCKET', `Cliente conectado: ${socket.id}`);
   socket.on("disconnect", () => log(LOG_LEVELS.INFO, 'SOCKET', `Cliente desconectado: ${socket.id}`));
 });
-
-// Expose io to Express so route handlers can emit socket events (e.g. withdrawal_update)
-app.set('io', io);
 
 
 // ─── PRICE CACHE ──────────────────────────────────
@@ -2592,37 +2334,4 @@ cron.schedule("0 */6 * * *", async () => {
   } catch {
     // Silenciar errores en tarea programada
   }
-});
-
-// ─── PRICE ENGINE API ENDPOINT ─────────────────────────
-// Resuelve precios de skins usando la cascada multi-fuente (KeyDrop-style)
-// Fuente 1: Caché local en memoria (<2ms)
-// Fuente 2: PriceEmpire / CSGOBackpack (API Index)
-// Fuente 3: Steam Community Market Direct (wear-specific)
-// Fuente 4: Matriz local pre-calculada (skin_prices.json)
-// Garantía final: Precio base ponderado por rareza (NUNCA null/undefined)
-app.get("/api/prices/resolve", async (req, res) => {
-  try {
-    const { market_hash_name, rarity, wear } = req.query;
-    if (!market_hash_name) {
-      return res.status(400).json({ error: "market_hash_name es obligatorio" });
-    }
-    const result = await PriceEngine.resolvePrice({
-      marketHashName: market_hash_name,
-      rarity: rarity || undefined,
-      wear: wear || undefined,
-    });
-    res.json(result);
-  } catch (err) {
-    log(LOG_LEVELS.ERROR, 'PRICE_ENGINE', 'Error en /api/prices/resolve:', err.message);
-    // Garantía cero crashes: devolver precio base por rareza
-    const { rarity, wear } = req.query;
-    const basePrice = PriceEngine.getRarityBasePrice(rarity || "Mil-Spec Grade", wear || null);
-    res.json({ price: basePrice, source: "rarity_base", error: err.message });
-  }
-});
-
-// Endpoint para estadísticas de caché de precios
-app.get("/api/prices/cache-stats", (req, res) => {
-  res.json(PriceEngine.getCacheStats());
 });
