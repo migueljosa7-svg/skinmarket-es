@@ -1,705 +1,47 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "../context/useAuth";
 import { useFetchSkins } from "../hooks/useFetchSkins";
 import { generateAllCases } from "../constants/cases.js";
 import { getRarityColor } from "../constants/colors.js";
 import { motion as Motion } from "framer-motion";
-import { getPlaceholderImage, handleImageError, getSkinImageUrl } from "../services/ImageService";
+import { getPlaceholderImage, handleImageError } from "../services/ImageService";
 import { useToast } from "../components/Toast";
 import { sound } from "../utils/audio";
 import ProvablyFairModal from "../components/ProvablyFairModal";
+import { useSearchParams, useNavigate } from "react-router-dom";
+import { StorageService } from "../services/StorageService";
+import MiniBattleRoulette from "../components/battles/MiniBattleRoulette";
+import BattleSelector from "../components/battles/BattleSelector";
+import { BOT_TEMPLATES, GAME_MODES, BATTLE_FORMATS } from "../components/battles/battleConfig";
 
+const API_BASE = import.meta.env.VITE_API_URL || "";
 
-/* ─────────────────────────────────────────────
-   MINI ROULETTE — igual que KeyDrop (slide)
-───────────────────────────────────────────── */
-const MiniBattleRoulette = ({ items, accentColor }) => {
-  const containerRef = useRef(null);
-
-  useEffect(() => {
-    if (!containerRef.current || items.length === 0) return;
-
-    const el = containerRef.current;
-    el.style.transition = "none";
-    el.style.transform = "translateX(0px)";
-
-    void el.offsetWidth;
-
-    const CARD_W = 120; // Increased width for better spacing
-    const winnerIndex = items.length - 4;
-    const offset = winnerIndex * CARD_W + 60;
-
-    const timerId = setTimeout(() => {
-      const jitter = Math.floor(Math.random() * 30) - 15;
-      el.style.transition = "transform 4s cubic-bezier(0.12, 0.9, 0.2, 1)";
-      el.style.transform = `translateX(-${offset + jitter}px)`;
-    }, 50);
-
-    return () => clearTimeout(timerId);
-  }, [items]);
-
-  if (!items || items.length === 0) return null;
-
-  const gold = accentColor || "#f5ac3b";
-
-  return (
-    <div
-      style={{
-        width: "100%",
-        height: "150px",
-        background: "rgba(0,0,0,0.3)",
-        border: `1px solid rgba(255,255,255,0.05)`,
-        borderRadius: "24px",
-        position: "relative",
-        overflow: "hidden",
-        display: "flex",
-        alignItems: "center",
-        backdropFilter: 'blur(10px)'
-      }}
-    >
-      <div
-        style={{
-          position: "absolute",
-          left: "50%",
-          top: 0,
-          bottom: 0,
-          width: "3px",
-          background: gold,
-          zIndex: 10,
-          boxShadow: `0 0 20px ${gold}`,
-          transform: "translateX(-50%)",
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          background: `linear-gradient(90deg, #0f1115 0%, transparent 25%, transparent 75%, #0f1115 100%)`,
-          zIndex: 5,
-          pointerEvents: "none",
-        }}
-      />
-
-      <div
-        ref={containerRef}
-        style={{
-          display: "flex",
-          gap: "10px",
-          height: "100%",
-          alignItems: "center",
-          paddingLeft: "50%",
-          willChange: "transform",
-        }}
-      >
-        {items.map((skin, idx) => {
-          const rc = getRarityColor(skin.rarity);
-          return (
-            <div
-              key={`minibattle-${skin.id || skin._id || idx}`}
-              style={{
-                minWidth: "110px",
-                height: "110px",
-                background: `radial-gradient(circle at center, ${rc}15 0%, rgba(255,255,255,0.02) 80%)`,
-                borderRadius: "16px",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "10px",
-                boxSizing: "border-box",
-                flexShrink: 0,
-                borderWidth: "0 0 4px 0",
-                borderStyle: "solid",
-                borderColor: rc
-              }}
-            >
-              <img
-                src={getSkinImageUrl(skin.name, skin.image)}
-                alt={skin.name}
-                onError={(e) => handleImageError(e, skin)}
-                style={{
-                  width: "80px",
-                  height: "60px",
-                  objectFit: "contain",
-                  marginBottom: "8px",
-                  filter: `drop-shadow(0 0 10px ${rc}40)`,
-                  opacity: skin.image ? 1 : 0.3
-                }}
-              />
-              <div
-                style={{
-                  color: "white",
-                  fontSize: "0.6rem",
-                  fontWeight: '800',
-                  textAlign: "center",
-                  width: "100%",
-                  overflow: "hidden",
-                  whiteSpace: "nowrap",
-                  textOverflow: "ellipsis",
-                }}
-              >
-                {skin.name}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
-const BoxCard = ({ c, qty, onAdd, onRemove }) => {
-  return (
-    <Motion.div
-      whileHover={{ y: -5 }}
-      style={{
-        position: "relative",
-        borderRadius: "24px",
-        overflow: "hidden",
-        border: qty > 0 ? `2px solid ${c.color}` : "1.5px solid rgba(255,255,255,0.05)",
-        cursor: "pointer",
-        transition: "all 0.2s",
-        background: 'rgba(255,255,255,0.02)',
-        boxShadow: qty > 0 ? `0 10px 30px ${c.color}25` : "none",
-        minHeight: "220px",
-      }}
-    >
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          background: c.bgGradient,
-          opacity: 0.1,
-        }}
-      />
-
-      {qty > 0 && (
-        <div
-          style={{
-            position: "absolute",
-            top: "12px",
-            right: "12px",
-            background: c.color,
-            color: "black",
-            borderRadius: "10px",
-            minWidth: "24px",
-            height: "24px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontWeight: "900",
-            fontSize: "0.75rem",
-            zIndex: 5,
-            padding: '0 8px'
-          }}
-        >
-          {qty}
-        </div>
-      )}
-
-      <div
-        style={{
-          position: "relative",
-          zIndex: 2,
-          padding: "20px",
-          height: "100%",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          boxSizing: 'border-box'
-        }}
-      >
-        <div style={{ fontSize: "2.8rem", marginBottom: "10px" }}>
-          {c.emoji}
-        </div>
-
-        <div
-          style={{
-            color: "white",
-            fontSize: "0.85rem",
-            textAlign: "center",
-            fontWeight: "800",
-            lineHeight: "1.2",
-            marginBottom: "5px",
-            width: '100%',
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {c.name}
-        </div>
-
-        <div
-          style={{
-            color: c.color,
-            fontWeight: "900",
-            fontSize: "1rem",
-            marginBottom: "20px",
-            letterSpacing: '0.5px'
-          }}
-        >
-          {c.price}€
-        </div>
-
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            width: "100%",
-            background: "rgba(255,255,255,0.03)",
-            borderRadius: "14px",
-            padding: "5px",
-            marginTop: "auto",
-            border: '1px solid rgba(255,255,255,0.05)'
-          }}
-        >
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onRemove(c.id);
-            }}
-            style={{
-              background: qty > 0 ? "rgba(239,68,68,0.1)" : "transparent",
-              border: "none",
-              color: qty > 0 ? "#ef4444" : "rgba(255,255,255,0.1)",
-              fontSize: "1.2rem",
-              cursor: qty > 0 ? "pointer" : "default",
-              width: "32px",
-              height: "32px",
-              borderRadius: "10px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontWeight: '900'
-            }}
-          >
-            −
-          </button>
-          <span
-            style={{
-              color: "white",
-              fontWeight: "900",
-              fontSize: "0.9rem",
-              minWidth: "20px",
-              textAlign: "center",
-            }}
-          >
-            {qty}
-          </span>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onAdd(c.id);
-            }}
-            style={{
-              background: "rgba(16,185,129,0.1)",
-              border: "none",
-              color: "#10b981",
-              fontSize: "1.2rem",
-              cursor: "pointer",
-              width: "32px",
-              height: "32px",
-              borderRadius: "10px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontWeight: '900'
-            }}
-          >
-            +
-          </button>
-        </div>
-      </div>
-    </Motion.div>
-  );
-};
-
-/* ─────────────────────────────────────────────
-   MODAL DE BATALLA — Estilo KeyDrop/Clash.gg
-───────────────────────────────────────────── */
-const BOT_TEMPLATES = [
-  { id: "newbie1", name: "Alex (Dumb)", winRate: "30%", icon: "◆", color: "#10b981", desc: "IA básica. Poca probabilidad de skins caras." },
-  { id: "newbie2", name: "Juan (Low)", winRate: "32%", icon: "◆", color: "#10b981", desc: "IA básica. Poca probabilidad de skins caras." },
-  { id: "std1", name: "Pro Bot", winRate: "42%", icon: "◆", color: "#3b82f6", desc: "IA balanceada. Probabilidades reales." },
-  { id: "std2", name: "Hardy", winRate: "45%", icon: "◆", color: "#3b82f6", desc: "IA balanceada. Probabilidades reales." },
-  { id: "elite1", name: "Elite AI", winRate: "75%", icon: "◆", color: "#ef4444", desc: "IA avanzada. Probabilidades altas de skins caras." },
-  { id: "elite2", name: "X-Terminator", winRate: "80%", icon: "◆", color: "#ef4444", desc: "IA avanzada. Probabilidades altas de skins caras." },
-  { id: "master1", name: "Master Mind", winRate: "85%", icon: "◆", color: "#a855f7", desc: "Maestro veterano. ¡Casi nunca falla!" },
-  { id: "master2", name: "Ghostmaster", winRate: "90%", icon: "◆", color: "#a855f7", desc: "Maestro veterano. ¡Casi nunca falla!" },
-  { id: "skin_king", name: "Skin King", winRate: "95%", icon: "◆", color: "#f5ac3b", desc: "El rey de la arena. Trae su propio amuleto." },
-  { id: "hacker", name: "0xHacker", winRate: "99%", icon: "◆", color: "#f5ac3b", desc: "01001000 01101001 00101110" },
-];
-
-const GAME_MODES = [
-  { id: "classic", name: "Clásico", desc: "Mayor valor TOTAL gana todo.", icon: "◆", color: "#f5ac3b" },
-  { id: "crazy", name: "Locura", desc: "¡Invertido! Menor valor TOTAL gana.", icon: "◆", color: "#ec4899" },
-  { id: "terminal", name: "Terminal", desc: "¡Todo o nada! Quien saque la skin más cara en la ÚLTIMA CAJA gana.", icon: "◆", color: "#ef4444" },
-  { id: "first_blood", name: "Primera Sangre", desc: "Quien saque la skin más cara en la PRIMERA CAJA gana todo.", icon: "◆", color: "#b91c1c" },
-  { id: "joker", name: "Comodín", desc: "Clásico + desempate aleatorio.", icon: "◆", color: "#a855f7" },
-];
-
-const BATTLE_FORMATS = [
-  { count: 2, label: "1v1", sub: "Duelo", icon: "◆", isTeam: false },
-  { count: 4, label: "2v2", sub: "Duo Squad", icon: "◆", isTeam: true },
-  { count: 6, label: "3v3", sub: "Triples", icon: "◆", isTeam: true },
-  { count: 8, label: "4v4", sub: "Team Wars", icon: "◆", isTeam: true },
-  { count: 3, label: "1v1v1", sub: "Triple", icon: "◆", isTeam: false },
-  { count: 4, label: "1v1v1v1", sub: "Squad", icon: "◆", isTeam: false },
-];
-
-const BattleSelector = ({
-  open, onClose, onStart, userBalance, allCases,
-  step, setStep,
-  selectedBoxes, setSelectedBoxes,
-  gameMode, setGameMode,
-  playerCount, setPlayerCount,
-  botLevels, setBotLevels,
-  toast
-}) => {
-  const [filter, setFilter] = useState("all");
-  const [sortBy, setSortBy] = useState("price-asc");
-  const [hoveredInfo, setHoveredInfo] = useState(null);
-
-  const totalCost = useMemo(() => {
-    return Object.entries(selectedBoxes).reduce((acc, [id, qty]) => {
-      const cData = allCases.find((c) => c.id === id);
-      return acc + (parseFloat(cData?.price || 0) * qty);
-    }, 0);
-  }, [selectedBoxes, allCases]);
-
-  const filteredCases = useMemo(() => {
-    let list = filter === "all" ? allCases : allCases.filter((c) => c.category === filter);
-    return list.sort((a, b) => {
-      if (sortBy === "price-asc") return parseFloat(a.price) - parseFloat(b.price);
-      if (sortBy === "price-desc") return parseFloat(b.price) - parseFloat(a.price);
-      if (sortBy === "alpha-asc") return a.name.localeCompare(b.name);
-      if (sortBy === "alpha-desc") return b.name.localeCompare(a.name);
-      return 0;
-    });
-  }, [allCases, filter, sortBy]);
-
-  if (!open) return null;
-
-  const canAfford = totalCost > 0 && totalCost <= userBalance;
-
-  const handleAddBox = (id) => {
-    setSelectedBoxes((prev) => ({ ...prev, [id]: (prev[id] || 0) + 1 }));
-  };
-
-  const handleRemoveBox = (id) => {
-    setSelectedBoxes((prev) => {
-      if (!prev[id]) return prev;
-      const next = prev[id] - 1;
-      if (next <= 0) {
-        const { [id]: _removed, ...rest } = prev;
-        return rest;
-      }
-      return { ...prev, [id]: next };
-    });
-  };
-
-  return (
-    <Motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      onClick={onClose}
-      style={{
-        position: "fixed", inset: 0, background: "rgba(0,0,0,0.9)", backdropFilter: "blur(20px)", zIndex: 1000,
-        display: "flex", alignItems: "center", justifyContent: "center", padding: "20px",
-      }}
-    >
-      <Motion.div
-        initial={{ opacity: 0, scale: 0.9, y: 30 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: "#0f1115", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "40px",
-          width: "100%", maxWidth: "1100px", padding: "40px", maxHeight: "90vh", overflowY: "auto",
-          position: "relative", boxShadow: "0 50px 100px rgba(0,0,0,0.8)",
-        }}
-      >
-        <button onClick={onClose} style={closeButtonStyle}>✕</button>
-
-        <h2 style={{ fontSize: "2.5rem", fontWeight: "900", margin: "0 0 10px 0", letterSpacing: '-2px' }}>
-          {step === 'config' ? '⚔️ CONFIGURAR BATALLA' : '🤖 SELECCIONAR RIVALES'}
-        </h2>
-        <p style={{ color: "rgba(255,255,255,0.3)", marginBottom: "40px", fontSize: "1.1rem", fontWeight: '500' }}>
-          {step === 'config' ? 'Configura tu enfrentamiento premium y compite por el premio mayor.' : 'Elige la dificultad de tus oponentes para la batalla.'}
-        </p>
-
-        {step === 'config' ? (
-          <>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '40px', marginBottom: '40px' }}>
-              <div>
-                <SectionHeader num="1" label="Formato" />
-                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                  {BATTLE_FORMATS.map((f) => (
-                    <div
-                      key={f.label}
-                      onClick={() => setPlayerCount(f.count)}
-                      style={{
-                        flex: 1, background: playerCount === f.count ? "rgba(245,172,59,0.15)" : "rgba(255,255,255,0.02)",
-                        border: playerCount === f.count ? "2px solid #f5ac3b" : "1.5px solid rgba(255,255,255,0.03)",
-                        padding: "20px 10px", borderRadius: "24px", cursor: "pointer", textAlign: 'center', transition: "all 0.2s",
-                      }}
-                    >
-                      <div style={{ fontSize: "1.8rem", marginBottom: '8px' }}>{f.icon}</div>
-                      <div style={{ color: "white", fontWeight: "900", fontSize: "1.1rem" }}>{f.label}</div>
-                      <div style={{ color: playerCount === f.count ? '#f5ac3b' : "rgba(255,255,255,0.3)", fontSize: "0.7rem", fontWeight: '800', textTransform: 'uppercase' }}>{f.sub}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <SectionHeader num="2" label="Modo de Juego" />
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    {GAME_MODES.map(m => (
-                      <button
-                        key={m.id}
-                        onMouseEnter={() => setHoveredInfo(m.desc)}
-                        onMouseLeave={() => setHoveredInfo(null)}
-                        onClick={() => setGameMode(m.id)}
-                        style={{
-                          flex: 1, padding: '18px', borderRadius: '20px',
-                          border: gameMode === m.id ? `2px solid ${m.color}` : '1.5px solid rgba(255,255,255,0.03)',
-                          background: gameMode === m.id ? `${m.color}15` : 'rgba(255,255,255,0.02)',
-                          color: 'white', fontWeight: '800', cursor: 'pointer', transition: 'all 0.2s'
-                        }}
-                      >
-                        <div style={{ fontSize: '1.4rem' }}>{m.icon}</div>
-                        {m.name}
-                      </button>
-                    ))}
-                  </div>
-                  {/* Box for hover info */}
-                  <div style={{
-                    height: '40px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#f5ac3b',
-                    fontSize: '0.85rem',
-                    fontWeight: '700',
-                    background: 'rgba(245, 172, 59, 0.05)',
-                    borderRadius: '12px',
-                    border: '1px dashed rgba(245, 172, 59, 0.2)',
-                    opacity: hoveredInfo ? 1 : 0.3,
-                    transition: 'all 0.3s'
-                  }}>
-                    {hoveredInfo || "Pasa el ratón por las opciones para más info"}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <SectionHeader num="3" label="Cajas del Botín" noMargin />
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  style={{
-                    padding: '8px 12px', borderRadius: '10px', background: 'rgba(255,255,255,0.05)',
-                    border: '1px solid rgba(255,255,255,0.1)', color: 'white', fontSize: '0.8rem', fontWeight: 'bold'
-                  }}
-                >
-                  <option value="price-asc">Precio: Bajo a Alto</option>
-                  <option value="price-desc">Precio: Alto a Bajo</option>
-                  <option value="alpha-asc">Nombre: A-Z</option>
-                  <option value="alpha-desc">Nombre: Z-A</option>
-                </select>
-                <div style={{ display: 'flex', gap: '5px' }}>
-                  {['all', 'económica', 'intermedia', 'premium'].map(cat => (
-                    <button
-                      key={cat}
-                      onClick={() => setFilter(cat)}
-                      style={{
-                        padding: '8px 12px', borderRadius: '10px',
-                        background: filter === cat ? '#f5ac3b15' : 'rgba(255,255,255,0.05)',
-                        border: filter === cat ? '1px solid #f5ac3b' : '1px solid rgba(255,255,255,0.1)',
-                        color: filter === cat ? '#f5ac3b' : 'white',
-                        fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase'
-                      }}
-                    >
-                      {cat}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <div style={boxesGridStyle}>
-              {filteredCases.map((c) => (
-                <BoxCard key={c.id} c={c} qty={selectedBoxes[c.id] || 0} onAdd={handleAddBox} onRemove={handleRemoveBox} />
-              ))}
-            </div>
-
-            <div style={footerStyle}>
-              <div>
-                <div style={costLabelStyle}>Costo de Entrada</div>
-                <div style={{ fontSize: '2.5rem', fontWeight: '900', color: canAfford ? '#f5ac3b' : '#ef4444' }}>{totalCost.toFixed(2)}€</div>
-              </div>
-              <Motion.button
-                whileHover={canAfford ? { scale: 1.05 } : {}}
-                whileTap={canAfford ? { scale: 0.95 } : {}}
-                disabled={!canAfford}
-                onClick={() => setStep('bots')}
-                style={{ ...primaryButtonStyle, background: canAfford ? "#f5ac3b" : "rgba(255,255,255,0.1)" }}
-              >
-                CONTINUAR ➔
-              </Motion.button>
-            </div>
-          </>
-        ) : (
-          <>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-              gap: '20px',
-              marginBottom: '40px',
-              maxHeight: '50vh',
-              overflowY: 'auto',
-              padding: '10px'
-            }}>
-              {Array.from({ length: playerCount - 1 }).map((_, i) => (
-                <div key={i + 1} style={botSlotStyle}>
-                  <div style={{ fontSize: '1rem', fontWeight: '900', color: 'rgba(255,255,255,0.4)', marginBottom: '20px' }}>RIVAL {i + 1}</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {BOT_TEMPLATES.map(b => (
-                      <button
-                        key={b.id}
-                        onClick={() => setBotLevels(prev => ({ ...prev, [i + 1]: b.id }))}
-                        style={{
-                          padding: '20px', borderRadius: '20px', border: botLevels[i + 1] === b.id ? `2px solid ${b.color}` : '1.5px solid rgba(255,255,255,0.03)',
-                          background: botLevels[i + 1] === b.id ? `${b.color}15` : 'rgba(255,255,255,0.02)',
-                          color: 'white', cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s'
-                        }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontWeight: '900', fontSize: '1.1rem' }}>{b.icon} {b.name}</span>
-                          <span style={{ color: b.color, fontWeight: '900', fontSize: '0.8rem' }}>{b.winRate} WIN</span>
-                        </div>
-                        <div style={{ fontSize: '0.7rem', opacity: 0.5, marginTop: '5px' }}>{b.desc}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div style={footerStyle}>
-              <button onClick={() => setStep('config')} style={secondaryButtonStyle}>← VOLVER</button>
-              <div style={{ display: 'flex', gap: '15px' }}>
-                <button
-                  onClick={() => {
-                    const newLevels = {};
-                    for (let i = 1; i < playerCount; i++) newLevels[i] = BOT_TEMPLATES[Math.floor(Math.random() * BOT_TEMPLATES.length)].id;
-                    setBotLevels(newLevels);
-                  }}
-                  style={secondaryButtonStyle}
-                >🎲 AZAR</button>
-                <Motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => {
-                    const levelsArray = [];
-                    for (let i = 1; i < playerCount; i++) levelsArray.push(botLevels[i]);
-                    const allBotsAssigned = levelsArray.every(level => level !== undefined);
-                    if (allBotsAssigned) {
-                      onStart(selectedBoxes, totalCost, levelsArray, gameMode, playerCount);
-                      setStep('config');
-                    } else {
-                      toast.warning('Por favor, asigna un nivel a todos los bots antes de iniciar la batalla.');
-                    }
-                  }}
-                  style={{ ...primaryButtonStyle, background: "#10b981" }}
-                >
-                  ¡A LUCHAR! ⚔️
-                </Motion.button>
-              </div>
-            </div>
-          </>
-        )}
-      </Motion.div>
-    </Motion.div>
-  );
-};
-
-const closeButtonStyle = {
-  position: "absolute", top: "30px", right: "30px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)",
-  color: "white", width: "45px", height: "45px", borderRadius: "50%", cursor: "pointer",
-  transition: 'all 0.2s ease'
-};
-
-const boxesGridStyle = {
-  display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "15px", marginBottom: "40px",
-  background: 'rgba(0,0,0,0.2)', padding: '25px', borderRadius: '30px', border: '1px solid rgba(255,255,255,0.03)'
-};
-
-const footerStyle = {
-  padding: '30px', background: 'rgba(255,255,255,0.02)', borderRadius: '32px', border: '1px solid rgba(255,255,255,0.03)',
-  display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-};
-
-const costLabelStyle = { color: 'rgba(255,255,255,0.3)', fontWeight: '800', fontSize: '0.8rem', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '5px' };
-
-const primaryButtonStyle = {
-  padding: "18px 50px", borderRadius: "18px", border: "none", color: "black", fontWeight: "900", fontSize: "1.1rem", cursor: "pointer",
-  boxShadow: "0 10px 30px rgba(245, 172, 59, 0.3)"
-};
-
-const secondaryButtonStyle = {
-  padding: '15px 30px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)', background: 'transparent',
-  color: 'rgba(255,255,255,0.5)', fontWeight: '900', cursor: 'pointer'
-};
-
-const botSlotStyle = {
-  background: 'rgba(255,255,255,0.01)', padding: '30px', borderRadius: '32px', border: '1px solid rgba(255,255,255,0.05)'
-};
-
-const SectionHeader = ({ num, label, noMargin }) => (
-  <h3
-    style={{
-      color: "white",
-      marginBottom: noMargin ? 0 : "12px",
-      fontSize: "1rem",
-      display: "flex",
-      alignItems: "center",
-      gap: "8px",
-    }}
-  >
-    <span
-      style={{
-        background: "#f5ac3b",
-        color: "black",
-        width: "22px",
-        height: "22px",
-        borderRadius: "50%",
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: "0.75rem",
-        fontWeight: "bold",
-        flexShrink: 0,
-      }}
-    >
-      {num}
-    </span>
-    {label}
-  </h3>
-);
+function getAuthToken() {
+  const directToken = localStorage.getItem("token");
+  if (directToken) return directToken;
+  try {
+    const raw = localStorage.getItem("skinmarket_db_v1");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return parsed?.user?.token || null;
+    }
+  } catch {
+    //
+  }
+  return null;
+}
 
 /* ─────────────────────────────────────────────
    MAIN COMPONENT — Battles
 ───────────────────────────────────────────── */
 export default function Battles() {
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, awardXP } = useAuth();
   const toast = useToast();
   const { skins: allSkins, loading: skinsLoading } = useFetchSkins(1000, false);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalStep, setModalStep] = useState("config"); // 'config' or 'bots'
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   // Persistent selector state
   const [selectedBoxes, setSelectedBoxes] = useState({});
@@ -707,11 +49,32 @@ export default function Battles() {
   const [playerCount, setPlayerCount] = useState(2);
   const [botLevels, setBotLevels] = useState({ 1: "normal", 2: "normal", 3: "normal", 4: "normal" });
 
+  // Private battles + loan
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [loanPercent, setLoanPercent] = useState(0);
+  const [inviteCode, setInviteCode] = useState(null);
+
   const [battleState, setBattleState] = useState(null);
   const [lastBattleConfig, setLastBattleConfig] = useState(null);
   const [animState, setAnimState] = useState({ visibleRounds: 0, hasCompleted: false });
   const [activeReels, setActiveReels] = useState({});
   const [showProvablyFair, setShowProvablyFair] = useState(false);
+
+  // If user arrives via invite link (?invite=CODE), open the modal in private mode
+  useEffect(() => {
+    const invite = searchParams.get("invite");
+    if (invite) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsPrivate(true);
+      setInviteCode(invite);
+      setModalOpen(true);
+      setModalStep("config");
+      toast.info(`Te has unido a la batalla privada #${invite}. Configura tu entrada para unirte.`);
+      // Clean the URL param so refresh doesn't re-trigger
+      navigate("/battles", { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const allCases = useMemo(() => generateAllCases().filter(c => c.category !== "daily"), []);
 
@@ -755,7 +118,7 @@ export default function Battles() {
 
       // Sort skins by price to find the jackpot (last item)
       const sortedSkins = [...validSkins].sort((a, b) => parseFloat(a.price) - parseFloat(b.price));
-      const jackpot = sortedSkins[sortedSkins.length - 1];
+      const jackpot = sortedSkins[sortedSkins.length - 1] || sortedSkins[0];
 
       // Determine difficulty from bot level
       const difficulty = getBotDifficulty(botLevel);
@@ -779,7 +142,7 @@ export default function Battles() {
             id: `${jackpot.id}-${Date.now()}-${Math.random()}`,
             name: jackpot.name,
             image: jackpot.image,
-            price: parseFloat(parseFloat(jackpot.price).toFixed(2)),
+            price: parseFloat(parseFloat(jackpot?.price || 0).toFixed(2)),
             rarity: jackpot.rarity,
           };
         }
@@ -826,6 +189,54 @@ export default function Battles() {
       setModalOpen(false);
       setActiveReels({});
       setLastBattleConfig({ selectedBoxes, totalCost, botLevelsArray, gameMode, playerCount });
+
+      // ─── PRIVATE BATTLE: Wire to backend create/join endpoints ───
+      if (isPrivate && inviteCode) {
+        const token = getAuthToken();
+        const caseIds = Object.entries(selectedBoxes).flatMap(([id, qty]) =>
+          Array.from({ length: qty }, () => id)
+        );
+        const loanMultiplier = loanPercent / 100;
+        const opponentCount = Math.max(0, playerCount - 1);
+        const loanCost = loanPercent > 0 ? totalCost * opponentCount * loanMultiplier : 0;
+        const totalToPay = totalCost + loanCost;
+
+        if (token) {
+          // Try backend first
+          fetch(`${API_BASE}/api/battles/create`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({
+              gameMode,
+              playerCount,
+              totalCost,
+              loanPercent,
+              caseIds,
+              inviteCode,
+              ownerName: user?.nombre_usuario || "Jugador"
+            })
+          })
+            .then(res => res.json())
+            .then(data => {
+              if (data.success) {
+                toast.success(data.message || `✅ Batalla privada #${data.code} creada.`);
+                if (data.expGain) awardXP(data.expGain);
+              } else {
+                toast.error(data.error || "Error al crear la batalla privada.");
+              }
+            })
+            .catch(() => {
+              // Local fallback: award XP locally
+              awardXP(StorageService.xpForSpend(totalToPay));
+            });
+        } else {
+          // Local fallback: award XP locally
+          awardXP(StorageService.xpForSpend(totalToPay));
+        }
+      } else {
+        // Non-private battle: award XP locally (1€ = 100 XP)
+        awardXP(StorageService.xpForSpend(totalCost));
+      }
 
       // Construir lista de cajas en orden
       const boxesToOpen = [];
@@ -978,7 +389,7 @@ export default function Battles() {
 
       setAnimState({ visibleRounds: 0, hasCompleted: false });
     },
-    [allCases, getBotDifficulty, getSkinsForCase, openBoxRandomly, updateUser]
+    [allCases, getBotDifficulty, getSkinsForCase, openBoxRandomly, updateUser, isPrivate, inviteCode, loanPercent, awardXP, toast, user]
   );
 
   // Otorgar loot al terminar + sound effects
@@ -1667,7 +1078,7 @@ export default function Battles() {
                           {battleState.players.map((p) => {
                             const skin = p.results[idx];
                             if (!skin) return <div key={p.id} />;
-                            const rc = getRarityColor(skin.rarity);
+                const rc = getRarityColor(skin.rarity);
                             return (
                               <div
                                 key={p.id}
@@ -1722,7 +1133,7 @@ export default function Battles() {
                                     {skin.name}
                                   </div>
                                   <div style={{ color: "#f5ac3b", fontWeight: 800, fontSize: "0.95rem", marginTop: "2px" }}>
-                                    €{skin.price.toFixed(2)}
+                                    €{Number(skin?.price || 0).toFixed(2)}
                                   </div>
                                 </div>
                               </div>
@@ -1789,6 +1200,12 @@ export default function Battles() {
         botLevels={botLevels}
         setBotLevels={setBotLevels}
         toast={toast}
+        isPrivate={isPrivate}
+        setIsPrivate={setIsPrivate}
+        loanPercent={loanPercent}
+        setLoanPercent={setLoanPercent}
+        inviteCode={inviteCode}
+        setInviteCode={setInviteCode}
       />
     </div>
   );

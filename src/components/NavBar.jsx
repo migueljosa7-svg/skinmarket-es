@@ -7,9 +7,10 @@
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import { useState } from "react";
-import { FaTrophy, FaShoppingBag, FaUser, FaSignOutAlt, FaPlus, FaBars, FaTimes, FaVolumeUp, FaVolumeMute } from "react-icons/fa";
-import { GiTwoCoins } from "react-icons/gi";
+import { FaTrophy, FaShoppingBag, FaUser, FaSignOutAlt, FaPlus, FaBars, FaTimes, FaVolumeUp, FaVolumeMute, FaRocket } from "react-icons/fa";
+import { GiTwoCoins, GiLevelFour } from "react-icons/gi";
 import RechargeModal from "./RechargeModal";
+import LevelProgressBar from "./LevelProgressBar";
 import { sound } from "../utils/audio";
 
 const NAV_ITEMS = [
@@ -17,6 +18,7 @@ const NAV_ITEMS = [
   { to: "/upgrade", label: "UPGRADE" },
   { to: "/contracts", label: "CONTRATOS" },
   { to: "/battles", label: "BATALLAS" },
+  { to: "/airdrop", label: "AIRDROP" },
   { to: "/ranking", label: "RANKING" },
 ];
 
@@ -293,6 +295,34 @@ export default function Navbar() {
         <div className="sm-desktop-icons" style={rightSectionStyle}>
           {user ? (
             <>
+              {/* Level Badge + XP Bar */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  flexShrink: 0,
+                  padding: "4px 10px",
+                  background: "rgba(245,172,59,0.06)",
+                  borderRadius: "12px",
+                  border: "1px solid rgba(245,172,59,0.12)"
+                }}
+              >
+                <GiLevelFour style={{ color: "#f5ac3b", fontSize: "0.9rem", flexShrink: 0 }} />
+                <div style={{ textAlign: "left", minWidth: "0" }}>
+                  <div style={{ fontSize: "0.6rem", fontWeight: 900, color: "#f5ac3b", lineHeight: 1, marginBottom: "2px", letterSpacing: "0.5px" }}>
+                    NIVEL {user?.nivel ?? user?.level ?? 0}
+                  </div>
+                  <LevelProgressBar
+                    experiencia={user?.experiencia || 0}
+                    nivel={user?.nivel || user?.level || 0}
+                    showLabel={false}
+                    compact={true}
+                    width="80px"
+                  />
+                </div>
+              </div>
+
               {/* Balance & Recharge */}
               <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
                 <div className="sm-balance" style={balanceBoxStyle}>

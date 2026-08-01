@@ -299,6 +299,18 @@ export function AuthProvider({ children }) {
     return newBal !== false;
   }, []);
 
+  /**
+   * Award XP to the current user. Locally persists via StorageService.
+   * Backend awards XP server-side on /api/cases/open and /api/battles/*,
+   * but this helper keeps the local UI in sync for guest/local sessions.
+   * Rule: 1€ spent = 100 XP.
+   * @param {number} xpAmount - XP to add
+   * @returns {number} New total XP
+   */
+  const awardXP = useCallback((xpAmount) => {
+    return StorageService.awardXP(xpAmount);
+  }, []);
+
   const claimDaily = useCallback(async () => {
     const token = localStorage.getItem("token");
     if (!token) {
@@ -400,6 +412,7 @@ export function AuthProvider({ children }) {
         depositSkins,
         updateProfile,
         addToBalance,
+        awardXP,
         fetchInventory,
         claimDaily,
         recoverPassword,
