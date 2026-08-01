@@ -251,6 +251,23 @@ const __dirname = path.dirname(__filename);
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3001';
 
+// ─── In-memory fallback for auth (used when DB is unavailable) ─────────
+let IN_MEMORY_USERS = new Map(); // key: email -> user object
+let IN_MEMORY_USERS_BY_ID = new Map(); // key: usuario_id -> user
+let IN_MEMORY_INVENTORY = new Map(); // key: userId -> array of items
+let IN_MEMORY_NEXT_ID = 1000000;
+let DB_AVAILABLE = true;
+(async function verifyDb() {
+  try {
+    // quick test query
+    await db.query('SELECT 1');
+    log(LOG_LEVELS.INFO, 'DB', 'Database connectivity OK');
+  } catch (err) {
+    DB_AVAILABLE = false;
+    log(LOG_LEVELS.WARN, 'DB', 'Database unavailable - enabling in-memory fallback', err?.message || err);
+  }
+})();
+
 // [ON-DEMAND] Bot NO se conecta al arrancar. Solo se conecta cuando 
 // un usuario solicita un retiro (withdraw). No hay polling a Steam.
 if (process.env.BOT_USERNAME && process.env.BOT_USERNAME !== 'tu_usuario_steam') {
@@ -266,6 +283,7 @@ if (process.env.BOT_USERNAME && process.env.BOT_USERNAME !== 'tu_usuario_steam')
   });
 }
 
+<<<<<<< HEAD
 // Inicializar Passport
 app.use(passport.initialize());
 app.use(passport.session());
@@ -282,6 +300,22 @@ if (process.env.STEAM_API_KEY) {
       returnURL: steamReturnURL,
       realm: steamRealm,
       apiKey: process.env.STEAM_API_KEY
+=======
+// Steam Strategy — configurada ANTES de las rutas Steam
+let steamStrategyConfigured = false;
+const steamApiKey = process.env.STEAM_API_KEY;
+const steamReturnURL = process.env.STEAM_RETURN_URL || `${BACKEND_URL.replace(/\/+$/, '')}/api/auth/steam/return`;
+const steamRealm = process.env.STEAM_REALM || `${BACKEND_URL.replace(/\/+$/, '')}/`;
+
+if (!steamApiKey) {
+  log(LOG_LEVELS.WARN, 'AUTH', 'STEAM_API_KEY no configurada. Steam auth deshabilitado.');
+} else {
+  try {
+    passport.use(new SteamStrategy({
+      returnURL: steamReturnURL,
+      realm: steamRealm,
+      apiKey: steamApiKey
+>>>>>>> 7617dd94fbdbb3144495d8461be1583c8fddcacd
     }, async (identifier, profile, done) => {
       try {
         const steamId = profile.id;
@@ -308,8 +342,11 @@ if (process.env.STEAM_API_KEY) {
   } catch (err) {
     log(LOG_LEVELS.ERROR, 'AUTH', 'Error al configurar Steam Strategy:', err);
   }
+<<<<<<< HEAD
 } else {
   log(LOG_LEVELS.WARN, 'AUTH', 'STEAM_API_KEY no configurada. Autenticación Steam deshabilitada.');
+=======
+>>>>>>> 7617dd94fbdbb3144495d8461be1583c8fddcacd
 }
 
 // ─── GOOGLE OAUTH CLIENT ────────────────────────────
@@ -749,6 +786,44 @@ app.post("/api/register", loginLimiter, async (req, res) => {
   }
 
   try {
+    if (!DB_AVAILABLE) {
+      // In-memory fallback registration (development / degraded mode)
+      const cleanUsername = sanitizeInput(nombre_usuario);
+      const cleanEmail = sanitizeInput(email);
+      if (!cleanUsername || !cleanEmail || !password) {
+        return res.status(400).json({ error: "Todos los campos son obligatorios" });
+      }
+      if (!isValidUsername(cleanUsername)) {
+        return res.status(400).json({ error: "El nombre de usuario debe tener entre 3 y 30 caracteres alfanuméricos" });
+      }
+      if (!isValidEmail(cleanEmail)) {
+        return res.status(400).json({ error: "Email inválido" });
+      }
+      const pwdCheck = validatePassword(password);
+      if (!pwdCheck.valid) return res.status(400).json({ error: pwdCheck.error });
+      // Unique check
+      if (IN_MEMORY_USERS.has(cleanEmail) || Array.from(IN_MEMORY_USERS.values()).find(u => u.nombre_usuario === cleanUsername)) {
+        return res.status(409).json({ error: "El nombre de usuario o email ya está registrado." });
+      }
+      const hashedPassword = await bcrypt.hash(password, 12);
+      const newId = IN_MEMORY_NEXT_ID++;
+      const user = {
+        usuario_id: newId,
+        nombre_usuario: cleanUsername,
+        email: cleanEmail,
+        password_hash: hashedPassword,
+        saldo: 0,
+        nivel: 0,
+        experiencia: 0,
+        avatar: null
+      };
+      IN_MEMORY_USERS.set(cleanEmail, user);
+      IN_MEMORY_USERS_BY_ID.set(newId, user);
+      IN_MEMORY_INVENTORY.set(newId, []);
+      const token = jwt.sign({ id: user.usuario_id, email: user.email }, JWT_SECRET, { expiresIn: '8h' });
+      log(LOG_LEVELS.INFO, 'AUTH', 'REGISTER_FALLBACK', { email: cleanEmail });
+      return res.status(201).json({ success: true, user: { usuario_id: user.usuario_id, nombre_usuario: user.nombre_usuario, email: user.email, saldo: user.saldo, nivel: user.nivel, experiencia: user.experiencia }, token });
+    }
     // Check if db is available before querying
     if (!db || typeof db.query !== 'function') {
       log(LOG_LEVELS.ERROR, 'REGISTER', 'Base de datos no disponible');
@@ -826,6 +901,17 @@ app.post("/api/login", loginLimiter, async (req, res) => {
   }
 
   try {
+    if (!DB_AVAILABLE) {
+      const cleanEmail = sanitizeInput(email);
+      if (!cleanEmail || !password) return res.status(400).json({ error: "Email y contraseña son obligatorios" });
+      const user = IN_MEMORY_USERS.get(cleanEmail);
+      if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+        return res.status(401).json({ error: "Credenciales inválidas" });
+      }
+      const token = jwt.sign({ id: user.usuario_id, email: user.email }, JWT_SECRET, { expiresIn: '8h' });
+      log(LOG_LEVELS.INFO, 'AUTH', 'LOGIN_FALLBACK', { email: cleanEmail });
+      return res.json({ user: { usuario_id: user.usuario_id, nombre_usuario: user.nombre_usuario, email: user.email, saldo: user.saldo, nivel: user.nivel, experiencia: user.experiencia }, token });
+    }
     const result = await db.query("SELECT * FROM usuarios WHERE email = $1", [cleanEmail]);
     const user = result.rows[0];
     if (!user || !(await bcrypt.compare(password, user.password_hash))) {
@@ -871,6 +957,16 @@ function getDailyCaseForLevel(level) {
 // ─── GET USER /api/me ────────────────────
 app.get("/api/me", authenticateToken, async (req, res) => {
   try {
+    if (!DB_AVAILABLE) {
+      const user = IN_MEMORY_USERS_BY_ID.get(req.user.id);
+      if (!user) return res.status(404).json({ error: "Usuario no encontrado (fallback)" });
+      const inventory = IN_MEMORY_INVENTORY.get(user.usuario_id) || [];
+      user.inventory = inventory;
+      user.level = user.nivel || 0;
+      user.totalDepositado = 0;
+      user.dailyCaseId = getDailyCaseForLevel(user.level);
+      return res.json(user);
+    }
     const userResult = await db.query(
       "SELECT usuario_id, nombre_usuario, email, saldo, nivel, experiencia, link_intercambio, steam_id, trade_token, ultimo_reclamo_diario, avatar FROM usuarios WHERE usuario_id = $1",
       [req.user.id]
@@ -1253,6 +1349,7 @@ app.post("/api/cases/open", authenticateToken, caseOpenLimiter, async (req, res)
 
     // Atomic balance check + deduction in a single transaction
     let userBalance;
+<<<<<<< HEAD
     await db.withTransaction(async (client) => {
       const userResult = await client.query(
         "SELECT saldo FROM usuarios WHERE usuario_id = $1 FOR UPDATE",
@@ -1267,6 +1364,32 @@ app.post("/api/cases/open", authenticateToken, caseOpenLimiter, async (req, res)
         [totalCost, req.user.id]
       );
     });
+=======
+    if (!DB_AVAILABLE) {
+      // In-memory balance check/deduction
+      const memUser = IN_MEMORY_USERS_BY_ID.get(req.user.id);
+      if (!memUser) return res.status(404).json({ error: 'Usuario no encontrado (fallback)' });
+      if ((memUser.saldo || 0) < totalCost) return res.status(400).json({ error: 'INSUFFICIENT_BALANCE' });
+      memUser.saldo = Number((memUser.saldo || 0) - totalCost);
+      memUser.experiencia = (memUser.experiencia || 0) + Math.floor(totalCost * 100);
+      userBalance = memUser.saldo;
+    } else {
+      await db.withTransaction(async (client) => {
+        const userResult = await client.query(
+          "SELECT saldo FROM usuarios WHERE usuario_id = $1 FOR UPDATE",
+          [req.user.id]
+        );
+        if (!userResult.rows[0] || userResult.rows[0].saldo < totalCost) {
+          throw new Error('INSUFFICIENT_BALANCE');
+        }
+        userBalance = userResult.rows[0].saldo;
+        await client.query(
+          "UPDATE usuarios SET saldo = saldo - $1, experiencia = experiencia + $2 WHERE usuario_id = $3",
+          [totalCost, Math.floor(totalCost * 100), req.user.id]
+        );
+      });
+    }
+>>>>>>> 7617dd94fbdbb3144495d8461be1583c8fddcacd
 
     // Import case configuration for realistic skins
     const { CASE_PROBABILITIES, SKIN_CATALOGS } = await import("../constants/cases.js");
@@ -1327,18 +1450,39 @@ app.post("/api/cases/open", authenticateToken, caseOpenLimiter, async (req, res)
       const nonce = Date.now() + i;
       const provablyFairHash = crypto.createHash('sha256').update(`${serverSeed}:${clientSeed}:${nonce}:${itemName}`).digest('hex');
 
-      const insertResult = await db.query(
-        `INSERT INTO inventario (usuario_id, name, price, image, rarity, marketable, wear, weapon, skin_name, market_hash_name, icon_url, provably_fair_hash, server_seed, client_seed, nonce, status)
+      if (!DB_AVAILABLE) {
+        const newItem = {
+          id: IN_MEMORY_NEXT_ID++,
+          name: itemName,
+          price: itemPrice,
+          image: imageHD,
+          rarity,
+          marketable: true,
+          status: 'on_site',
+          provably_fair_hash: provablyFairHash
+        };
+        const inv = IN_MEMORY_INVENTORY.get(req.user.id) || [];
+        inv.push(newItem);
+        IN_MEMORY_INVENTORY.set(req.user.id, inv);
+        results.push(newItem);
+      } else {
+        const insertResult = await db.query(
+          `INSERT INTO inventario (usuario_id, name, price, image, rarity, marketable, wear, weapon, skin_name, market_hash_name, icon_url, provably_fair_hash, server_seed, client_seed, nonce, status)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'on_site')
          RETURNING item_id as id, name, price, image, rarity, marketable, status`,
-        [req.user.id, itemName, itemPrice, imageHD,
-          rarity, true, randomWear, weapon, skinName, itemName, iconHash, provablyFairHash, serverSeed, clientSeed, nonce]
-      );
-      results.push(insertResult.rows[0]);
+          [req.user.id, itemName, itemPrice, imageHD,
+            rarity, true, randomWear, weapon, skinName, itemName, iconHash, provablyFairHash, serverSeed, clientSeed, nonce]
+        );
+        results.push(insertResult.rows[0]);
+      }
     }
 
-    await recordTransaction(req.user.id, 'apertura_caja', totalCost, 'saldo_sitio', `Apertura de ${qty}x ${caseId}${jokerMode ? ' (Joker Mode)' : ''}`);
-    await logAction(req.user.id, 'ABRIR_CAJA', { caseId, quantity: qty, jokerMode, winnings: results.map(r => r.name), provablyFairHashes: results.map(r => r.provably_fair_hash) });
+    if (DB_AVAILABLE) {
+      await recordTransaction(req.user.id, 'apertura_caja', totalCost, 'saldo_sitio', `Apertura de ${qty}x ${caseId}${jokerMode ? ' (Joker Mode)' : ''}`);
+      await logAction(req.user.id, 'ABRIR_CAJA', { caseId, quantity: qty, jokerMode, winnings: results.map(r => r.name), provablyFairHashes: results.map(r => r.provably_fair_hash) });
+    } else {
+      log(LOG_LEVELS.INFO, 'CAJA', 'ABRIR_CAJA_FALLBACK', { user: req.user.id, caseId, quantity: qty, jokerMode, winnings: results.map(r => r.name) });
+    }
 
     res.json({ success: true, items: results, newBalance: userBalance - totalCost });
   } catch {

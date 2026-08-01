@@ -1,0 +1,4709 @@
+============================================================================== 
+RUTA: src\backend\server.js 
+============================================================================== 
+import express from "express";
+import cors from "cors";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import db from "./db.js";
+import botEngine from "./steam/botEngine.js";
+import dotenv from "dotenv";
+import session from "express-session";
+import { createClient } from "redis";
+import { RedisStore } from "connect-redis";
+import helmet from "helmet";
+import hpp from "hpp";
+import rateLimit from "express-rate-limit";
+import passport from "passport";
+import { Strategy as SteamStrategy } from "@dessly/passport-steam";
+import { OAuth2Client } from "google-auth-library";
+import { Server as SocketIOServer } from "socket.io";
+import path from "path";
+import { fileURLToPath } from "url";
+import cron from "node-cron";
+import { createCharge, handleWebhook, getPaymentStatus } from "./controllers/paymentController.js";
+import p2pMarketService from "./services/p2pMarketService.js";
+import fs from "fs";
+import crypto from "crypto";
+import PriceEngine from "./services/PriceEngine.js";
+
+dotenv.config();
+
+// ─────────────────────────────────────────────────
+// LOGGING SYSTEM (MUST BE FIRST - BEFORE ANY USAGE)
+// ─────────────────────────────────────────────────
+
+const LOG_LEVELS = { INFO: 'INFO', WARN: 'WARN', ERROR: 'ERROR', DEBUG: 'DEBUG' };
+
+// ─── CDN IMAGE HELPER ────────────────────────────────
+// Generate a deterministic Steam economy image hash from a skin name.
+function generateIconUrlHash(skinName, seed) {
+  const baseChars = '-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw';
+  const input = `${skinName}_${seed || Date.now()}_${skinName.length}_${skinName.charCodeAt(0) || 65}`;
+  let hash = '';
+  for (let i = 0; i < input.length; i++) {
+    const idx = (input.charCodeAt(i) + i * 7) % baseChars.length;
+    hash += baseChars[idx];
+  }
+  while (hash.length < 180) {
+    const idx = (hash.length * 13 + skinName.charCodeAt(hash.length % skinName.length)) % baseChars.length;
+    hash += baseChars[idx];
+  }
+  return hash;
+}
+
+function buildAkamaiImageUrl(iconUrlHash) {
+  if (!iconUrlHash) return '';
+  return `https://steamcommunity-a.akamaihd.net/economy/image/${iconUrlHash}/360fx360f`;
+}
+
+function log(level, module, message, data = null) {
+  if (process.env.NODE_ENV === 'production' && level !== LOG_LEVELS.ERROR) return;
+  const timestamp = new Date().toISOString();
+  const prefix = `[${timestamp}] [${level}] [${module}]`;
+  const method = level === 'ERROR' ? console.error : level === 'WARN' ? console.warn : console.log;
+  method(`${prefix} ${message}`, data || '');
+}
+
+log(LOG_LEVELS.INFO, 'SYSTEM', 'Iniciando servidor...');
+
+// ─────────────────────────────────────────────────
+// ENVIRONMENT VALIDATION (AFTER LOGGER IS READY)
+// ─────────────────────────────────────────────────
+
+const requiredEnvVars = {
+  'STEAM_API_KEY': 'Steam Web API Key',
+  'DATABASE_URL': 'PostgreSQL Database URL',
+  'JWT_SECRET': 'JWT Secret Key',
+  'BOT_USERNAME': 'Bot Steam Username',
+  'BOT_PASSWORD': 'Bot Steam Password',
+  'BOT_SHARED_SECRET': 'Bot 2FA Shared Secret',
+  'BOT_IDENTITY_SECRET': 'Bot Identity Secret (for confirmations)',
+  'REDIS_URL': 'Redis URL (optional but recommended)',
+  'BACKEND_URL': 'Backend URL',
+  'FRONTEND_URL': 'Frontend URL'
+};
+
+const missingEnvVars = [];
+for (const [key, description] of Object.entries(requiredEnvVars)) {
+  if (!process.env[key] && key !== 'REDIS_URL') {
+    missingEnvVars.push(`${key} (${description})`);
+  }
+}
+
+if (missingEnvVars.length > 0) {
+  log(LOG_LEVELS.ERROR, 'SYSTEM', '╔════════════════════════════════════════════════════════════╗');
+  log(LOG_LEVELS.ERROR, 'SYSTEM', '║  VARIABLES DE ENTORNO CRÍTICAS FALTANTES                  ║');
+  log(LOG_LEVELS.ERROR, 'SYSTEM', '╚════════════════════════════════════════════════════════════╝');
+  missingEnvVars.forEach((missing, index) => {
+    log(LOG_LEVELS.ERROR, 'SYSTEM', `  ${index + 1}. ${missing}`);
+  });
+  log(LOG_LEVELS.ERROR, 'SYSTEM', '  El servidor continuará, pero algunas funciones pueden fallar.');
+  log(LOG_LEVELS.ERROR, 'SYSTEM', '  Configura estas variables en Render o en tu archivo .env');
+} else {
+  log(LOG_LEVELS.INFO, 'SYSTEM', '✅ Todas las variables de entorno críticas están configuradas');
+}
+
+
+const app = express();
+const PORT = process.env.PORT || 3001;
+const JWT_SECRET = process.env.JWT_SECRET;
+
+// ─── Session Store ──────
+const sessionStore = (() => {
+  let store;
+  const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
+
+  try {
+    const redisClient = createClient({ url: redisUrl });
+    redisClient.connect().catch(err => log(LOG_LEVELS.WARN, 'SESSION', 'Redis no disponible, usando MemoryStore', err.message));
+    store = new RedisStore({ client: redisClient });
+    log(LOG_LEVELS.INFO, 'SESSION', 'Usando RedisStore');
+    return store;
+  } catch {
+    log(LOG_LEVELS.WARN, 'SESSION', 'Fallback a MemoryStore (Redis no disponible)');
+  }
+
+  const MemoryStore = session.MemoryStore || (session.Store && session.Store);
+  if (MemoryStore) {
+    store = new session.MemoryStore();
+  } else {
+    const simpleStore = new Map();
+    store = {
+      get: (sid, cb) => { cb(null, simpleStore.get(sid) || null); },
+      set: (sid, session, cb) => { simpleStore.set(sid, session); cb(null); },
+      destroy: (sid, cb) => { simpleStore.delete(sid); cb(null); },
+    };
+  }
+  return store;
+})();
+
+// Middlewares de Seguridad
+app.use(helmet());
+app.use(hpp());
+
+const allowedOrigins = [
+  "https://skinmarket-frontend.onrender.com",
+  "http://localhost:5173",
+  process.env.FRONTEND_URL
+].filter(Boolean);
+
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+}));
+app.use(express.json());
+
+// Trust proxy — needed for correct IP detection behind Render/Nginx
+app.set('trust proxy', true);
+
+// Rate Limiting - General
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+  keyGenerator: (req) => {
+    return req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+  },
+  validate: { keyGeneratorIpFallback: false },
+  handler: (req, res) => {
+    console.error('[EXPRESS RATE LIMIT EXCEEDED] General - IP:', req.ip, 'URL:', req.originalUrl);
+    res.status(429).json({ error: "Demasiadas peticiones desde esta IP, por favor intenta de nuevo más tarde.", code: "RATE_LIMIT_GENERAL" });
+  }
+});
+app.use("/api/", limiter);
+
+const withdrawLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  keyGenerator: (req) => req.user?.id || req.ip || 'unknown',
+  validate: { keyGeneratorIpFallback: false },
+  handler: (req, res) => res.status(429).json({ error: "Límite de retiros excedido. Intenta de nuevo en 1 minuto.", code: "RATE_LIMIT_WITHDRAW" })
+});
+
+// depositLimiter - disponible para uso futuro
+const _depositLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  keyGenerator: (req) => req.user?.id || req.ip || 'unknown',
+  validate: { keyGeneratorIpFallback: false },
+  handler: (req, res) => res.status(429).json({ error: "Límite de depósitos excedido. Intenta de nuevo en 1 minuto.", code: "RATE_LIMIT_DEPOSIT" })
+});
+
+const caseOpenLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  keyGenerator: (req) => req.user?.id || req.ip || 'unknown',
+  validate: { keyGeneratorIpFallback: false },
+  handler: (req, res) => res.status(429).json({ error: "Límite de aperturas excedido. Intenta de nuevo en 1 minuto.", code: "RATE_LIMIT_CASE_OPEN" })
+});
+
+const dailyCaseLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  keyGenerator: (req) => req.user?.id || req.ip || 'unknown',
+  validate: { keyGeneratorIpFallback: false },
+  handler: (req, res) => res.status(429).json({ error: "Límite de reclamos excedido.", code: "RATE_LIMIT_DAILY" })
+});
+
+const inspectorLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  keyGenerator: (req) => req.user?.id || req.ip || 'unknown',
+  validate: { keyGeneratorIpFallback: false },
+  handler: (req, res) => {
+    console.error('[EXPRESS RATE LIMIT EXCEEDED] Inspector - IP:', req.ip, 'URL:', req.originalUrl);
+    res.status(429).json({ error: "Límite de consultas excedido.", code: "RATE_LIMIT_INSPECTOR" });
+  }
+});
+
+// ─── LOGIN & REGISTER RATE LIMITERS ──────────────────
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  keyGenerator: (req) => req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+  validate: { keyGeneratorIpFallback: false },
+  handler: (req, res) => res.status(429).json({ error: "Demasiados intentos de inicio de sesión. Intenta de nuevo en 15 minutos.", code: "RATE_LIMIT_LOGIN" })
+});
+
+// registerLimiter - disponible para uso futuro
+const _registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  keyGenerator: (req) => req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+  validate: { keyGeneratorIpFallback: false },
+  handler: (req, res) => res.status(429).json({ error: "Demasiados intentos de registro. Intenta de nuevo en 1 hora.", code: "RATE_LIMIT_REGISTER" })
+});
+
+// Configurar Sesiones (usar SESSION_SECRET con fallback seguro)
+app.use(session({
+  store: sessionStore,
+  secret: process.env.SESSION_SECRET || 'skinmarket_super_secret_key_998877665544',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === "production",
+    httpOnly: true,
+    sameSite: process.env.NODE_ENV === "production" ? "lax" : "lax",
+    maxAge: 24 * 60 * 60 * 1000
+  }
+}));
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3001';
+
+// ─── In-memory fallback for auth (used when DB is unavailable) ─────────
+let IN_MEMORY_USERS = new Map(); // key: email -> user object
+let IN_MEMORY_USERS_BY_ID = new Map(); // key: usuario_id -> user
+let IN_MEMORY_INVENTORY = new Map(); // key: userId -> array of items
+let IN_MEMORY_NEXT_ID = 1000000;
+let DB_AVAILABLE = true;
+(async function verifyDb() {
+  try {
+    // quick test query
+    await db.query('SELECT 1');
+    log(LOG_LEVELS.INFO, 'DB', 'Database connectivity OK');
+  } catch (err) {
+    DB_AVAILABLE = false;
+    log(LOG_LEVELS.WARN, 'DB', 'Database unavailable - enabling in-memory fallback', err?.message || err);
+  }
+})();
+
+// [ON-DEMAND] Bot NO se conecta al arrancar. Solo se conecta cuando 
+// un usuario solicita un retiro (withdraw). No hay polling a Steam.
+// ─── PASSPORT INIT (must be BEFORE any /api/auth/steam routes) ──────
+app.use(passport.initialize());
+app.use(passport.session());
+
+passport.serializeUser((user, done) => done(null, user));
+passport.deserializeUser((obj, done) => done(null, obj));
+
+if (process.env.BOT_USERNAME && process.env.BOT_USERNAME !== 'tu_usuario_steam') {
+  // NO llamar a botEngine.logIn() aquí - solo registrar endpoint de estado
+  app.get("/api/bot/status", (req, res) => {
+    const status = botEngine.getStatus();
+    res.json(status);
+  });
+} else {
+  log(LOG_LEVELS.INFO, 'BOT', 'Bot no configurado. Iniciando en modo espera.');
+  app.get("/api/bot/status", (req, res) => {
+    res.json({ status: "ok", bot: "not_configured", message: "Bot no configurado - requiere credenciales Steam" });
+  });
+}
+
+// Steam Strategy — configurada ANTES de las rutas Steam
+let steamStrategyConfigured = false;
+const steamApiKey = process.env.STEAM_API_KEY;
+const steamReturnURL = process.env.STEAM_RETURN_URL || `${BACKEND_URL.replace(/\/+$/, '')}/api/auth/steam/return`;
+const steamRealm = process.env.STEAM_REALM || `${BACKEND_URL.replace(/\/+$/, '')}/`;
+
+if (!steamApiKey) {
+  log(LOG_LEVELS.WARN, 'AUTH', 'STEAM_API_KEY no configurada. Steam auth deshabilitado.');
+} else {
+  try {
+    passport.use(new SteamStrategy({
+      returnURL: steamReturnURL,
+      realm: steamRealm,
+      apiKey: steamApiKey
+    }, async (identifier, profile, done) => {
+      try {
+        const steamId = profile.id;
+        const nombre = profile.displayName;
+        // Extract Steam avatar from profile photos (full-size)
+        const steamAvatar = profile.photos?.[0]?.value || profile._json?.avatarfull || null;
+        let result = await db.query("SELECT * FROM usuarios WHERE steam_id = $1", [steamId]);
+        if (result.rows.length === 0) {
+          result = await db.query(
+            "INSERT INTO usuarios (nombre_usuario, email, password_hash, steam_id, avatar, nivel, experiencia) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *",
+            [nombre, `${steamId}@steam.auth`, 'steam_no_password', steamId, steamAvatar, 0, 0]
+          );
+        } else {
+          // Update avatar on subsequent logins
+          await db.query(
+            "UPDATE usuarios SET avatar = COALESCE(NULLIF($1, ''), avatar) WHERE usuario_id = $2",
+            [steamAvatar, result.rows[0].usuario_id]
+          );
+        }
+        return done(null, result.rows[0]);
+      } catch (err) { return done(err); }
+    }));
+    steamStrategyConfigured = true;
+    log(LOG_LEVELS.INFO, 'AUTH', 'Steam Strategy configurada correctamente');
+  } catch (err) {
+    log(LOG_LEVELS.ERROR, 'AUTH', 'Error al configurar Steam Strategy:', err);
+  }
+}
+
+// ─── GOOGLE OAUTH CLIENT ────────────────────────────
+// Initialize Google OAuth2 client for verifying Google ID tokens server-side.
+// Requires GOOGLE_CLIENT_ID and optionally GOOGLE_CLIENT_SECRET env vars.
+const googleClientId = process.env.GOOGLE_CLIENT_ID;
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+const googleClient = googleClientId
+  ? new OAuth2Client(googleClientId, googleClientSecret)
+  : null;
+
+if (googleClient) {
+  log(LOG_LEVELS.INFO, 'AUTH', 'Google OAuth2 client configurado correctamente');
+} else {
+  log(LOG_LEVELS.WARN, 'AUTH', 'GOOGLE_CLIENT_ID no configurada. Autenticación Google deshabilitada.');
+}
+
+// ─── IS ADMIN MIDDLEWARE (DEFINED FIRST - HOISTED VIA FUNCTION DECLARATION) ──
+// IMPORTANT: Must be defined BEFORE any endpoint that uses it (like /api/update-balance)
+async function isAdmin(req, res, next) {
+  try {
+    const result = await db.query("SELECT role FROM usuarios WHERE usuario_id = $1", [req.user.id]);
+    if (result.rows[0]?.role === 'admin') next();
+    else res.status(403).json({ error: "Acceso denegado: Se requiere rol de administrador" });
+  } catch {
+    res.status(500).json({ error: "Error al verificar permisos" });
+  }
+}
+
+// ─── SECURITY HELPERS (PASO 3) ──────────────────────
+
+/**
+ * Sanitize a string input to prevent XSS and injection attacks.
+ * Removes HTML tags, control characters, and trims whitespace.
+ * @param {string} input - Raw user input
+ * @returns {string} Sanitized string
+ */
+function sanitizeInput(input) {
+  if (input === null || input === undefined) return '';
+  if (typeof input !== 'string') return String(input);
+  // Remove HTML tags
+  let cleaned = input.replace(/<[^>]*>/g, '');
+  // Remove control characters (except newlines/tabs)
+  // eslint-disable-next-line no-control-regex
+  cleaned = cleaned.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '');
+  // Remove null bytes
+  cleaned = cleaned.replace(/\0/g, '');
+  // Trim and limit length
+  return cleaned.trim().slice(0, 1000);
+}
+
+/**
+ * Validate password against security policy.
+ * Requires: min 8 chars, at least 1 uppercase, 1 number, 1 special char.
+ * @param {string} password - Password to validate
+ * @returns {{valid: boolean, error?: string}}
+ */
+function validatePassword(password) {
+  if (!password || typeof password !== 'string') {
+    return { valid: false, error: 'La contraseña es obligatoria' };
+  }
+  if (password.length < 8) {
+    return { valid: false, error: 'La contraseña debe tener al menos 8 caracteres' };
+  }
+  if (!/[A-Z]/.test(password)) {
+    return { valid: false, error: 'La contraseña debe contener al menos una mayúscula' };
+  }
+  if (!/[0-9]/.test(password)) {
+    return { valid: false, error: 'La contraseña debe contener al menos un número' };
+  }
+  if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(password)) {
+    return { valid: false, error: 'La contraseña debe contener al menos un carácter especial (!@#$%^&*...)' };
+  }
+  return { valid: true };
+}
+
+/**
+ * Validate email format.
+ * @param {string} email
+ * @returns {boolean}
+ */
+function isValidEmail(email) {
+  if (!email || typeof email !== 'string') return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 254;
+}
+
+/**
+ * Validate username format (alphanumeric + underscores, 3-30 chars).
+ * @param {string} username
+ * @returns {boolean}
+ */
+function isValidUsername(username) {
+  if (!username || typeof username !== 'string') return false;
+  return /^[a-zA-Z0-9_]{3,30}$/.test(username);
+}
+
+// Helper para Auditoría
+async function logAction(usuario_id, accion, detalles = null) {
+  try {
+    await db.query(
+      "INSERT INTO logs_auditoria (usuario_id, accion, detalles) VALUES ($1, $2, $3)",
+      [usuario_id, accion, detalles ? JSON.stringify(detalles) : null]
+    );
+  } catch (err) { log(LOG_LEVELS.ERROR, 'SYSTEM', 'Error al registrar log de auditoría', err); }
+}
+
+async function recordTransaction(usuario_id, tipo, monto, metodo, detalles = null) {
+  try {
+    await db.query(
+      "INSERT INTO transacciones (usuario_id, tipo, monto, metodo, detalles) VALUES ($1, $2, $3, $4, $5)",
+      [usuario_id, tipo, monto, metodo, detalles]
+    );
+  } catch (err) { log(LOG_LEVELS.ERROR, 'SYSTEM', 'Error al registrar transacción', err); }
+}
+
+const authenticateToken = (req, res, next) => {
+  if (req.isAuthenticated()) return next();
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) {
+    return res.status(401).json({
+      success: false,
+      error: 'TOKEN_MISSING',
+      message: 'No autorizado. Debes iniciar sesión para acceder a este recurso.'
+    });
+  }
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      const isExpired = err.name === 'TokenExpiredError';
+      return res.status(401).json({
+        success: false,
+        error: isExpired ? 'TOKEN_EXPIRED' : 'TOKEN_INVALID',
+        message: isExpired ? 'Sesión expirada. Vuelve a iniciar sesión.' : 'Token inválido. Vuelve a iniciar sesión.'
+      });
+    }
+    req.user = user;
+    next();
+  });
+};
+
+// ─── STEAM AUTH TIMEOUT HELPER ──────────────────────────────
+// Wraps passport.authenticate with a safety timeout to prevent
+// infinite pending when Steam OpenID validation hangs.
+// If Steam doesn't respond within STEAM_AUTH_TIMEOUT_MS (8 seconds),
+// the request is aborted with a redirect to the login page with error.
+const STEAM_AUTH_TIMEOUT_MS = 8000;
+
+function steamAuthWithTimeout(req, res, next, authCallback) {
+  let responded = false;
+  const safeRespond = (redirectUrl) => {
+    if (!responded) {
+      responded = true;
+      return res.redirect(redirectUrl);
+    }
+  };
+
+  const timeout = setTimeout(() => {
+    if (!responded) {
+      responded = true;
+      log(LOG_LEVELS.ERROR, 'AUTH', '⏱️ TIMEOUT: Steam OpenID no respondió en 8 segundos');
+      const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+      res.redirect(`${FRONTEND_URL}/login?error=steam_timeout`);
+    }
+  }, STEAM_AUTH_TIMEOUT_MS);
+
+  // Wrap the original callback to clear timeout and prevent double response
+  const wrappedCallback = (err, user) => {
+    clearTimeout(timeout);
+    if (responded) return; // Already responded via timeout
+    authCallback(err, user, safeRespond);
+  };
+
+  passport.authenticate('steam', { failureRedirect: '/login' }, wrappedCallback)(req, res, next);
+}
+
+// --- AUTH ROUTES ---
+
+app.get('/api/auth/steam', (req, res, next) => {
+  const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+  if (!steamStrategyConfigured) {
+    return res.redirect(`${FRONTEND_URL}/login?error=steam_disabled`);
+  }
+  steamAuthWithTimeout(req, res, next, (err, user, safeRespond) => {
+    if (err) {
+      log(LOG_LEVELS.ERROR, 'AUTH', 'Error en autenticación Steam:', err.message);
+      return safeRespond(`${FRONTEND_URL}/login?error=steam_auth_failed`);
+    }
+    if (!user) return safeRespond(`${FRONTEND_URL}/login`);
+    req.logIn(user, (loginErr) => {
+      if (loginErr) return safeRespond(`${FRONTEND_URL}/login?error=login_failed`);
+      // Proceed to the next middleware (the redirect handler below)
+      next();
+    });
+  });
+}, (req, res) => {
+  const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+  res.redirect(`${FRONTEND_URL}/login`);
+});
+
+app.get('/api/auth/steam/return', (req, res, next) => {
+  const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+  if (!steamStrategyConfigured) {
+    return res.redirect(`${FRONTEND_URL}/login?error=steam_disabled`);
+  }
+  steamAuthWithTimeout(req, res, next, (err, user, safeRespond) => {
+    if (err) {
+      log(LOG_LEVELS.ERROR, 'AUTH', 'Error en callback Steam:', err.message);
+      return safeRespond(`${FRONTEND_URL}/login?error=steam_callback_failed`);
+    }
+    if (!user) return safeRespond(`${FRONTEND_URL}/login`);
+    req.logIn(user, (loginErr) => {
+      if (loginErr) {
+        log(LOG_LEVELS.ERROR, 'AUTH', 'Error en login de Steam:', loginErr.message);
+        return safeRespond(`${FRONTEND_URL}/login?error=login_failed`);
+      }
+      try {
+        const token = jwt.sign({ id: user.usuario_id, email: user.email }, JWT_SECRET, { expiresIn: '8h' });
+        safeRespond(`${FRONTEND_URL}/login?token=${token}`);
+      } catch (jwtErr) {
+        log(LOG_LEVELS.ERROR, 'AUTH', 'Error generando JWT en Steam:', jwtErr.message);
+        safeRespond(`${FRONTEND_URL}/login?error=token_generation_failed`);
+      }
+    });
+  });
+});
+
+// ─── GOOGLE OAUTH ENDPOINT ─────────────────────────
+// Verifies the Google ID token server-side using the official Google library.
+// The frontend sends the idToken obtained from Google Sign-In.
+app.post("/api/auth/google", async (req, res) => {
+  const { idToken } = req.body;
+
+  if (!idToken || typeof idToken !== 'string') {
+    return res.status(400).json({ error: "idToken es obligatorio" });
+  }
+
+  if (!googleClient) {
+    return res.status(503).json({ error: "Autenticación con Google no está configurada en el servidor" });
+  }
+
+  try {
+    // Verify the ID token using Google's official library
+    const ticket = await googleClient.verifyIdToken({
+      idToken: idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+
+    if (!payload) {
+      return res.status(401).json({ error: "Token de Google inválido" });
+    }
+
+    const googleId = payload['sub'];
+    const email = sanitizeInput(payload['email']);
+    const nombre = sanitizeInput(payload['name'] || payload['given_name'] || email.split('@')[0]);
+    const avatar = payload['picture'] || null;
+
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ error: "Email de Google inválido" });
+    }
+
+    // Check if user exists by Google ID or email
+    let result = await db.query("SELECT * FROM usuarios WHERE google_id = $1 OR email = $2", [googleId, email]);
+
+    if (result.rows.length === 0) {
+      // Create new user with Google account
+      result = await db.query(
+        "INSERT INTO usuarios (nombre_usuario, email, password_hash, google_id, avatar, nivel, experiencia) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING usuario_id, nombre_usuario, email, saldo, nivel, experiencia",
+        [nombre, email, 'google_no_password', googleId, avatar, 0, 0]
+      );
+    } else {
+      // Update Google ID if user existed via email but didn't have google_id
+      if (!result.rows[0].google_id) {
+        await db.query("UPDATE usuarios SET google_id = $1, avatar = COALESCE(avatar, $2) WHERE usuario_id = $3",
+          [googleId, avatar, result.rows[0].usuario_id]);
+      }
+    }
+
+    const user = result.rows[0];
+    const token = jwt.sign({ id: user.usuario_id, email: user.email }, JWT_SECRET, { expiresIn: '8h' });
+
+    await logAction(user.usuario_id, 'LOGIN_GOOGLE', { googleId, email });
+
+    res.json({
+      user: {
+        usuario_id: user.usuario_id,
+        nombre_usuario: user.nombre_usuario,
+        email: user.email,
+        saldo: user.saldo,
+        nivel: user.nivel,
+        experiencia: user.experiencia,
+        avatar: avatar || user.avatar
+      },
+      token
+    });
+  } catch (err) {
+    log(LOG_LEVELS.ERROR, 'AUTH', 'Error en Google OAuth:', err.message);
+    res.status(401).json({ error: "Error al verificar el token de Google. Intenta de nuevo." });
+  }
+});
+
+// ─── PASSWORD RECOVERY ──────────────────────────────
+// In-memory store for password reset tokens (in production, use Redis or DB)
+const passwordResetTokens = new Map();
+
+app.post("/api/auth/forgot-password", async (req, res) => {
+  const { email } = req.body;
+
+  if (!email || !isValidEmail(email)) {
+    return res.status(400).json({ error: "Email inválido" });
+  }
+
+  try {
+    const result = await db.query("SELECT usuario_id, email, nombre_usuario FROM usuarios WHERE email = $1", [email]);
+
+    // Always return success to prevent email enumeration attacks
+    if (result.rows.length === 0) {
+      return res.json({
+        success: true,
+        message: "Si el email existe en nuestro sistema, recibirás un enlace de recuperación."
+      });
+    }
+
+    const user = result.rows[0];
+
+    // Generate secure reset token (valid for 1 hour)
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    // Store token (in production, use database table)
+    passwordResetTokens.set(tokenHash, {
+      userId: user.usuario_id,
+      email: user.email,
+      expiresAt: expiresAt,
+      used: false
+    });
+
+    // Clean up expired tokens
+    for (const [key, value] of passwordResetTokens.entries()) {
+      if (value.expiresAt < new Date()) {
+        passwordResetTokens.delete(key);
+      }
+    }
+
+    // In production, send email here
+    // For now, log the reset link (in production, remove this log)
+    const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`;
+    log(LOG_LEVELS.INFO, 'AUTH', `Password reset link for ${email}: ${resetLink}`);
+
+    await logAction(user.usuario_id, 'PASSWORD_RESET_REQUESTED', { email });
+
+    res.json({
+      success: true,
+      message: "Si el email existe en nuestro sistema, recibirás un enlace de recuperación.",
+      // Only include resetLink in development
+      ...(process.env.NODE_ENV !== 'production' && { resetLink })
+    });
+  } catch {
+    res.status(500).json({ error: "Error al procesar la solicitud" });
+  }
+});
+
+app.post("/api/auth/reset-password", async (req, res) => {
+  const { token, newPassword } = req.body;
+
+  if (!token || !newPassword) {
+    return res.status(400).json({ error: "Token y nueva contraseña son requeridos" });
+  }
+
+  // Validate password security policy
+  const pwdCheck = validatePassword(newPassword);
+  if (!pwdCheck.valid) {
+    return res.status(400).json({ error: pwdCheck.error });
+  }
+
+  try {
+    // Hash the token to compare with stored hash
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const resetData = passwordResetTokens.get(tokenHash);
+
+    if (!resetData) {
+      return res.status(400).json({ error: "Token inválido o expirado" });
+    }
+
+    if (resetData.used) {
+      return res.status(400).json({ error: "Este token ya ha sido utilizado" });
+    }
+
+    if (resetData.expiresAt < new Date()) {
+      passwordResetTokens.delete(tokenHash);
+      return res.status(400).json({ error: "Token expirado. Solicita uno nuevo." });
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+    // Update password in database
+    await db.query(
+      "UPDATE usuarios SET password_hash = $1 WHERE usuario_id = $2",
+      [hashedPassword, resetData.userId]
+    );
+
+    // Mark token as used
+    resetData.used = true;
+    passwordResetTokens.set(tokenHash, resetData);
+
+    await logAction(resetData.userId, 'PASSWORD_RESET_COMPLETED', { email: resetData.email });
+
+    res.json({
+      success: true,
+      message: "Contraseña actualizada correctamente. Ahora puedes iniciar sesión."
+    });
+  } catch {
+    res.status(500).json({ error: "Error al actualizar la contraseña" });
+  }
+});
+
+app.post("/api/register", loginLimiter, async (req, res) => {
+  const { nombre_usuario, email, password } = req.body;
+
+  // Sanitize inputs
+  const cleanUsername = sanitizeInput(nombre_usuario);
+  const cleanEmail = sanitizeInput(email);
+
+  // Validate inputs
+  if (!cleanUsername || !cleanEmail || !password) {
+    return res.status(400).json({ error: "Todos los campos son obligatorios" });
+  }
+  if (!isValidUsername(cleanUsername)) {
+    return res.status(400).json({ error: "El nombre de usuario debe tener entre 3 y 30 caracteres alfanuméricos" });
+  }
+  if (!isValidEmail(cleanEmail)) {
+    return res.status(400).json({ error: "Email inválido" });
+  }
+
+  // Validate password security policy
+  const pwdCheck = validatePassword(password);
+  if (!pwdCheck.valid) {
+    return res.status(400).json({ error: pwdCheck.error });
+  }
+
+  try {
+    if (!DB_AVAILABLE) {
+      // In-memory fallback registration (development / degraded mode)
+      const cleanUsername = sanitizeInput(nombre_usuario);
+      const cleanEmail = sanitizeInput(email);
+      if (!cleanUsername || !cleanEmail || !password) {
+        return res.status(400).json({ error: "Todos los campos son obligatorios" });
+      }
+      if (!isValidUsername(cleanUsername)) {
+        return res.status(400).json({ error: "El nombre de usuario debe tener entre 3 y 30 caracteres alfanuméricos" });
+      }
+      if (!isValidEmail(cleanEmail)) {
+        return res.status(400).json({ error: "Email inválido" });
+      }
+      const pwdCheck = validatePassword(password);
+      if (!pwdCheck.valid) return res.status(400).json({ error: pwdCheck.error });
+      // Unique check
+      if (IN_MEMORY_USERS.has(cleanEmail) || Array.from(IN_MEMORY_USERS.values()).find(u => u.nombre_usuario === cleanUsername)) {
+        return res.status(409).json({ error: "El nombre de usuario o email ya está registrado." });
+      }
+      const hashedPassword = await bcrypt.hash(password, 12);
+      const newId = IN_MEMORY_NEXT_ID++;
+      const user = {
+        usuario_id: newId,
+        nombre_usuario: cleanUsername,
+        email: cleanEmail,
+        password_hash: hashedPassword,
+        saldo: 0,
+        nivel: 0,
+        experiencia: 0,
+        avatar: null
+      };
+      IN_MEMORY_USERS.set(cleanEmail, user);
+      IN_MEMORY_USERS_BY_ID.set(newId, user);
+      IN_MEMORY_INVENTORY.set(newId, []);
+      const token = jwt.sign({ id: user.usuario_id, email: user.email }, JWT_SECRET, { expiresIn: '8h' });
+      log(LOG_LEVELS.INFO, 'AUTH', 'REGISTER_FALLBACK', { email: cleanEmail });
+      return res.status(201).json({ success: true, user: { usuario_id: user.usuario_id, nombre_usuario: user.nombre_usuario, email: user.email, saldo: user.saldo, nivel: user.nivel, experiencia: user.experiencia }, token });
+    }
+    // Check if db is available before querying
+    if (!db || typeof db.query !== 'function') {
+      log(LOG_LEVELS.ERROR, 'REGISTER', 'Base de datos no disponible');
+      return res.status(503).json({
+        success: false,
+        error: "Servicio de base de datos no disponible. Intenta más tarde.",
+        code: "DB_UNAVAILABLE"
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 12);
+    const result = await db.query(
+      "INSERT INTO usuarios (nombre_usuario, email, password_hash, nivel, experiencia) VALUES ($1, $2, $3, $4, $5) RETURNING usuario_id, nombre_usuario, email, saldo, nivel, experiencia",
+      [cleanUsername, cleanEmail, hashedPassword, 0, 0]
+    );
+    const user = result.rows[0];
+    const token = jwt.sign({ id: user.usuario_id, email: user.email }, JWT_SECRET, { expiresIn: '8h' });
+    await logAction(user.usuario_id, 'REGISTER', { email: cleanEmail });
+    res.status(201).json({
+      success: true,
+      user: {
+        usuario_id: user.usuario_id,
+        nombre_usuario: user.nombre_usuario,
+        email: user.email,
+        saldo: user.saldo,
+        nivel: user.nivel,
+        experiencia: user.experiencia
+      },
+      token
+    });
+  } catch (err) {
+    log(LOG_LEVELS.ERROR, 'REGISTER', 'Error al registrar usuario', { error: err.message, code: err.code });
+
+    // Error de conexión a la base de datos
+    if (err.code === 'ECONNREFUSED' || err.code === 'ENOTFOUND' || err.message?.includes('connect')) {
+      return res.status(503).json({
+        success: false,
+        error: "No se pudo conectar con la base de datos. Verifica tu conexión e intenta de nuevo.",
+        code: "DB_CONNECTION_ERROR"
+      });
+    }
+
+    // Violación de clave única (usuario o email ya existe)
+    if (err.code === '23505') {
+      const detail = err.detail || '';
+      const campo = detail.includes('nombre_usuario') ? 'nombre de usuario' : 'email';
+      return res.status(409).json({
+        success: false,
+        error: `El ${campo} ya está registrado. Por favor, usa otro o inicia sesión.`,
+        code: "DUPLICATE_ENTRY",
+        field: detail.includes('nombre_usuario') ? 'nombre_usuario' : 'email'
+      });
+    }
+
+    // Error genérico del servidor
+    res.status(500).json({
+      success: false,
+      error: "Error interno al registrar usuario. Por favor, intenta de nuevo más tarde.",
+      code: "REGISTER_ERROR"
+    });
+  }
+});
+
+app.post("/api/login", loginLimiter, async (req, res) => {
+  const { email, password } = req.body;
+
+  // Sanitize email
+  const cleanEmail = sanitizeInput(email);
+
+  if (!cleanEmail || !password) {
+    return res.status(400).json({ error: "Email y contraseña son obligatorios" });
+  }
+  if (!isValidEmail(cleanEmail)) {
+    return res.status(400).json({ error: "Email inválido" });
+  }
+
+  try {
+    if (!DB_AVAILABLE) {
+      const cleanEmail = sanitizeInput(email);
+      if (!cleanEmail || !password) return res.status(400).json({ error: "Email y contraseña son obligatorios" });
+      const user = IN_MEMORY_USERS.get(cleanEmail);
+      if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+        return res.status(401).json({ error: "Credenciales inválidas" });
+      }
+      const token = jwt.sign({ id: user.usuario_id, email: user.email }, JWT_SECRET, { expiresIn: '8h' });
+      log(LOG_LEVELS.INFO, 'AUTH', 'LOGIN_FALLBACK', { email: cleanEmail });
+      return res.json({ user: { usuario_id: user.usuario_id, nombre_usuario: user.nombre_usuario, email: user.email, saldo: user.saldo, nivel: user.nivel, experiencia: user.experiencia }, token });
+    }
+    const result = await db.query("SELECT * FROM usuarios WHERE email = $1", [cleanEmail]);
+    const user = result.rows[0];
+    if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+      return res.status(401).json({ error: "Credenciales inválidas" });
+    }
+    const token = jwt.sign({ id: user.usuario_id, email: user.email }, JWT_SECRET, { expiresIn: '8h' });
+    await logAction(user.usuario_id, 'LOGIN', { email: cleanEmail });
+    res.json({ user: { usuario_id: user.usuario_id, nombre_usuario: user.nombre_usuario, email: user.email, saldo: user.saldo, nivel: user.nivel, experiencia: user.experiencia }, token });
+  } catch {
+    res.status(500).json({ error: "Error al iniciar sesión" });
+  }
+});
+
+// ─── LEVEL SYSTEM ────────────────────────────────────
+// Escalado hasta Nivel 360 - Sistema VIP Supreme
+const LEVEL_THRESHOLDS = [
+  { level: 0, minDeposit: 0, dailyCaseId: "daily-0", caseLabel: "DAILY FREE", reward: 0.15 },
+  { level: 5, minDeposit: 10, dailyCaseId: "daily-5", caseLabel: "BRONZE DAILY", reward: 0.25 },
+  { level: 15, minDeposit: 50, dailyCaseId: "daily-15", caseLabel: "SILVER DAILY", reward: 0.50 },
+  { level: 30, minDeposit: 150, dailyCaseId: "daily-30", caseLabel: "GOLD DAILY", reward: 1.00 },
+  { level: 50, minDeposit: 500, dailyCaseId: "daily-50", caseLabel: "DIAMOND DAILY", reward: 2.00 },
+  { level: 80, minDeposit: 1500, dailyCaseId: "daily-80", caseLabel: "PLATINUM DAILY", reward: 3.50 },
+  { level: 120, minDeposit: 4000, dailyCaseId: "daily-120", caseLabel: "EMERALD DAILY", reward: 6.00 },
+  { level: 170, minDeposit: 10000, dailyCaseId: "daily-170", caseLabel: "RUBY DAILY", reward: 10.00 },
+  { level: 230, minDeposit: 25000, dailyCaseId: "daily-230", caseLabel: "MASTER DAILY", reward: 18.00 },
+  { level: 300, minDeposit: 75000, dailyCaseId: "daily-300", caseLabel: "LEGENDARY DAILY", reward: 30.00 },
+  { level: 360, minDeposit: 200000, dailyCaseId: "daily-360", caseLabel: "VIP SUPREME", reward: 50.00 },
+];
+
+// Pre-computed lookup map for O(1) level → daily case resolution
+const DAILY_CASE_BY_LEVEL_MAP = new Map(LEVEL_THRESHOLDS.map(t => [t.level, t]));
+
+// Binary search for O(log n) level calculation (vs previous O(n) linear scan)
+function calculateLevel(totalDeposited) {
+  let lo = 0, hi = LEVEL_THRESHOLDS.length - 1, result = 0;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (totalDeposited >= LEVEL_THRESHOLDS[mid].minDeposit) {
+      result = LEVEL_THRESHOLDS[mid].level;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  return result;
+}
+
+function getDailyCaseForLevel(level) {
+  return DAILY_CASE_BY_LEVEL_MAP.get(level) || LEVEL_THRESHOLDS[0];
+}
+
+// ─── GET USER /api/me ────────────────────
+app.get("/api/me", authenticateToken, async (req, res) => {
+  try {
+    if (!DB_AVAILABLE) {
+      const user = IN_MEMORY_USERS_BY_ID.get(req.user.id);
+      if (!user) return res.status(404).json({ error: "Usuario no encontrado (fallback)" });
+      const inventory = IN_MEMORY_INVENTORY.get(user.usuario_id) || [];
+      user.inventory = inventory;
+      user.level = user.nivel || 0;
+      user.totalDepositado = 0;
+      user.dailyCaseId = getDailyCaseForLevel(user.level);
+      return res.json(user);
+    }
+    const userResult = await db.query(
+      "SELECT usuario_id, nombre_usuario, email, saldo, nivel, experiencia, link_intercambio, steam_id, trade_token, ultimo_reclamo_diario, avatar FROM usuarios WHERE usuario_id = $1",
+      [req.user.id]
+    );
+
+    const depositResult = await db.query(
+      "SELECT COALESCE(SUM(monto), 0) as total_depositado FROM transacciones WHERE usuario_id = $1 AND tipo IN ('deposito', 'apertura_caja')",
+      [req.user.id]
+    );
+    const totalDepositado = parseFloat(depositResult.rows[0].total_depositado) || 0;
+    const calculatedLevel = calculateLevel(totalDepositado);
+
+    const inventoryResult = await db.query(
+      "SELECT item_id as id, name, price, image, rarity, marketable, status, market_hash_name, wear, assetid FROM inventario WHERE usuario_id = $1 AND status != 'sold' AND status != 'withdrawn'",
+      [req.user.id]
+    );
+
+    const user = userResult.rows[0];
+    user.inventory = inventoryResult.rows.map(item => ({ ...item, price: item.price ?? 0.00 }));
+    user.level = calculatedLevel;
+    user.totalDepositado = totalDepositado;
+    user.dailyCaseId = getDailyCaseForLevel(calculatedLevel);
+    user.nextLevel = calculateLevel(totalDepositado) + 1;
+
+    res.json(user);
+  } catch {
+    res.status(500).json({ error: "Error al obtener datos del usuario" });
+  }
+});
+
+app.get("/api/ranking", async (req, res) => {
+  try {
+    const result = await db.query(
+      "SELECT nombre_usuario as name, saldo as balance, nivel as level, experiencia as exp FROM usuarios ORDER BY saldo DESC LIMIT 100"
+    );
+    res.json(result.rows);
+  } catch {
+    res.status(500).json({ error: "Error al obtener ranking" });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// DAILY CASE SYSTEM - Level-based (KeyDrop-style) - 24h cooldown
+// ─────────────────────────────────────────────────────────────────
+
+app.post("/api/claim-daily", authenticateToken, dailyCaseLimiter, async (req, res) => {
+  try {
+    const userResult = await db.query(
+      "SELECT ultimo_reclamo_diario, nivel, saldo FROM usuarios WHERE usuario_id = $1",
+      [req.user.id]
+    );
+    const user = userResult.rows[0];
+    const now = new Date();
+    const lastClaim = user.ultimo_reclamo_diario ? new Date(user.ultimo_reclamo_diario) : null;
+
+    const hoursWait = 24;
+    const bufferMs = 5000;
+
+    if (lastClaim && (now - lastClaim) < (hoursWait * 60 * 60 * 1000 - bufferMs)) {
+      const remaining = hoursWait * 60 * 60 * 1000 - (now - lastClaim);
+      const remainingHours = Math.floor(remaining / (1000 * 60 * 60));
+      const remainingMinutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+      const remainingSeconds = Math.floor((remaining % (1000 * 60)) / 1000);
+
+      return res.status(400).json({
+        error: `⏳ ${remainingHours}h ${remainingMinutes}m ${remainingSeconds}s`,
+        remainingMs: remaining,
+        canOpen: false
+      });
+    }
+
+    const depositResult = await db.query(
+      "SELECT COALESCE(SUM(monto), 0) as total_depositado FROM transacciones WHERE usuario_id = $1 AND tipo IN ('deposito', 'apertura_caja')",
+      [req.user.id]
+    );
+    const totalDepositado = parseFloat(depositResult.rows[0].total_depositado) || 0;
+
+    const userLevelRaw = user.nivel || 0;
+    if (totalDepositado < 2.00 && userLevelRaw < 1) {
+      return res.status(403).json({
+        error: "Debes tener un depósito acumulado de al menos 2.00€ o alcanzar el Nivel 1 para reclamar la caja diaria. ¡Deposita para desbloquear!",
+        code: "DAILY_LOCKED",
+        requiredDeposit: 2.00,
+        currentDeposit: totalDepositado
+      });
+    }
+
+    const userLevel = calculateLevel(totalDepositado);
+    const dailyCase = getDailyCaseForLevel(userLevel);
+
+    const rarityRoll = Math.random() * 100;
+    const rarityPrices = { "Covert": 50, "Classified": 15, "Restricted": 3, "Mil-Spec Grade": 1 };
+    let rarity;
+    if (userLevel >= 5 && rarityRoll < 8) {
+      rarity = "Covert";
+    } else if (userLevel >= 3 && rarityRoll < 20) {
+      rarity = "Classified";
+    } else if (rarityRoll < 35) {
+      rarity = "Restricted";
+    } else {
+      rarity = "Mil-Spec Grade";
+    }
+
+    const weaponNames = ["AK-47", "AWP", "M4A4", "M4A1-S", "Desert Eagle", "USP-S", "Glock-18", "SSG 08", "FAMAS", "P250"];
+    const skinSuffixes = ["Safari Mesh", "Boreal Forest", "Sand Dune", "Predator", "Tornado", "Scorched", "Jungle", "Urban", "Army", "Contractor"];
+    const wearValues = ["Factory New", "Minimal Wear", "Field-Tested", "Well-Worn", "Battle-Scarred"];
+    const randomWeapon = weaponNames[Math.floor(Math.random() * weaponNames.length)];
+    const randomSkin = skinSuffixes[Math.floor(Math.random() * skinSuffixes.length)];
+    const randomWear = wearValues[Math.floor(Math.random() * wearValues.length)];
+    const itemName = `${randomWeapon} | ${randomSkin}`;
+    const itemPrice = parseFloat(((rarityPrices[rarity] || 1) * (0.5 + Math.random() * 1.5)).toFixed(2));
+
+    const iconHash = generateIconUrlHash(itemName, Date.now());
+    const imageHD = buildAkamaiImageUrl(iconHash);
+
+    const serverSeed = crypto.randomBytes(32).toString('hex');
+    const clientSeed = crypto.randomBytes(16).toString('hex');
+    const nonce = Date.now();
+    const provablyFairHash = crypto.createHash('sha256').update(`${serverSeed}:${clientSeed}:${nonce}:${itemName}`).digest('hex');
+
+    let insertedSkin;
+    const expReward = userLevel * 15;
+
+    await db.withTransaction(async (client) => {
+      const insertResult = await client.query(
+        `INSERT INTO inventario (usuario_id, name, price, image, rarity, marketable, wear, weapon, skin_name, market_hash_name, status, icon_url, provably_fair_hash, server_seed, client_seed, nonce)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'on_site', $11, $12, $13, $14, $15)
+         RETURNING item_id as id, name, price, image, rarity, marketable, status`,
+        [req.user.id, itemName, itemPrice, imageHD,
+          rarity, true, randomWear, randomWeapon, randomSkin, itemName, iconHash, provablyFairHash, serverSeed, clientSeed, nonce]
+      );
+      insertedSkin = insertResult.rows[0];
+
+      await client.query(
+        "UPDATE usuarios SET experiencia = experiencia + $1, ultimo_reclamo_diario = $2 WHERE usuario_id = $3",
+        [expReward, now, req.user.id]
+      );
+    });
+
+    await recordTransaction(req.user.id, 'premio', itemPrice, 'caja_diaria', `Skin de caja diaria nivel ${userLevel}: ${itemName}`);
+    await logAction(req.user.id, 'RECLAMAR_CAJA_DIARIA', { level: userLevel, caseId: dailyCase.dailyCaseId, skin: itemName, price: itemPrice, provablyFairHash });
+
+    res.json({
+      success: true,
+      skin: insertedSkin,
+      expReward,
+      level: userLevel,
+      caseId: dailyCase.dailyCaseId,
+      caseLabel: dailyCase.caseLabel,
+      provablyFair: { serverSeed, clientSeed, nonce, hash: provablyFairHash },
+      message: `🎉 ¡Caja diaria nivel ${userLevel} abierta! Has ganado: ${itemName} (€${itemPrice}) +${expReward} EXP`
+    });
+  } catch {
+    res.status(500).json({ error: "Error al procesar reclamo diario" });
+  }
+});
+
+// ─── STEAM INVENTORY INSPECTOR ───────────────────────────
+app.get("/api/steam/inspector/:steamId", authenticateToken, inspectorLimiter, async (req, res) => {
+  const steamId = req.params.steamId;
+
+  if (!steamId || steamId.length < 15) {
+    return res.status(400).json({ error: "SteamID64 inválido. Debe tener 17 dígitos." });
+  }
+
+  log(LOG_LEVELS.INFO, 'INSPECTOR', `Inspeccionando inventario: ${steamId}`);
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+    const response = await fetch(
+      `https://steamcommunity.com/inventory/${steamId}/730/2?l=english&count=2000`,
+      {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Referer": "https://steamcommunity.com/",
+          "Accept": "application/json"
+        },
+        signal: controller.signal
+      }
+    );
+
+    clearTimeout(timeoutId);
+
+    if (response.status === 403) {
+      return res.status(403).json({ error: "El inventario es privado. Debe ser público para ser inspeccionado.", code: "PRIVATE_INVENTORY" });
+    }
+
+    if (response.status === 401) {
+      return res.status(401).json({ error: "Perfil no encontrado o SteamID inválido.", code: "INVALID_STEAMID" });
+    }
+
+    if (!response.ok) {
+      return res.status(response.status).json({
+        error: `Steam respondió con error ${response.status}. Intenta de nuevo.`,
+        details: "La API de Steam puede estar rate-limited. Espera unos minutos."
+      });
+    }
+
+    const data = await response.json();
+
+    if (!data || data.success === false) {
+      return res.status(403).json({
+        error: "No se puede acceder a este inventario. Ajusta tu perfil a público.",
+        code: "PRIVATE_INVENTORY"
+      });
+    }
+
+    if (!data.assets || !data.descriptions || data.assets.length === 0) {
+      return res.json({ items: [], totalValue: 0, totalItems: 0, steamId });
+    }
+
+    const items = data.assets.map(asset => {
+      const desc = data.descriptions.find(d => d.classid === asset.classid);
+      if (!desc) return null;
+
+      const rarityTag = desc.tags?.find(t => t.category === "Rarity");
+      const rarity = rarityTag?.name || "Consumer Grade";
+      const typeTag = desc.tags?.find(t => t.category === "Type");
+      const type = typeTag?.name || "";
+      const weaponTag = desc.tags?.find(t => t.category === "Weapon");
+      const weapon = weaponTag?.name || "";
+
+      const iconUrl = desc.icon_url || desc.icon_url_large || "";
+      const imageHD = iconUrl
+        ? `https://steamcommunity-a.akamaihd.net/economy/image/${iconUrl}/360fx360f`
+        : "";
+
+      return {
+        assetid: asset.assetid,
+        classid: asset.classid,
+        name: desc.market_hash_name || desc.name,
+        market_hash_name: desc.market_hash_name,
+        icon_url: iconUrl,
+        image: imageHD,
+        rarity,
+        type,
+        weapon,
+        wear: desc.type || "",
+        tradable: desc.tradable === 1,
+        marketable: desc.marketable === 1,
+        descriptions: desc.descriptions?.map(d => d.value).filter(Boolean) || []
+      };
+    }).filter(item => item !== null);
+
+    const totalValue = items.reduce((sum, item) => {
+      let estPrice = 0.50;
+      if (item.rarity.includes("Extraordinary") || item.rarity.includes("Contraband")) estPrice = 500.00;
+      else if (item.rarity.includes("Covert")) estPrice = 50.00;
+      else if (item.rarity.includes("Classified")) estPrice = 15.00;
+      else if (item.rarity.includes("Restricted")) estPrice = 3.00;
+      else if (item.rarity.includes("Mil-Spec")) estPrice = 1.00;
+      return sum + estPrice;
+    }, 0);
+
+    log(LOG_LEVELS.INFO, 'INSPECTOR', `Inventario cargado: ${items.length} items, valor estimado: €${totalValue.toFixed(2)}`);
+
+    res.json({
+      items,
+      totalValue: parseFloat(totalValue.toFixed(2)),
+      totalItems: items.length,
+      steamId,
+      queryTime: new Date().toISOString()
+    });
+
+  } catch {
+    res.status(500).json({ error: "Error al consultar inventario de Steam." });
+  }
+});
+
+// ─── API to fetch price from Steam Market (real) ──────────
+app.get("/api/steam/price", inspectorLimiter, async (req, res) => {
+  const hashName = req.query.market_hash_name;
+  if (!hashName) return res.status(400).json({ error: "market_hash_name requerido" });
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    const response = await fetch(
+      `https://steamcommunity.com/market/priceoverview/?appid=730&currency=3&market_hash_name=${encodeURIComponent(hashName)}`,
+      {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Referer": "https://steamcommunity.com/market/"
+        },
+        signal: controller.signal
+      }
+    );
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      return res.status(response.status).json({ error: "Error al obtener precio de Steam" });
+    }
+
+    const data = await response.json();
+
+    if (data.success === false) {
+      return res.json({ success: false, market_hash_name: hashName, error: "No hay datos de precio" });
+    }
+
+    let price = 0;
+    if (data.median_price) {
+      price = parseFloat(data.median_price.replace(/[^0-9.,]/g, '').replace(',', '.'));
+    } else if (data.lowest_price) {
+      price = parseFloat(data.lowest_price.replace(/[^0-9.,]/g, '').replace(',', '.'));
+    }
+
+    res.json({
+      success: true,
+      market_hash_name: hashName,
+      lowest_price: data.lowest_price,
+      median_price: data.median_price,
+      volume: data.volume,
+      price_eur: price
+    });
+  } catch {
+    res.status(500).json({ error: "Error al consultar precio" });
+  }
+});
+
+// ─── CASE OPENING (with atomic transactions) ─────────────
+
+// Module-level case price lookup table — avoids recreating the object on every request.
+// Maps caseId to real price from the frontend case definitions.
+// Updated economic balance:
+// - Económica: €0.50 - €2.50
+// - Intermedia: €5.00 - €25.00
+// - Premium: €50.00 - €300.00
+// - Limited: €50.00 - €300.00
+// - Risk Zone: €10.00 - €150.00
+const CASE_PRICES = {
+  "econ-0": 0.50, "econ-1": 0.75, "econ-2": 1.00, "econ-3": 1.25,
+  "econ-4": 1.50, "econ-5": 1.75, "econ-6": 2.00, "econ-7": 2.25,
+  "econ-8": 2.50, "econ-9": 2.50, "econ-10": 2.50, "econ-11": 2.50,
+  // Legacy eco IDs for backward compatibility
+  "eco-0": 0.50, "eco-1": 0.75, "eco-2": 1.00, "eco-3": 1.25, "eco-4": 1.50,
+  "eco-5": 1.75, "eco-6": 2.00, "eco-7": 2.25, "eco-8": 2.50, "eco-9": 2.75,
+  "eco-10": 3.00, "eco-11": 3.50,
+  // Intermedia: €5.00 - €25.00
+  "inter-0": 5.00, "inter-1": 5.50, "inter-2": 6.00, "inter-3": 7.00,
+  "inter-4": 8.00, "inter-5": 9.00, "inter-6": 10.00, "inter-7": 12.00,
+  "inter-8": 14.00, "inter-9": 16.00, "inter-10": 18.00, "inter-11": 20.00,
+  "inter-12": 22.00, "inter-13": 25.00,
+  // Premium: €50.00 - €300.00
+  "prem-0": 50.00, "prem-1": 60.00, "prem-2": 75.00, "prem-3": 90.00,
+  "prem-4": 100.00, "prem-5": 120.00, "prem-6": 150.00, "prem-7": 180.00,
+  "prem-8": 200.00, "prem-9": 220.00, "prem-10": 250.00, "prem-11": 300.00,
+  // Limited: €50.00 - €300.00
+  "limit-0": 50.00, "limit-1": 75.00, "limit-2": 100.00, "limit-3": 125.00,
+  "limit-4": 150.00, "limit-5": 175.00, "limit-6": 200.00, "limit-7": 300.00,
+  // Risk Zone: €10.00 - €150.00
+  "risk-0": 10.00, "risk-1": 15.00, "risk-2": 20.00, "risk-3": 30.00,
+  "risk-4": 50.00, "risk-5": 75.00, "risk-6": 100.00, "risk-7": 150.00
+};
+
+// ─── SECURE RNG HELPER (cryptographically secure) ───────────
+// Uses crypto.randomInt() for tamper-proof drop rate calculations.
+// The frontend NEVER computes the outcome — it only renders the animation.
+function secureRoll() {
+  // crypto.randomInt(0, 10000) gives 0-9999, divide by 100 for 2-decimal precision
+  return crypto.randomInt(0, 10000) / 100;
+}
+
+function securePick(array) {
+  if (!array || array.length === 0) return null;
+  return array[crypto.randomInt(0, array.length)];
+}
+
+app.post("/api/cases/open", authenticateToken, caseOpenLimiter, async (req, res) => {
+  const { caseId, quantity, jokerMode } = req.body;
+
+  try {
+    // Validate quantity (prevent abuse)
+    const qty = Math.min(Math.max(parseInt(quantity) || 1, 1), 5);
+
+    const casePrice = CASE_PRICES[caseId] || 2.50;
+    const priceMultiplier = jokerMode ? 3 : 1;
+    const totalCost = casePrice * priceMultiplier * qty;
+
+    // Atomic balance check + deduction in a single transaction
+    let userBalance;
+    if (!DB_AVAILABLE) {
+      // In-memory balance check/deduction
+      const memUser = IN_MEMORY_USERS_BY_ID.get(req.user.id);
+      if (!memUser) return res.status(404).json({ error: 'Usuario no encontrado (fallback)' });
+      if ((memUser.saldo || 0) < totalCost) return res.status(400).json({ error: 'INSUFFICIENT_BALANCE' });
+      memUser.saldo = Number((memUser.saldo || 0) - totalCost);
+      memUser.experiencia = (memUser.experiencia || 0) + Math.floor(totalCost * 100);
+      userBalance = memUser.saldo;
+    } else {
+      await db.withTransaction(async (client) => {
+        const userResult = await client.query(
+          "SELECT saldo FROM usuarios WHERE usuario_id = $1 FOR UPDATE",
+          [req.user.id]
+        );
+        if (!userResult.rows[0] || userResult.rows[0].saldo < totalCost) {
+          throw new Error('INSUFFICIENT_BALANCE');
+        }
+        userBalance = userResult.rows[0].saldo;
+        await client.query(
+          "UPDATE usuarios SET saldo = saldo - $1, experiencia = experiencia + $2 WHERE usuario_id = $3",
+          [totalCost, Math.floor(totalCost * 100), req.user.id]
+        );
+      });
+    }
+
+    // Import case configuration for realistic skins
+    const { CASE_PROBABILITIES, SKIN_CATALOGS } = await import("../constants/cases.js");
+
+    const caseCategory = caseId?.startsWith("econ") || caseId?.startsWith("eco") ? "económica"
+      : caseId?.startsWith("inter") ? "intermedia"
+        : caseId?.startsWith("prem") ? "premium"
+          : caseId?.startsWith("limit") ? "limited"
+            : caseId?.startsWith("risk") ? "risk"
+              : "económica";
+    const catalog = SKIN_CATALOGS[caseCategory] || SKIN_CATALOGS.económica;
+    const probs = CASE_PROBABILITIES[caseCategory] || CASE_PROBABILITIES.económica;
+
+    const results = [];
+    for (let i = 0; i < qty; i++) {
+      // ─── CRYPTOGRAPHICALLY SECURE RNG (crypto.randomInt) ───
+      // The drop rate is determined HERE on the backend, never on the client.
+      let rarity, rarityPrice;
+      if (jokerMode) {
+        // Joker Mode: equalized probabilities (all rarities have equal chance)
+        const equalizedRoll = secureRoll(100);
+        if (equalizedRoll < 20) { rarity = "Covert"; rarityPrice = catalog.priceRange[1] * 0.8; }
+        else if (equalizedRoll < 40) { rarity = "Classified"; rarityPrice = catalog.priceRange[1] * 0.5; }
+        else if (equalizedRoll < 60) { rarity = "Restricted"; rarityPrice = catalog.priceRange[1] * 0.3; }
+        else { rarity = "Mil-Spec Grade"; rarityPrice = catalog.priceRange[0]; }
+      } else {
+        // Standard weighted probabilities using crypto.randomInt
+        const roll = secureRoll(100);
+        if (roll < probs.covert) {
+          rarity = "Covert";
+          rarityPrice = catalog.priceRange[1] * (0.6 + (crypto.randomInt(0, 10000) / 10000) * 0.4);
+        } else if (roll < probs.covert + probs.classified) {
+          rarity = "Classified";
+          rarityPrice = catalog.priceRange[0] + (catalog.priceRange[1] - catalog.priceRange[0]) * (0.3 + (crypto.randomInt(0, 10000) / 10000) * 0.4);
+        } else if (roll < probs.covert + probs.classified + probs.restricted) {
+          rarity = "Restricted";
+          rarityPrice = catalog.priceRange[0] + (catalog.priceRange[1] - catalog.priceRange[0]) * (0.1 + (crypto.randomInt(0, 10000) / 10000) * 0.3);
+        } else {
+          rarity = "Mil-Spec Grade";
+          rarityPrice = catalog.priceRange[0] + (crypto.randomInt(0, 10000) / 10000) * (catalog.priceRange[1] - catalog.priceRange[0]) * 0.2;
+        }
+      }
+
+      // Pick weapon and skin using crypto.randomInt (secure)
+      const weapon = securePick(catalog.weapons);
+      const skinName = securePick(catalog.skins);
+      const wearValues = ["Factory New", "Minimal Wear", "Field-Tested", "Well-Worn", "Battle-Scarred"];
+      const randomWear = securePick(wearValues);
+      const itemName = `${weapon} | ${skinName}`;
+      const itemPrice = parseFloat(rarityPrice.toFixed(2));
+
+      const iconHash = generateIconUrlHash(itemName, Date.now() + i);
+      const imageHD = buildAkamaiImageUrl(iconHash);
+
+      // Provably Fair seeds
+      const serverSeed = crypto.randomBytes(32).toString('hex');
+      const clientSeed = crypto.randomBytes(16).toString('hex');
+      const nonce = Date.now() + i;
+      const provablyFairHash = crypto.createHash('sha256').update(`${serverSeed}:${clientSeed}:${nonce}:${itemName}`).digest('hex');
+
+      if (!DB_AVAILABLE) {
+        const newItem = {
+          id: IN_MEMORY_NEXT_ID++,
+          name: itemName,
+          price: itemPrice,
+          image: imageHD,
+          rarity,
+          marketable: true,
+          status: 'on_site',
+          provably_fair_hash: provablyFairHash
+        };
+        const inv = IN_MEMORY_INVENTORY.get(req.user.id) || [];
+        inv.push(newItem);
+        IN_MEMORY_INVENTORY.set(req.user.id, inv);
+        results.push(newItem);
+      } else {
+        const insertResult = await db.query(
+          `INSERT INTO inventario (usuario_id, name, price, image, rarity, marketable, wear, weapon, skin_name, market_hash_name, icon_url, provably_fair_hash, server_seed, client_seed, nonce, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'on_site')
+         RETURNING item_id as id, name, price, image, rarity, marketable, status`,
+          [req.user.id, itemName, itemPrice, imageHD,
+            rarity, true, randomWear, weapon, skinName, itemName, iconHash, provablyFairHash, serverSeed, clientSeed, nonce]
+        );
+        results.push(insertResult.rows[0]);
+      }
+    }
+
+    if (DB_AVAILABLE) {
+      await recordTransaction(req.user.id, 'apertura_caja', totalCost, 'saldo_sitio', `Apertura de ${qty}x ${caseId}${jokerMode ? ' (Joker Mode)' : ''}`);
+      await logAction(req.user.id, 'ABRIR_CAJA', { caseId, quantity: qty, jokerMode, winnings: results.map(r => r.name), provablyFairHashes: results.map(r => r.provably_fair_hash) });
+    } else {
+      log(LOG_LEVELS.INFO, 'CAJA', 'ABRIR_CAJA_FALLBACK', { user: req.user.id, caseId, quantity: qty, jokerMode, winnings: results.map(r => r.name) });
+    }
+
+    res.json({ success: true, items: results, newBalance: userBalance - totalCost });
+  } catch {
+    res.status(500).json({ error: "Error al abrir la caja" });
+  }
+});
+
+// ─── TRADE URL VALIDATION ─────────────────────────
+app.post("/api/validate-trade-url", authenticateToken, async (req, res) => {
+  const { url } = req.body;
+  if (!url) return res.status(400).json({ valid: false, error: "Trade URL no proporcionada" });
+
+  const partnerMatch = url.match(/partner=(\d+)/);
+  const tokenMatch = url.match(/token=([\w-]+)/);
+
+  if (!partnerMatch || !tokenMatch) {
+    return res.json({
+      valid: false,
+      error: "Formato de Trade URL inválido. Debe contener 'partner' y 'token'.",
+      code: "INVALID_TRADE_URL_FORMAT"
+    });
+  }
+
+  const partnerId = partnerMatch[1];
+  const token = tokenMatch[1];
+
+  if (!/^\d+$/.test(partnerId) || partnerId.length < 5) {
+    return res.json({ valid: false, error: "Partner ID inválido en la Trade URL.", code: "INVALID_PARTNER_ID" });
+  }
+
+  if (!/^[\w-]+$/.test(token) || token.length < 5) {
+    return res.json({ valid: false, error: "Token de intercambio inválido.", code: "INVALID_TOKEN" });
+  }
+
+  const steamId64 = (BigInt(partnerId) + BigInt("76561197960265728")).toString();
+
+  if (!url.includes("steamcommunity.com/tradeoffer/")) {
+    return res.json({
+      valid: false,
+      error: "La URL debe ser una Trade Offer de Steam (steamcommunity.com/tradeoffer/...)",
+      code: "NOT_STEAM_URL"
+    });
+  }
+
+  res.json({ valid: true, steam_id: steamId64, trade_token: token });
+});
+
+// ─── WITHDRAW FALLBACK: Sell skin for 100% balance ──────────
+app.post("/api/inventory/withdraw-fallback", authenticateToken, async (req, res) => {
+  const { itemId, action } = req.body;
+  if (!itemId || !action) return res.status(400).json({ error: "itemId y action requeridos" });
+
+  try {
+    const itemResult = await db.query(
+      "SELECT * FROM inventario WHERE item_id = $1 AND usuario_id = $2 AND status = 'on_site'",
+      [itemId, req.user.id]
+    );
+    if (itemResult.rows.length === 0) {
+      return res.status(404).json({ error: "Objeto no encontrado o ya procesado" });
+    }
+    const item = itemResult.rows[0];
+
+    if (action === 'sell') {
+      await db.withTransaction(async (client) => {
+        await client.query("UPDATE inventario SET status = 'sold' WHERE item_id = $1", [itemId]);
+        await client.query(
+          "UPDATE usuarios SET saldo = saldo + $1 WHERE usuario_id = $2",
+          [item.price, req.user.id]
+        );
+      });
+      await recordTransaction(req.user.id, 'venta_forzada', item.price, 'fallback_saldo',
+        `Venta forzada (bot sin stock): ${item.name}`);
+      await logAction(req.user.id, 'WITHDRAW_FALLBACK_SELL', { itemId, itemName: item.name, price: item.price });
+
+      const balanceResult = await db.query("SELECT saldo FROM usuarios WHERE usuario_id = $1", [req.user.id]);
+      res.json({
+        success: true,
+        action: 'sell',
+        price: item.price,
+        newBalance: balanceResult.rows[0].saldo,
+        message: `✅ Skin vendida por €${item.price} en saldo (100% del valor).`
+      });
+    } else if (action === 'replace') {
+      const replacementResult = await db.query(
+        `SELECT item_id, name, price, image, rarity, market_hash_name, wear, weapon, skin_name
+         FROM inventario
+         WHERE status = 'on_site' AND usuario_id != $1
+           AND price >= $2 AND price <= $3
+         ORDER BY RANDOM() LIMIT 1`,
+        [req.user.id, item.price * 0.9, item.price * 1.1]
+      );
+
+      if (replacementResult.rows.length === 0) {
+        return res.json({
+          success: false,
+          error: "No hay skins de reemplazo disponibles en este momento.",
+          code: "NO_REPLACEMENT",
+          alternative: "sell",
+          message: "Puedes vender la skin por €" + parseFloat(item.price).toFixed(2) + " en saldo."
+        });
+      }
+
+      const replacement = replacementResult.rows[0];
+
+      await db.withTransaction(async (client) => {
+        await client.query("UPDATE inventario SET status = 'replaced' WHERE item_id = $1", [itemId]);
+        await client.query(
+          `INSERT INTO inventario (usuario_id, name, price, image, rarity, marketable, market_hash_name, wear, weapon, skin_name, status)
+           VALUES ($1, $2, $3, $4, $5, true, $6, $7, $8, $9, 'on_site')`,
+          [req.user.id, replacement.name, replacement.price, replacement.image,
+          replacement.rarity, replacement.market_hash_name, replacement.wear,
+          replacement.weapon, replacement.skin_name]
+        );
+      });
+
+      await logAction(req.user.id, 'WITHDRAW_FALLBACK_REPLACE', {
+        originalItemId: itemId,
+        originalName: item.name,
+        replacementId: replacement.item_id,
+        replacementName: replacement.name
+      });
+
+      res.json({
+        success: true,
+        action: 'replace',
+        replacement: {
+          id: replacement.item_id,
+          name: replacement.name,
+          price: replacement.price,
+          image: replacement.image,
+          rarity: replacement.rarity
+        },
+        message: `🔄 Skin reemplazada por: ${replacement.name} (€${replacement.price})`
+      });
+    } else {
+      res.status(400).json({ error: "Acción inválida. Usa 'sell' o 'replace'." });
+    }
+  } catch {
+    res.status(500).json({ error: "Error al procesar fallback de retiro" });
+  }
+});
+
+// --- INVENTORY ROUTES ---
+
+app.get("/api/inventory", authenticateToken, async (req, res) => {
+  try {
+    const result = await db.query(
+      "SELECT item_id as id, name, price, image, rarity, marketable, status, market_hash_name, wear, assetid FROM inventario WHERE usuario_id = $1 AND status != 'sold' AND status != 'withdrawn'",
+      [req.user.id]
+    );
+    res.json(result.rows.map(item => ({ ...item, price: item.price ?? 0.00 })));
+  } catch { res.status(500).json({ error: "Error al obtener inventario" }); }
+});
+
+app.post("/api/inventory/add", authenticateToken, async (req, res) => {
+  const { items } = req.body;
+  if (!items || !Array.isArray(items)) return res.status(400).json({ error: "Items no proporcionados" });
+  try {
+    const addedItems = [];
+    for (const item of items) {
+      const result = await db.query(
+        `INSERT INTO inventario (usuario_id, name, price, image, rarity, marketable, market_hash_name, wear, weapon, skin_name)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         RETURNING item_id as id, name, price, image, rarity, marketable, status`,
+        [req.user.id, item.name, item.price, item.image, item.rarity, item.marketable !== false, item.market_hash_name || item.name, item.wear || "Field-Tested", item.weapon || "", item.skin_name || ""]
+      );
+      addedItems.push(result.rows[0]);
+    }
+    res.json({ success: true, items: addedItems });
+  } catch { res.status(500).json({ error: "Error al añadir al inventario" }); }
+});
+
+app.post("/api/inventory/sell", authenticateToken, async (req, res) => {
+  const { itemId } = req.body;
+  try {
+    await db.withTransaction(async (client) => {
+      const itemResult = await client.query(
+        "SELECT * FROM inventario WHERE item_id = $1 AND usuario_id = $2 AND status = 'on_site' FOR UPDATE",
+        [itemId, req.user.id]
+      );
+      if (itemResult.rows.length === 0) {
+        throw new Error("Objeto no encontrado o ya procesado");
+      }
+      const item = itemResult.rows[0];
+
+      await client.query("UPDATE inventario SET status = 'sold' WHERE item_id = $1", [itemId]);
+
+      const balanceResult = await client.query(
+        "UPDATE usuarios SET saldo = saldo + $1 WHERE usuario_id = $2 RETURNING saldo",
+        [item.price, req.user.id]
+      );
+
+      await recordTransaction(req.user.id, 'venta', item.price, 'inventario_sitio', `Venta de ${item.name}`);
+      await logAction(req.user.id, 'VENDER_ITEM', { itemId, itemName: item.name, price: item.price });
+
+      res.json({ success: true, newBalance: balanceResult.rows[0].saldo });
+    });
+  } catch (err) {
+    if (err.message === "Objeto no encontrado o ya procesado") {
+      return res.status(404).json({ error: err.message });
+    }
+    res.status(500).json({ error: "Error al vender objeto" });
+  }
+});
+
+// ─── REAL WITHDRAW TO STEAM TRADE OFFER ──────────────────
+app.post("/api/inventory/withdraw", authenticateToken, withdrawLimiter, async (req, res) => {
+  const { itemId } = req.body;
+
+  // [TRADE] Log de inicio de retiro
+  log(LOG_LEVELS.INFO, 'TRADE', `[TRADE] Iniciando retiro - ItemID: ${itemId} para usuario: ${req.user.id}`);
+
+  try {
+    const itemResult = await db.query("SELECT * FROM inventario WHERE item_id = $1 AND usuario_id = $2 AND status = 'on_site'", [itemId, req.user.id]);
+    if (itemResult.rows.length === 0) {
+      log(LOG_LEVELS.WARN, 'TRADE', `[TRADE] Item ${itemId} no disponible para retiro (usuario: ${req.user.id})`);
+      return res.status(404).json({ error: "Objeto no disponible para retirar" });
+    }
+    const item = itemResult.rows[0];
+
+    const userResult = await db.query("SELECT link_intercambio, steam_id, trade_token FROM usuarios WHERE usuario_id = $1", [req.user.id]);
+    const user = userResult.rows[0];
+
+    if (!user.steam_id || !user.trade_token) {
+      log(LOG_LEVELS.WARN, 'TRADE', `[TRADE] Usuario ${req.user.id} sin Steam ID o Trade Token configurado`);
+      return res.status(400).json({
+        success: false,
+        error: 'Debes configurar tu Steam Trade URL en tu perfil antes de solicitar un retiro.',
+        code: "TRADE_URL_MISSING"
+      });
+    }
+
+    // [TRADE] Log del estado del bot (ON-DEMAND: bot se conecta solo cuando se solicita un retiro)
+    console.log('[WITHDRAW REAL] Iniciando oferta real para SteamID:', user.steam_id, '- Item:', item.name, '- ItemID:', itemId);
+    const botStatus = botEngine.isLoggedIn ? 'Conectado' : 'Desconectado (bajo demanda)';
+    log(LOG_LEVELS.INFO, 'TRADE', `[TRADE] Estado del Bot: ${botStatus} | Solicitando retiro on-demand: ${item.name} (${item.market_hash_name || item.name}) para SteamID: ${user.steam_id}`);
+
+    // ON-DEMAND: sendWithdrawOffer handles login internally via ensureConnected()
+    try {
+      log(LOG_LEVELS.INFO, 'TRADE', `[TRADE] Solicitando retiro de item: ${item.market_hash_name || item.name} para SteamID: ${user.steam_id}`);
+
+      const result = await botEngine.sendWithdrawOffer(
+        user.steam_id,
+        user.trade_token,
+        item.name,
+        item.market_hash_name || item.name
+      );
+
+      if (result.success) {
+        log(LOG_LEVELS.INFO, 'TRADE', `[TRADE] ✅ Oferta enviada exitosamente - OfferID: ${result.offerId} | Item: ${item.name}`);
+
+        await db.query("UPDATE inventario SET status = 'withdrawn' WHERE item_id = $1", [itemId]);
+        await recordTransaction(req.user.id, 'retiro', item.price, 'steam_trade', `Retiro real: ${item.name} - Offer ID: ${result.offerId}`);
+        await logAction(req.user.id, 'RETIRAR_ITEM_REAL', { itemId, itemName: item.name, offerId: result.offerId, marketHashName: item.market_hash_name });
+
+        if (req.app.get('io')) {
+          req.app.get('io').to(req.user.id.toString()).emit('withdrawal_update', {
+            itemId, status: 'withdrawn', offerId: result.offerId,
+            message: `Oferta #${result.offerId} enviada a Steam. Revisa tu inventario de ofertas.`
+          });
+        }
+
+        return res.json({ success: true, offerId: result.offerId, message: `Oferta #${result.offerId} enviada a Steam. Revisa tu inventario.` });
+      } else {
+        log(LOG_LEVELS.ERROR, 'TRADE', `[TRADE] ❌ Fallo al enviar oferta - Error: ${result.error} | Item: ${item.name}`);
+        return res.status(400).json({
+          success: false,
+          error: result.error || "No se pudo enviar la oferta real. Inténtalo más tarde.",
+          code: result.code || 'TRADE_OFFER_FAILED',
+          itemId
+        });
+      }
+    } catch (botErr) {
+      log(LOG_LEVELS.ERROR, 'TRADE', `[TRADE] ❌ Error del bot en retiro - ${botErr.message} | Item: ${item.name}`);
+
+      // Determine specific error type for better user feedback
+      let errorMessage = "Error al procesar el retiro. ";
+      let errorCode = 'BOT_ERROR';
+
+      if (botErr.message && botErr.message.includes('RateLimitExceeded')) {
+        errorMessage = "Steam está limitando las solicitudes. Espera 5 minutos e intenta de nuevo.";
+        errorCode = 'RATE_LIMIT_EXCEEDED';
+      } else if (botErr.message && (botErr.message.includes('no dispone') || botErr.message.includes('no tiene'))) {
+        errorMessage = "El bot no tiene esta skin en stock actualmente. Intenta más tarde o usa la opción de venta.";
+        errorCode = 'ITEM_OUT_OF_STOCK';
+      } else if (botErr.message && (botErr.message.includes('conexión') || botErr.message.includes('network') || botErr.message.includes('timeout'))) {
+        errorMessage = "Error de conexión con Steam. Verifica tu internet e intenta de nuevo.";
+        errorCode = 'CONNECTION_ERROR';
+      } else if (botErr.message && (botErr.message.includes('trade') || botErr.message.includes('intercambio'))) {
+        errorMessage = "Error en la oferta de intercambio. La skin puede no ser intercambiable o ya fue usada.";
+        errorCode = 'TRADE_ERROR';
+      }
+
+      return res.status(500).json({
+        success: false,
+        error: errorMessage,
+        code: errorCode,
+        itemId,
+        details: botErr.message
+      });
+    }
+  } catch {
+    res.status(500).json({ error: "Error al procesar el retiro" });
+  }
+});
+
+app.post("/api/update-profile", authenticateToken, async (req, res) => {
+  const { link_intercambio } = req.body;
+  if (!link_intercambio) return res.status(400).json({ error: "Enlace no proporcionado" });
+
+  let steam_id = null;
+  let trade_token = null;
+
+  const partnerMatch = link_intercambio.match(/partner=(\d+)/);
+  if (partnerMatch) {
+    steam_id = (BigInt(partnerMatch[1]) + BigInt("76561197960265728")).toString();
+  }
+
+  const tokenMatch = link_intercambio.match(/token=([\w-]+)/);
+  if (tokenMatch) {
+    trade_token = tokenMatch[1];
+  }
+
+  try {
+    const result = await db.query(
+      "UPDATE usuarios SET link_intercambio = $1, steam_id = $2, trade_token = $3 WHERE usuario_id = $4 RETURNING link_intercambio, steam_id, trade_token",
+      [link_intercambio, steam_id, trade_token, req.user.id]
+    );
+    res.json({ success: true, profile: result.rows[0] });
+  } catch {
+    res.status(500).json({ error: "Error al actualizar perfil" });
+  }
+});
+
+// SECURITY FIX: /api/update-balance was previously open to ANY authenticated user,
+// allowing arbitrary balance injection. Now protected behind isAdmin middleware.
+// Balance can ONLY be credited via verified payment webhooks or admin action.
+app.post("/api/update-balance", authenticateToken, isAdmin, async (req, res) => {
+  const { amount, targetUserId } = req.body;
+  if (amount === undefined) return res.status(400).json({ error: "Monto no especificado" });
+
+  // Strict validation: reject NaN, negative, or non-finite values
+  const parsedAmount = parseFloat(amount);
+  if (isNaN(parsedAmount) || !isFinite(parsedAmount) || parsedAmount === 0) {
+    return res.status(400).json({ error: "Monto inválido. Debe ser un número finito y distinto de cero." });
+  }
+  if (Math.abs(parsedAmount) > 10000) {
+    return res.status(400).json({ error: "Monto excede el límite máximo permitido (€10,000)." });
+  }
+
+  const userId = targetUserId || req.user.id;
+  try {
+    const result = await db.query(
+      "UPDATE usuarios SET saldo = saldo + $1 WHERE usuario_id = $2 RETURNING saldo",
+      [parsedAmount, userId]
+    );
+    await recordTransaction(userId, 'ajuste_admin', parsedAmount, 'sistema', `Ajuste manual por admin #${req.user.id}`);
+    await logAction(req.user.id, 'ACTUALIZAR_SALDO_ADMIN', { amount: parsedAmount, targetUser: userId });
+    res.json({ success: true, newBalance: result.rows[0].saldo });
+  } catch {
+    res.status(500).json({ error: "Error al actualizar saldo" });
+  }
+});
+
+// --- STEAM ROUTES (Legacy) ---
+
+const steamInventoryCache = new Map();
+const STEAM_CACHE_TTL = 5 * 60 * 1000;
+
+app.get("/api/steam-inventory/:steamId", authenticateToken, async (req, res) => {
+  const steamId = req.params.steamId;
+  const cacheKey = `inventory_${steamId}`;
+
+  const cached = steamInventoryCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < STEAM_CACHE_TTL) {
+    return res.json(cached.data);
+  }
+  if (cached) steamInventoryCache.delete(cacheKey);
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+    const response = await fetch(
+      `https://steamcommunity.com/inventory/${steamId}/730/2?l=english`,
+      {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+          "Referer": "https://steamcommunity.com/"
+        },
+        signal: controller.signal
+      }
+    );
+
+    clearTimeout(timeoutId);
+
+    if (response.status !== 200) {
+      return res.status(response.status).json({ error: `Steam respondió con error ${response.status}` });
+    }
+
+    const data = await response.json();
+    if (!data || data.success === false) {
+      return res.status(403).json({ error: "El inventario es privado o no se pudo acceder." });
+    }
+
+    const inventory = data.assets.map(asset => {
+      const description = data.descriptions.find(d => d.classid === asset.classid);
+      if (!description) return null;
+      let rarity = description.tags?.find(t => t.category === "Rarity")?.name || "Consumer Grade";
+      let basePrice = 0.50;
+      if (rarity.includes("Covert")) basePrice = (Math.random() * 400 + 50);
+      else if (rarity.includes("Classified")) basePrice = (Math.random() * 40 + 10);
+      else if (rarity.includes("Restricted")) basePrice = (Math.random() * 8 + 2);
+      return {
+        id: asset.assetid,
+        name: description.market_hash_name,
+        market_hash_name: description.market_hash_name,
+        assetid: asset.assetid,
+        image: `https://community.cloudflare.steamstatic.com/economy/image/${description.icon_url}`,
+        price: parseFloat(basePrice.toFixed(2)) ?? 0.00,
+        rarity: rarity,
+        marketable: description.marketable === 1
+      };
+    }).filter(skin => skin !== null);
+
+    steamInventoryCache.set(cacheKey, { data: inventory, timestamp: Date.now() });
+    res.json(inventory);
+  } catch {
+    res.status(500).json({ error: "Error interno al conectar con Steam" });
+  }
+});
+
+app.get("/api/steam-price", async (req, res) => {
+  const hashName = req.query.market_hash_name;
+  if (!hashName) return res.status(400).json({ error: "Missing market_hash_name" });
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const response = await fetch(
+      `https://steamcommunity.com/market/priceoverview/?appid=730&currency=3&market_hash_name=${encodeURIComponent(hashName)}`,
+      { headers: { "User-Agent": "Mozilla/5.0" }, signal: controller.signal }
+    );
+    clearTimeout(timeoutId);
+    if (!response.ok) {
+      return res.status(response.status).json({ error: `Steam Market respondió con error ${response.status}` });
+    }
+    const data = await response.json();
+    res.json(data);
+  } catch {
+    res.status(500).json({ error: "Error al consultar precio de Steam" });
+  }
+});
+
+// Health endpoints
+app.get("/api/health", (req, res) => {
+  res.status(200).json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || "development"
+  });
+});
+
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+app.get("/", (req, res) => {
+  res.status(200).send("SkinMarket API Running");
+});
+
+// --- SKIN REPLACEMENT ---
+
+app.post("/api/skins/replace-corrupted", authenticateToken, async (req, res) => {
+  const { skinId, userId } = req.body;
+  if (!skinId || !userId) return res.status(400).json({ error: "skinId y userId son requeridos" });
+  try {
+    const originalSkinResult = await db.query("SELECT * FROM inventario WHERE item_id = $1 AND usuario_id = $2", [skinId, userId]);
+    if (originalSkinResult.rows.length === 0) return res.status(404).json({ error: "Skin original no encontrada" });
+    const originalSkin = originalSkinResult.rows[0];
+    const originalPrice = parseFloat(originalSkin.price) || 0;
+    let replacementSkin = null;
+
+    const userSkinsResult = await db.query(
+      `SELECT * FROM inventario WHERE usuario_id = $1 AND item_id != $2 AND status = 'on_site' AND image IS NOT NULL AND image != '' AND price >= $3 ORDER BY price DESC LIMIT 1`,
+      [userId, skinId, originalPrice]
+    );
+    if (userSkinsResult.rows.length > 0) {
+      replacementSkin = userSkinsResult.rows[0];
+    } else {
+      const systemSkinsResult = await db.query(
+        `SELECT * FROM inventario WHERE status = 'on_site' AND image IS NOT NULL AND image != '' AND price >= $1 AND usuario_id != $2 ORDER BY RANDOM() LIMIT 1`,
+        [originalPrice, userId]
+      );
+      if (systemSkinsResult.rows.length > 0) replacementSkin = systemSkinsResult.rows[0];
+    }
+
+    if (!replacementSkin) return res.status(404).json({ error: "No hay skins de reemplazo disponibles", code: "NO_REPLACEMENT_AVAILABLE" });
+
+    await logAction(userId, 'SKIN_REPLACED', { originalSkinId: skinId, originalSkinName: originalSkin.name, replacementSkinId: replacementSkin.item_id, replacementSkinName: replacementSkin.name });
+    res.json({ success: true, replacementSkin: { id: replacementSkin.item_id, name: replacementSkin.name, image: replacementSkin.image, price: replacementSkin.price, rarity: replacementSkin.rarity } });
+  } catch {
+    res.status(500).json({ error: "Error al procesar reemplazo de skin" });
+  }
+});
+
+// --- ADMIN ROUTES ---
+
+app.get("/api/admin/stats", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const userCount = await db.query("SELECT COUNT(*) FROM usuarios");
+    const transCount = await db.query("SELECT COUNT(*) FROM transacciones");
+    const totalDeposited = await db.query("SELECT COALESCE(SUM(monto), 0) FROM transacciones WHERE tipo = 'deposito'");
+    const totalWithdrawn = await db.query("SELECT COALESCE(SUM(monto), 0) FROM transacciones WHERE tipo = 'retiro'");
+    res.json({ users: userCount.rows[0].count, transactions: transCount.rows[0].count, deposited: totalDeposited.rows[0].sum, withdrawn: totalWithdrawn.rows[0].sum });
+  } catch {
+    res.status(500).json({ error: "Error al obtener estadísticas" });
+  }
+});
+
+app.get("/api/admin/settings/probabilities", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const result = await db.query("SELECT valor FROM configuracion WHERE clave = 'probabilidades'");
+    res.json(result.rows[0]?.valor || {});
+  } catch {
+    res.status(500).json({ error: "Error al obtener probabilidades" });
+  }
+});
+
+app.post("/api/admin/settings/probabilities", authenticateToken, isAdmin, async (req, res) => {
+  const { probabilities } = req.body;
+  try {
+    await db.query("UPDATE configuracion SET valor = $1, ultima_modificacion = NOW() WHERE clave = 'probabilidades'", [JSON.stringify(probabilities)]);
+    await logAction(req.user.id, "UPDATE_SETTINGS", { key: 'probabilidades', value: probabilities });
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ error: "Error al actualizar probabilidades" });
+  }
+});
+
+// ─── PAYMENT ROUTES ───────────────────────────────
+app.post("/api/payments/create-charge", authenticateToken, createCharge);
+app.post("/api/payments/webhook", handleWebhook);
+app.get("/api/payments/status/:chargeId", authenticateToken, getPaymentStatus);
+
+// ─── P2P MARKET ───────────────────────────────────
+app.get("/api/p2p/status", authenticateToken, (req, res) => { res.json(p2pMarketService.getStatus()); });
+app.post("/api/p2p/search", authenticateToken, async (req, res) => {
+  const { marketHashName, minPrice, maxPrice } = req.body;
+  if (!marketHashName) return res.status(400).json({ error: "marketHashName requerido" });
+  try {
+    const results = await p2pMarketService.searchSkin(marketHashName, { minPrice, maxPrice });
+    res.json({ success: true, results });
+  } catch {
+    res.status(500).json({ error: "Error al buscar en mercado P2P" });
+  }
+});
+
+// ─────────────────────────────────────────────────
+// BATTLES PRIVADAS — Salas en memoria con TTL
+// ─────────────────────────────────────────────────
+// Las salas viven en memoria (Map) con expiración automática (TTL).
+// El creador paga su entrada (y opcionalmente un % de la entrada de los
+// rivales vía "préstamo"). Al unirse, cada jugador paga su entrada de
+// forma atómica (SELECT ... FOR UPDATE). Los endpoints responden a la UI.
+// ─────────────────────────────────────────────────
+
+const BATTLE_ROOM_TTL_MS = 30 * 60 * 1000; // 30 minutos de vida por sala
+const battleRooms = new Map(); // roomCode -> { ...room, expiresAt }
+
+function generateBattleCode() {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let code;
+  do {
+    code = "";
+    for (let i = 0; i < 8; i++) {
+      code += chars[Math.floor(Math.random() * chars.length)];
+    }
+  } while (battleRooms.has(code));
+  return code;
+}
+
+// Limpiar salas expiradas periódicamente
+setInterval(() => {
+  const now = Date.now();
+  for (const [code, room] of battleRooms.entries()) {
+    if (room.expiresAt < now) {
+      battleRooms.delete(code);
+      log(LOG_LEVELS.INFO, 'BATTLES', `Sala ${code} expirada y eliminada (TTL)`);
+    }
+  }
+}, 60 * 1000).unref?.();
+
+// Helper: deducción atómica de saldo (con FOR UPDATE) + otorga XP (1€ = 100 XP)
+// Lanza Error('INSUFFICIENT_BALANCE') si no hay saldo suficiente.
+async function atomicDeductBalanceAndAwardXP(usuario_id, monto) {
+  const amount = Math.max(0, parseFloat(monto) || 0);
+  let userBalance;
+  await db.withTransaction(async (client) => {
+    const userResult = await client.query(
+      "SELECT saldo FROM usuarios WHERE usuario_id = $1 FOR UPDATE",
+      [usuario_id]
+    );
+    if (!userResult.rows[0] || Number(userResult.rows[0].saldo) < amount) {
+      throw new Error('INSUFFICIENT_BALANCE');
+    }
+    userBalance = Number(userResult.rows[0].saldo);
+    const expGain = Math.floor(amount * 100); // $1 = 100 XP
+    await client.query(
+      "UPDATE usuarios SET saldo = saldo - $1, experiencia = experiencia + $2 WHERE usuario_id = $3",
+      [amount, expGain, usuario_id]
+    );
+  });
+  return { newBalance: userBalance - amount, expGain: Math.floor(amount * 100) };
+}
+
+// POST /api/battles/create — El creador paga entrada + préstamo y crea la sala
+app.post("/api/battles/create", authenticateToken, async (req, res) => {
+  const {
+    gameMode = "classic",
+    playerCount = 2,
+    totalCost = 0,
+    loanPercent = 0,
+    caseIds = [],
+    inviteCode = null
+  } = req.body || {};
+
+  try {
+    const entry = parseFloat(totalCost) || 0;
+    const loanMultiplier = (parseInt(loanPercent, 10) || 0) / 100;
+    const opponentCount = Math.max(0, (parseInt(playerCount, 10) || 2) - 1);
+    const loanCost = loanMultiplier > 0 ? entry * opponentCount * loanMultiplier : 0;
+    const totalToPay = entry + loanCost;
+
+    if (entry <= 0 || !Array.isArray(caseIds) || caseIds.length === 0) {
+      return res.status(400).json({ error: "Datos de batalla inválidos. Entrada y cajas son obligatorias.", code: "INVALID_BATTLE_DATA" });
+    }
+    if (totalToPay > 10000) {
+      return res.status(400).json({ error: "El coste de la batalla supera el límite permitido.", code: "BATTLE_TOO_EXPENSIVE" });
+    }
+
+    // Deducción atómica del saldo del creador (entrada + préstamo)
+    let deduction;
+    try {
+      deduction = await atomicDeductBalanceAndAwardXP(req.user.id, totalToPay);
+    } catch (err) {
+      if (err.message === 'INSUFFICIENT_BALANCE') {
+        return res.status(400).json({ error: "Saldo insuficiente para crear la batalla.", code: "INSUFFICIENT_BALANCE", required: totalToPay });
+      }
+      throw err;
+    }
+
+    const code = inviteCode || generateBattleCode();
+    // Si el código ya existe, regenerar
+    const finalCode = battleRooms.has(code) ? generateBattleCode() : code;
+
+    const room = {
+      code: finalCode,
+      ownerId: req.user.id,
+      ownerName: (req.body && req.body.ownerName) || "Jugador",
+      gameMode,
+      playerCount: parseInt(playerCount, 10) || 2,
+      entry: entry,
+      loanPercent: parseInt(loanPercent, 10) || 0,
+      loanCost,
+      caseIds,
+      status: "waiting",
+      createdAt: new Date().toISOString(),
+      expiresAt: Date.now() + BATTLE_ROOM_TTL_MS,
+      players: [{
+        userId: req.user.id,
+        name: (req.body && req.body.ownerName) || "Jugador",
+        paid: totalToPay,
+        isOwner: true,
+        joinedAt: new Date().toISOString()
+      }]
+    };
+
+    battleRooms.set(finalCode, room);
+
+    await recordTransaction(req.user.id, 'batalla', totalToPay, 'saldo_sitio', `Creación de batalla privada #${finalCode} (entrada ${entry}€ + préstamo ${loanCost}€)`);
+    await logAction(req.user.id, 'BATALLA_CREAR', { code: finalCode, gameMode, playerCount, entry, loanPercent, loanCost, caseIds });
+
+    log(LOG_LEVELS.INFO, 'BATTLES', `Sala ${finalCode} creada por usuario ${req.user.id} (coste ${totalToPay}€)`);
+
+    res.status(201).json({
+      success: true,
+      code: finalCode,
+      room: {
+        code: finalCode,
+        gameMode,
+        playerCount,
+        entry,
+        loanPercent,
+        caseIds,
+        status: "waiting",
+        players: room.players,
+        inviteUrl: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/battles?invite=${finalCode}`
+      },
+      newBalance: deduction.newBalance,
+      expGain: deduction.expGain,
+      message: `✅ Batalla privada #${finalCode} creada. Comparte el enlace de invitación.`
+    });
+  } catch (err) {
+    log(LOG_LEVELS.ERROR, 'BATTLES', 'Error al crear batalla:', err.message);
+    res.status(500).json({ error: "Error al crear la batalla.", code: "BATTLE_CREATE_ERROR" });
+  }
+});
+
+// POST /api/battles/join — Un jugador se une a una sala existente pagando su entrada
+app.post("/api/battles/join", authenticateToken, async (req, res) => {
+  const { inviteCode, playerName } = req.body || {};
+
+  try {
+    if (!inviteCode) {
+      return res.status(400).json({ error: "Código de invitación obligatorio.", code: "INVITE_CODE_REQUIRED" });
+    }
+
+    const code = String(inviteCode).toUpperCase().trim();
+    const room = battleRooms.get(code);
+
+    if (!room) {
+      return res.status(404).json({ error: "La batalla no existe o ha expirado.", code: "BATTLE_NOT_FOUND" });
+    }
+    if (room.status !== "waiting") {
+      return res.status(409).json({ error: "La batalla ya ha comenzado o ha finalizado.", code: "BATTLE_ALREADY_STARTED" });
+    }
+    if (room.expiresAt < Date.now()) {
+      battleRooms.delete(code);
+      return res.status(404).json({ error: "La batalla ha expirado.", code: "BATTLE_EXPIRED" });
+    }
+    if (room.players.some((p) => p.userId === req.user.id)) {
+      return res.status(409).json({ error: "Ya estás dentro de esta batalla.", code: "ALREADY_JOINED" });
+    }
+    if (room.players.length >= room.playerCount) {
+      return res.status(409).json({ error: "La batalla está completa.", code: "BATTLE_FULL" });
+    }
+
+    // El jugador que se une paga su propia entrada (sin préstamo)
+    const joinCost = room.entry;
+
+    // Deducción atómica del saldo del que se une
+    let deduction;
+    try {
+      deduction = await atomicDeductBalanceAndAwardXP(req.user.id, joinCost);
+    } catch (err) {
+      if (err.message === 'INSUFFICIENT_BALANCE') {
+        return res.status(400).json({ error: "Saldo insuficiente para unirte a la batalla.", code: "INSUFFICIENT_BALANCE", required: joinCost });
+      }
+      throw err;
+    }
+
+    room.players.push({
+      userId: req.user.id,
+      name: playerName || "Jugador",
+      paid: joinCost,
+      isOwner: false,
+      joinedAt: new Date().toISOString()
+    });
+
+    // Si la sala está llena, marcarla como lista
+    const isFull = room.players.length >= room.playerCount;
+    if (isFull) {
+      room.status = "ready";
+    }
+
+    await recordTransaction(req.user.id, 'batalla', joinCost, 'saldo_sitio', `Unión a batalla privada #${code} (entrada ${joinCost}€)`);
+    await logAction(req.user.id, 'BATALLA_UNIRSE', { code, playerCount: room.players.length });
+
+    log(LOG_LEVELS.INFO, 'BATTLES', `Usuario ${req.user.id} se unió a la sala ${code} (${room.players.length}/${room.playerCount})`);
+
+    res.json({
+      success: true,
+      code,
+      room: {
+        code,
+        gameMode: room.gameMode,
+        playerCount: room.playerCount,
+        entry: room.entry,
+        loanPercent: room.loanPercent,
+        caseIds: room.caseIds,
+        status: room.status,
+        players: room.players
+      },
+      newBalance: deduction.newBalance,
+      expGain: deduction.expGain,
+      isReady: isFull,
+      message: isFull
+        ? `🎉 ¡Batalla #${code} completa! Puede comenzar.`
+        : `✅ Te has unido a la batalla #${code}. Esperando a más jugadores (${room.players.length}/${room.playerCount}).`
+    });
+  } catch (err) {
+    log(LOG_LEVELS.ERROR, 'BATTLES', 'Error al unirse a batalla:', err.message);
+    res.status(500).json({ error: "Error al unirse a la batalla.", code: "BATTLE_JOIN_ERROR" });
+  }
+});
+
+// GET /api/battles/:code — Consultar el estado de una sala
+app.get("/api/battles/:code", authenticateToken, async (req, res) => {
+  const code = String(req.params.code || "").toUpperCase().trim();
+  const room = battleRooms.get(code);
+
+  if (!room || room.expiresAt < Date.now()) {
+    if (room) battleRooms.delete(code);
+    return res.status(404).json({ error: "La batalla no existe o ha expirado.", code: "BATTLE_NOT_FOUND" });
+  }
+
+  res.json({
+    success: true,
+    room: {
+      code,
+      gameMode: room.gameMode,
+      playerCount: room.playerCount,
+      entry: room.entry,
+      loanPercent: room.loanPercent,
+      loanCost: room.loanCost,
+      caseIds: room.caseIds,
+      status: room.status,
+      ownerName: room.ownerName,
+      createdAt: room.createdAt,
+      expiresAt: room.expiresAt,
+      players: room.players
+    }
+  });
+});
+
+// ─── GLOBAL ERROR HANDLER ────────────────────────
+process.on('unhandledRejection', (reason, promise) => {
+  log(LOG_LEVELS.ERROR, 'GLOBAL', '❌ Unhandled Promise Rejection', {
+    reason: reason?.toString() || 'Unknown reason',
+    type: typeof reason,
+    isError: reason instanceof Error,
+    stack: reason instanceof Error ? reason.stack : undefined,
+    promise: promise ? 'promise was provided' : 'no promise context'
+  });
+
+  // Never crash on unhandled rejections — log and continue
+  log(LOG_LEVELS.WARN, 'GLOBAL', '🔁 Proceso continúa a pesar del rejection no capturado');
+});
+
+process.on('uncaughtException', (err) => {
+  log(LOG_LEVELS.ERROR, 'GLOBAL', '💥 UNCAUGHT EXCEPTION', {
+    error: err.message,
+    stack: err.stack,
+    code: err.code,
+    syscall: err.syscall,
+    errno: err.errno,
+    path: err.path,
+    address: err.address,
+    port: err.port
+  });
+
+  // Log environment context
+  log(LOG_LEVELS.ERROR, 'GLOBAL', '📋 Contexto del error', {
+    nodeEnv: process.env.NODE_ENV || 'development',
+    pid: process.pid,
+    uptime: process.uptime(),
+    memoryUsage: process.memoryUsage(),
+    cwd: process.cwd()
+  });
+
+  // En producción, gracia: no matar el proceso inmediatamente
+  if (process.env.NODE_ENV === 'production') {
+    log(LOG_LEVELS.ERROR, 'GLOBAL', '⚠️ Error crítico en producción — ejecutando shutdown graceful en 5s...');
+
+    // Dar tiempo para que los logs se escriban y las conexiones se cierren
+    setTimeout(() => {
+      log(LOG_LEVELS.INFO, 'GLOBAL', '🔄 Forzando reinicio del proceso...');
+      process.exit(1);
+    }, 5000);
+  } else {
+    // En desarrollo, salir inmediatamente para que el watcher reinicie
+    log(LOG_LEVELS.ERROR, 'GLOBAL', '🛑 Saliendo del proceso (desarrollo)');
+    process.exit(1);
+  }
+});
+
+// ─── SIGTERM / SIGINT HANDLER (Graceful Shutdown para Render) ──
+process.on('SIGTERM', () => {
+  log(LOG_LEVELS.INFO, 'GLOBAL', '📡 Señal SIGTERM recibida — cerrando servidor gracefulmente...');
+  if (server) {
+    server.close(() => {
+      log(LOG_LEVELS.INFO, 'GLOBAL', '✅ Servidor HTTP cerrado correctamente');
+      process.exit(0);
+    });
+  } else {
+    process.exit(0);
+  }
+});
+
+process.on('SIGINT', () => {
+  log(LOG_LEVELS.INFO, 'GLOBAL', '⌨️ Señal SIGINT recibida — cerrando servidor...');
+  if (server) {
+    server.close(() => {
+      log(LOG_LEVELS.INFO, 'GLOBAL', '✅ Servidor HTTP cerrado correctamente');
+      process.exit(0);
+    });
+  } else {
+    process.exit(0);
+  }
+});
+
+// ─── RESPONSE ERROR MIDDLEWARE ───────────────────
+// Express requires exactly 4 args (err, req, res, next) to identify error handlers.
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  log(LOG_LEVELS.ERROR, 'GLOBAL', 'Error en middleware global', {
+    error: err.message,
+    stack: err.stack,
+    url: req.url,
+    method: req.method
+  });
+
+  // Siempre devolver JSON estructurado
+  res.status(500).json({
+    success: false,
+    error: process.env.NODE_ENV === 'production'
+      ? 'Error interno del servidor'
+      : err.message
+  });
+});
+
+// ─── SKIN PRICES CACHE WITH HTTP CACHE HEADERS ─────
+const skinPricesPath = path.join(__dirname, '../../public/skin_prices.json');
+app.get('/skin_prices.json', (req, res) => {
+  if (!fs.existsSync(skinPricesPath)) {
+    return res.status(404).json({ error: "Cache de precios no disponible" });
+  }
+
+  // Cache-Control: public, max-age=300 (5 minutos)
+  res.set('Cache-Control', 'public, max-age=300');
+  res.set('Content-Type', 'application/json');
+  res.sendFile(skinPricesPath);
+});
+
+// ─── SPA CATCH-ALL ───────────────────────────────
+const distPath = path.join(__dirname, '../../dist');
+const indexPath = path.join(distPath, 'index.html');
+const publicPath = path.join(__dirname, '../../public');
+if (!fs.existsSync(publicPath)) fs.mkdirSync(publicPath, { recursive: true });
+
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
+  app.get(/^\/(?!api\/).*/, (req, res) => {
+    if (fs.existsSync(indexPath)) res.sendFile(indexPath);
+    else res.status(404).json({ error: "Frontend no construido. Ejecuta npm run build." });
+  });
+} else {
+  log(LOG_LEVELS.WARN, 'SYSTEM', 'Directorio dist/ no encontrado. Sirviendo solo API.');
+}
+
+// ─── SOCKET.IO ────────────────────────────────────
+const server = app.listen(PORT, "0.0.0.0", () => log(LOG_LEVELS.INFO, 'SYSTEM', `Servidor corriendo en puerto ${PORT}`));
+server.on('error', (err) => {
+  log(LOG_LEVELS.ERROR, 'SYSTEM', `Error al abrir puerto ${PORT}:`, err.message);
+  process.exit(1);
+});
+
+const io = new SocketIOServer(server, {
+  cors: {
+    origin: allowedOrigins,
+    methods: ["GET", "POST"],
+    credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization"]
+  },
+  transports: ['websocket', 'polling'],
+  pingTimeout: 30000,
+  pingInterval: 25000,
+  allowEIO3: true,
+  connectTimeout: 45000,
+  maxHttpBufferSize: 1e6
+});
+
+io.on("connection", (socket) => {
+  log(LOG_LEVELS.INFO, 'SOCKET', `Cliente conectado: ${socket.id}`);
+  socket.on("disconnect", () => log(LOG_LEVELS.INFO, 'SOCKET', `Cliente desconectado: ${socket.id}`));
+});
+
+// Expose io to Express so route handlers can emit socket events (e.g. withdrawal_update)
+app.set('io', io);
+
+
+// ─── PRICE CACHE ──────────────────────────────────
+async function refreshPriceCache() {
+  try {
+    const { execSync } = await import("child_process");
+    const scriptPath = path.join(__dirname, "../../generate_prices_cache.js");
+    log(LOG_LEVELS.INFO, 'PRICES', 'Iniciando actualización de caché de precios...');
+    const result = execSync(`node "${scriptPath}"`, { timeout: 30000 });
+    log(LOG_LEVELS.INFO, 'PRICES', `Caché actualizada: ${result.toString().trim()}`);
+  } catch (err) {
+    log(LOG_LEVELS.ERROR, 'PRICES', 'Error al actualizar caché de precios', { error: err.message });
+  }
+}
+
+cron.schedule("0 */6 * * *", () => { refreshPriceCache(); });
+setTimeout(() => { refreshPriceCache(); }, 10000);
+
+app.post("/api/admin/refresh-prices", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    await refreshPriceCache();
+    await logAction(req.user.id, "REFRESH_PRICES", {});
+    res.json({ success: true, message: "Caché de precios actualizada correctamente." });
+  } catch {
+    res.status(500).json({ error: "Error al refrescar precios" });
+  }
+});
+
+// ─── CS2 PRICE SYNC ENGINE ──────────────────────────────
+app.get("/api/skins/sync-market-prices", async (req, res) => {
+  try {
+    log(LOG_LEVELS.INFO, 'PRICE_SYNC', 'Iniciando sincronización de precios CS2...');
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    const response = await fetch(
+      'https://csgo-api.vercel.app/api/skins/prices',
+      {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Accept": "application/json"
+        },
+        signal: controller.signal
+      }
+    );
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      log(LOG_LEVELS.WARN, 'PRICE_SYNC', 'CSGO-API falló, intentando PriceEmpire...');
+      const fallbackController = new AbortController();
+      const fallbackTimeout = setTimeout(() => fallbackController.abort(), 30000);
+
+      const fallbackResponse = await fetch(
+        'https://api.priceempire.com/v1/skins/prices?appid=730',
+        {
+          headers: {
+            "User-Agent": "Mozilla/5.0",
+            "Accept": "application/json"
+          },
+          signal: fallbackController.signal
+        }
+      );
+
+      clearTimeout(fallbackTimeout);
+
+      if (!fallbackResponse.ok) {
+        return res.status(502).json({
+          success: false,
+          error: "No se pudieron obtener precios de mercado. Las APIs externas no responden.",
+          code: "PRICE_API_UNAVAILABLE"
+        });
+      }
+
+      const fallbackData = await fallbackResponse.json();
+      log(LOG_LEVELS.INFO, 'PRICE_SYNC', `PriceEmpire respondió con ${fallbackData?.length || 0} precios`);
+
+      if (Array.isArray(fallbackData) && fallbackData.length > 0) {
+        let updated = 0;
+        for (const item of fallbackData.slice(0, 500)) {
+          if (item.market_hash_name && item.price) {
+            try {
+              await db.query(
+                "UPDATE inventario SET price = $1 WHERE market_hash_name = $2 AND status = 'on_site'",
+                [parseFloat(item.price), item.market_hash_name]
+              );
+              updated++;
+            } catch {
+              // Ignorar errores individuales
+            }
+          }
+        }
+        log(LOG_LEVELS.INFO, 'PRICE_SYNC', `Precios actualizados: ${updated} skins`);
+        return res.json({ success: true, updated, source: "priceempire", total: fallbackData.length });
+      }
+
+      return res.json({ success: true, updated: 0, source: "priceempire", message: "Sin datos de precios disponibles" });
+    }
+
+    const data = await response.json();
+    log(LOG_LEVELS.INFO, 'PRICE_SYNC', `CSGO-API respondió con ${data?.length || 0} precios`);
+
+    if (Array.isArray(data) && data.length > 0) {
+      let updated = 0;
+      for (const item of data.slice(0, 500)) {
+        if (item.market_hash_name && item.price) {
+            try {
+              await db.query(
+                "UPDATE inventario SET price = $1 WHERE market_hash_name = $2 AND status = 'on_site'",
+                [parseFloat(item.price), item.market_hash_name]
+              );
+              updated++;
+            } catch {
+              // Ignorar errores individuales
+            }
+        }
+      }
+      log(LOG_LEVELS.INFO, 'PRICE_SYNC', `Precios actualizados: ${updated} skins`);
+      return res.json({ success: true, updated, source: "csgo-api", total: data.length });
+    }
+
+    res.json({ success: true, updated: 0, source: "csgo-api", message: "Sin datos de precios disponibles" });
+  } catch {
+    res.status(500).json({ error: "Error al sincronizar precios" });
+  }
+});
+
+// Tarea periódica: sincronizar precios cada 6 horas
+cron.schedule("0 */6 * * *", async () => {
+  log(LOG_LEVELS.INFO, 'PRICE_SYNC', 'Ejecutando tarea programada de sincronización de precios...');
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const response = await fetch(
+      `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/skins/sync-market-prices`,
+      { signal: controller.signal }
+    );
+    clearTimeout(timeoutId);
+    const result = await response.json();
+    log(LOG_LEVELS.INFO, 'PRICE_SYNC', `Sincronización programada completada: ${JSON.stringify(result)}`);
+  } catch {
+    // Silenciar errores en tarea programada
+  }
+});
+
+// ─── PRICE ENGINE API ENDPOINT ─────────────────────────
+// Resuelve precios de skins usando la cascada multi-fuente (KeyDrop-style)
+// Fuente 1: Caché local en memoria (<2ms)
+// Fuente 2: PriceEmpire / CSGOBackpack (API Index)
+// Fuente 3: Steam Community Market Direct (wear-specific)
+// Fuente 4: Matriz local pre-calculada (skin_prices.json)
+// Garantía final: Precio base ponderado por rareza (NUNCA null/undefined)
+app.get("/api/prices/resolve", async (req, res) => {
+  try {
+    const { market_hash_name, rarity, wear } = req.query;
+    if (!market_hash_name) {
+      return res.status(400).json({ error: "market_hash_name es obligatorio" });
+    }
+    const result = await PriceEngine.resolvePrice({
+      marketHashName: market_hash_name,
+      rarity: rarity || undefined,
+      wear: wear || undefined,
+    });
+    res.json(result);
+  } catch (err) {
+    log(LOG_LEVELS.ERROR, 'PRICE_ENGINE', 'Error en /api/prices/resolve:', err.message);
+    // Garantía cero crashes: devolver precio base por rareza
+    const { rarity, wear } = req.query;
+    const basePrice = PriceEngine.getRarityBasePrice(rarity || "Mil-Spec Grade", wear || null);
+    res.json({ price: basePrice, source: "rarity_base", error: err.message });
+  }
+});
+
+// Endpoint para estadísticas de caché de precios
+app.get("/api/prices/cache-stats", (req, res) => {
+  res.json(PriceEngine.getCacheStats());
+});
+ 
+
+============================================================================== 
+RUTA: src\context\AuthContext.jsx 
+============================================================================== 
+// src/context/AuthContext.jsx
+import { createContext, useEffect, useState, useCallback, useMemo } from "react";
+import { StorageService } from "../services/StorageService";
+
+export const AuthContext = createContext(null);
+
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(() => {
+    const token = localStorage.getItem("token");
+    if (token && token.length > 10) {
+      const storedUser = StorageService.getUser();
+      if (storedUser && storedUser.email && storedUser.email !== "guest@skinmarket.es") {
+        return storedUser;
+      }
+    }
+    return null;
+  });
+  const [inventory, setInventory] = useState(() => {
+    if (StorageService.hasSession()) {
+      return StorageService.getInventory();
+    }
+    return [];
+  });
+  const [, setTokenState] = useState(() => localStorage.getItem("token") || null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const existingToken = localStorage.getItem("token");
+    if (existingToken && existingToken.length > 10) {
+      const API = import.meta.env.VITE_API_URL || "";
+      fetch(`${API}/api/me`, {
+        headers: { Authorization: `Bearer ${existingToken}` }
+      })
+        .then(res => {
+          if (!res.ok) throw new Error('Not authenticated');
+          return res.json();
+        })
+        .then(userData => {
+          if (userData && userData.email) {
+            StorageService.updateUser({
+              nombre_usuario: userData.nombre_usuario || userData.name || "Usuario",
+              email: userData.email,
+              saldo: Number(userData.saldo || 0),
+              balance: Number(userData.saldo || userData.balance || 0),
+              nivel: Number(userData.nivel || userData.level || 0),
+              experiencia: Number(userData.experiencia || 0),
+              steam_id: userData.steam_id || null,
+              link_intercambio: userData.link_intercambio || null
+            });
+            setUser(StorageService.getUser());
+          } else {
+            localStorage.removeItem('token');
+            StorageService.destroySession();
+            setUser(null);
+            setInventory([]);
+          }
+        })
+        .catch(() => {
+          localStorage.removeItem('token');
+          StorageService.destroySession();
+          setUser(null);
+          setInventory([]);
+        });
+    }
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = StorageService.subscribe((data) => {
+      if (data) {
+        setUser(data.user);
+        setInventory(data.inventory);
+      } else {
+        setUser(null);
+        setInventory([]);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const login = useCallback(async (email, password) => {
+    setLoading(true);
+    try {
+      const API = import.meta.env.VITE_API_URL || "";
+      if (!password) {
+        throw new Error("La contraseña es obligatoria");
+      }
+      const response = await fetch(`${API}/api/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      });
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        localStorage.removeItem('token');
+        StorageService.destroySession();
+        setUser(null);
+        setInventory([]);
+        throw new Error(errData.error || "Credenciales inválidas");
+      }
+      const data = await response.json();
+      if (!data?.token || !data?.user?.email) {
+        localStorage.removeItem('token');
+        StorageService.destroySession();
+        setUser(null);
+        setInventory([]);
+        throw new Error("Respuesta de login inválida");
+      }
+      localStorage.setItem("token", data.token);
+      setTokenState(data.token);
+      StorageService.updateUser({
+        ...data.user,
+        nombre_usuario: data.user.nombre_usuario || "Usuario",
+        email: data.user.email,
+        saldo: Number(data.user.saldo || 0),
+        balance: Number(data.user.saldo || data.user.balance || 0),
+        nivel: Number(data.user.nivel || 0),
+        experiencia: Number(data.user.experiencia || 0)
+      });
+      setUser(StorageService.getUser());
+      return data.user;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const register = useCallback(async (nombre_usuario, email, password) => {
+    setLoading(true);
+    try {
+      const API = import.meta.env.VITE_API_URL || "";
+      if (!password) {
+        throw new Error("La contraseña es obligatoria");
+      }
+      const response = await fetch(`${API}/api/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre_usuario, email, password })
+      });
+      let data;
+      try {
+        data = await response.json();
+      } catch (err) {
+        data = { error: `Server error (status ${response.status})` };
+      }
+      if (response.ok && data.success) {
+        localStorage.setItem("token", data.token);
+        setTokenState(data.token);
+        StorageService.updateUser({
+          ...data.user,
+          nombre_usuario: data.user.nombre_usuario,
+          email: data.user.email,
+          saldo: data.user.saldo,
+          balance: data.user.saldo,
+          nivel: data.user.nivel || 0,
+          experiencia: data.user.experiencia || 0
+        });
+        return data.user;
+      }
+      const errorMsg = data.error || "Error al registrar en el servidor";
+      if (response.status === 409) {
+        throw new Error(errorMsg);
+      } else if (response.status === 503) {
+        throw new Error(errorMsg);
+      } else if (response.status === 400) {
+        throw new Error(errorMsg);
+      } else {
+        throw new Error(errorMsg);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const logout = useCallback(() => {
+    StorageService.destroySession();
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setUser(null);
+    setTokenState(null);
+    setInventory([]);
+    window.location.href = "/";
+  }, []);
+
+  const updateUser = useCallback((updatedUserOrFn) => {
+    StorageService.updateUser(updatedUserOrFn);
+  }, []);
+
+  const fetchInventory = useCallback(() => {
+    if (StorageService.hasSession()) {
+      setInventory(StorageService.getInventory());
+    } else {
+      setInventory([]);
+    }
+  }, []);
+
+  const sellSkin = useCallback(async (skinId) => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      return { success: false, error: "Debes iniciar sesión para vender skins" };
+    }
+    try {
+      const API = import.meta.env.VITE_API_URL || "";
+      const response = await fetch(`${API}/api/inventory/sell`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ itemId: skinId })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        StorageService.sellSkin(skinId);
+        return { success: true, newBalance: data.newBalance };
+      }
+      const errData = await response.json().catch(() => ({}));
+      return { success: false, error: errData.error || "Error al vender en servidor" };
+    } catch {
+      return { success: false, error: "Error de conexión al vender. Intenta de nuevo." };
+    }
+  }, []);
+
+  const sellAllSkins = useCallback(() => {
+    const total = StorageService.sellAllSkins();
+    const token = localStorage.getItem("token");
+    if (token) {
+      StorageService.getInventory().forEach(skin => {
+        if (skin.status === 'in_inventory') {
+          const API = import.meta.env.VITE_API_URL || "";
+          fetch(`${API}/api/inventory/sell`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ itemId: skin.id })
+          }).catch(() => { });
+        }
+      });
+    }
+    return total;
+  }, []);
+
+  const withdrawSkin = useCallback(async (skinId) => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      return {
+        success: false,
+        error: 'NOT_LOGGED_IN',
+        message: 'Debes iniciar sesion para retirar skins.',
+        code: 'NOT_LOGGED_IN'
+      };
+    }
+    try {
+      const API = import.meta.env.VITE_API_URL || "";
+      const response = await fetch(`${API}/api/inventory/withdraw`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ itemId: skinId })
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        StorageService.withdrawSkin(skinId);
+        return { success: true, offerId: data.offerId, message: data.message || "Oferta enviada a Steam." };
+      }
+      const errorCode = data.code || 'UNKNOWN_ERROR';
+      const errorMessage = data.error || "Error al procesar el retiro.";
+      const errorMessages = {
+        'TRADE_URL_MISSING': 'Debes configurar tu Steam Trade URL en tu perfil antes de solicitar un retiro.',
+        'ITEM_OUT_OF_STOCK': 'El bot no tiene esta skin en stock actualmente. Intenta mas tarde o usa la opcion de venta.',
+        'RATE_LIMIT_EXCEEDED': 'Steam esta limitando las solicitudes. Espera 5 minutos e intenta de nuevo.',
+        'RATE_LIMIT_WITHDRAW': 'Has excedido el limite de retiros. Espera 1 minuto e intenta de nuevo.',
+        'BOT_UNAVAILABLE': 'El bot de intercambios no esta disponible en este momento. Intentelo mas tarde.',
+        'CONFIG_MISSING': 'El bot no esta configurado correctamente. Contacta al administrador.',
+        'BOT_ERROR': 'Error del bot al procesar el retiro. Intenta de nuevo.',
+        'TRADE_ERROR': 'Error en la oferta de intercambio. La skin puede no ser intercambiable.',
+        'CONNECTION_ERROR': 'Error de conexion con Steam. Verifica tu conexion e intenta de nuevo.',
+        'TRADE_OFFER_FAILED': 'No se pudo enviar la oferta de intercambio. Intenta de nuevo.'
+      };
+      return {
+        success: false,
+        error: errorCode,
+        message: errorMessages[errorCode] || errorMessage,
+        code: errorCode
+      };
+    } catch {
+      return {
+        success: false,
+        error: 'NETWORK_ERROR',
+        message: 'Error de conexion con el servidor. Verifica tu conexion e intenta de nuevo.',
+        code: 'NETWORK_ERROR'
+      };
+    }
+  }, []);
+
+  const depositSkins = useCallback((skins) => {
+    return StorageService.addSkinsToInventory(skins);
+  }, []);
+
+  const updateProfile = useCallback((tradeLink, steamId) => {
+    const patch = {};
+    if (tradeLink) patch.link_intercambio = tradeLink;
+    if (steamId) patch.steam_id = steamId;
+    StorageService.updateUser(patch);
+    return true;
+  }, []);
+
+  const addToBalance = useCallback((amount) => {
+    const newBal = StorageService.addBalance(amount);
+    return newBal !== false;
+  }, []);
+
+  /**
+   * Award XP to the current user. Locally persists via StorageService.
+   * Backend awards XP server-side on /api/cases/open and /api/battles/*,
+   * but this helper keeps the local UI in sync for guest/local sessions.
+   * Rule: 1€ spent = 100 XP.
+   * @param {number} xpAmount - XP to add
+   * @returns {number} New total XP
+   */
+  const awardXP = useCallback((xpAmount) => {
+    return StorageService.awardXP(xpAmount);
+  }, []);
+
+  const claimDaily = useCallback(async () => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      return { success: false, error: "Debes iniciar sesion para reclamar la recompensa diaria." };
+    }
+    try {
+      const API = import.meta.env.VITE_API_URL || "";
+      const response = await fetch(`${API}/api/claim-daily`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        // Update local storage with the new skin and balance from the server
+        if (data.skin) {
+          StorageService.addSkinsToInventory([data.skin]);
+        }
+        if (data.expReward) {
+          const currentUser = StorageService.getUser();
+          StorageService.updateUser({
+            experiencia: (currentUser?.experiencia || 0) + data.expReward
+          });
+        }
+        return {
+          success: true,
+          reward: data.skin?.price || 0,
+          expReward: data.expReward || 0,
+          skin: data.skin,
+          message: data.message || `Recompensa diaria reclamada!`
+        };
+      }
+      // Handle cooldown error (remaining time)
+      if (response.status === 400 && data.remainingMs) {
+        const remainingMs = data.remainingMs;
+        const hours = Math.floor(remainingMs / (1000 * 60 * 60));
+        const minutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((remainingMs % (1000 * 60)) / 1000);
+        return {
+          success: false,
+          error: `⏳ ${hours}h ${minutes}m ${seconds}s`,
+          remainingMs,
+          canOpen: false
+        };
+      }
+      return {
+        success: false,
+        error: data.error || "Error al reclamar la recompensa diaria."
+      };
+    } catch {
+      return {
+        success: false,
+        error: "Error de conexion al reclamar la recompensa diaria."
+      };
+    }
+  }, []);
+
+  const recoverPassword = useCallback(async (email) => {
+    try {
+      const API = import.meta.env.VITE_API_URL || "";
+      const response = await fetch(`${API}/api/auth/forgot-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        return data.message || `Se ha enviado un correo de recuperacion a ${email}`;
+      } else {
+        throw new Error(data.error || "Error al procesar la solicitud");
+      }
+    } catch (err) {
+      throw new Error(err.message || "Error al conectar con el servidor");
+    }
+  }, []);
+
+  // Memoize the merged user+inventory object to prevent unnecessary re-renders
+  // of all consumers when only internal state references change.
+  const isAuthenticated = Boolean(user && user.email && user.email !== "guest@skinmarket.es");
+  const userWithInventory = useMemo(() => user ? {
+    ...user,
+    inventory,
+    balance: Number(user.balance ?? user.saldo ?? 0),
+    saldo: Number(user.saldo ?? user.balance ?? 0)
+  } : null, [user, inventory]);
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user: userWithInventory,
+        isAuthenticated,
+        inventory,
+        loading,
+        login,
+        register,
+        logout,
+        updateUser,
+        sellSkin,
+        sellAllSkins,
+        withdrawSkin,
+        depositSkins,
+        updateProfile,
+        addToBalance,
+        awardXP,
+        fetchInventory,
+        claimDaily,
+        recoverPassword,
+        checkAuth: () => { }
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
+ 
+
+============================================================================== 
+RUTA: src\services\StorageService.js 
+============================================================================== 
+// src/services/StorageService.js
+/**
+ * Single source of truth for skinmarket LocalStorage data management.
+ * Follows SRP, Observer Pattern for reactive React updates, and clean fallback initialization.
+ */
+
+const STORAGE_KEY = "skinmarket_db_v1";
+
+const DEFAULT_USER = {
+  id: "usr_local_main",
+  nombre_usuario: "Invitado",
+  email: "guest@skinmarket.es",
+  avatar: "https://images.unsplash.com/photo-1566492031773-4f4e44671857?w=150&auto=format&fit=crop&q=80",
+  saldo: 0.00,
+  balance: 0.00,
+  nivel: 0,
+  experiencia: 0,
+  steam_id: null,
+  link_intercambio: null,
+  role: "user",
+  ultimo_reclamo_diario: null,
+  stats: {
+    casesOpened: 0,
+    battlesWon: 0,
+    totalSpent: 0.00,
+    totalWon: 0.00,
+    upgradesWon: 0
+  }
+};
+
+const INITIAL_INVENTORY = [];
+
+const INITIAL_LIVE_DROPS = [
+  {
+    id: "drop_1",
+    user: "CSGO_God",
+    userAvatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&auto=format&fit=crop&q=80",
+    item: { name: "★ Butterfly Knife | Doppler", price: 1450.00, rarity: "Extraordinary", image: "" },
+    caseName: "Cosmic Infinity",
+    timestamp: new Date().toISOString()
+  },
+  {
+    id: "drop_2",
+    user: "ProGamer_ES",
+    userAvatar: DEFAULT_USER.avatar,
+    item: { name: "AWP | Asiimov", price: 115.00, rarity: "Covert", image: "" },
+    caseName: "Phoenix Flame",
+    timestamp: new Date(Date.now() - 30000).toISOString()
+  },
+  {
+    id: "drop_3",
+    user: "Alex_Sniper",
+    userAvatar: "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=80&auto=format&fit=crop&q=80",
+    item: { name: "AK-47 | Vulcan", price: 210.00, rarity: "Covert", image: "" },
+    caseName: "Sentinel Guardian",
+    timestamp: new Date(Date.now() - 60000).toISOString()
+  }
+];
+
+class StorageServiceClass {
+  constructor() {
+    this.listeners = new Set();
+    this.data = this.loadInitialData();
+  }
+
+loadInitialData() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        if (raw === 'undefined' || raw === 'null' || raw.trim() === '') {
+          localStorage.removeItem(STORAGE_KEY);
+          return null;
+        }
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object' || parsed === null) {
+          localStorage.removeItem(STORAGE_KEY);
+          return null;
+        }
+        return {
+          user: { ...DEFAULT_USER, ...(parsed.user || {}) },
+          inventory: Array.isArray(parsed.inventory) ? parsed.inventory : INITIAL_INVENTORY,
+          history: Array.isArray(parsed.history) ? parsed.history : [],
+          liveDrops: Array.isArray(parsed.liveDrops) ? parsed.liveDrops : INITIAL_LIVE_DROPS,
+          adminSettings: parsed.adminSettings && typeof parsed.adminSettings === 'object' ? parsed.adminSettings : { dropMultiplier: 1.0, winRateBonus: 0, customCases: [] }
+        };
+      }
+      return null;
+    } catch {
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        // Silently handle localStorage write failures
+      }
+    }
+    return null;
+  }
+
+  saveDataDirect(data) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch  {
+      // Silently handle localStorage write failures
+    }
+  }
+
+  persistAndNotify() {
+    this.saveDataDirect(this.data);
+    this.listeners.forEach((listener) => {
+      try {
+        listener(this.data);
+      } catch{
+        // Silently handle listener errors
+      }
+    });
+  }
+
+  subscribe(listener) {
+    this.listeners.add(listener);
+    listener(this.data);
+    return () => this.listeners.delete(listener);
+  }
+
+  getUser() {
+    if (!this.data) return null;
+    return { ...this.data.user };
+  }
+
+  updateUser(updater) {
+    if (!this.data) {
+      this.data = this.createInitialData();
+    }
+    const nextUser = typeof updater === "function" ? updater(this.data.user) : { ...this.data.user, ...updater };
+    if (nextUser.balance !== undefined) {
+      nextUser.balance = Number(parseFloat(nextUser.balance).toFixed(2));
+      nextUser.saldo = nextUser.balance;
+    }
+    this.data.user = nextUser;
+    this.persistAndNotify();
+    return this.data.user;
+  }
+
+  createInitialData() {
+    return {
+      user: DEFAULT_USER,
+      inventory: INITIAL_INVENTORY,
+      history: [],
+      liveDrops: INITIAL_LIVE_DROPS,
+      adminSettings: { dropMultiplier: 1.0, winRateBonus: 0, customCases: [] }
+    };
+  }
+
+  addBalance(amount) {
+    if (!this.data) return false;
+    const num = Number(parseFloat(amount).toFixed(2));
+    if (isNaN(num) || num <= 0) return false;
+    const newBalance = Number((this.data.user.balance + num).toFixed(2));
+    this.updateUser({ balance: newBalance });
+    return newBalance;
+  }
+
+  deductBalance(amount) {
+    if (!this.data) return false;
+    const num = Number(parseFloat(amount).toFixed(2));
+    if (isNaN(num) || num <= 0) return false;
+    if (this.data.user.balance < num) return false;
+    const newBalance = Number((this.data.user.balance - num).toFixed(2));
+    this.updateUser({ balance: newBalance });
+    return newBalance;
+  }
+
+  /**
+   * Award XP to the current user (local fallback).
+   * Rule: 1€ spent = 100 XP. Level N requires (N+1)*1000 XP for next level.
+   * @param {number} amount - XP to add (positive integer)
+   * @returns {number} New total XP
+   */
+  awardXP(amount) {
+    if (!this.data) return 0;
+    const xp = Math.max(0, Math.floor(parseFloat(amount) || 0));
+    if (xp === 0) return this.data.user.experiencia || 0;
+    const current = Number(this.data.user.experiencia || 0);
+    const next = current + xp;
+    this.updateUser({ experiencia: next });
+    return next;
+  }
+
+  /**
+   * Get XP value equivalent for a money amount spent.
+   * @param {number} euros - Amount spent in €
+   * @returns {number} XP earned (1€ = 100 XP)
+   */
+  xpForSpend(euros) {
+    return Math.floor((parseFloat(euros) || 0) * 100);
+  }
+
+  getInventory() {
+    if (!this.data) return [];
+    return [...(this.data.inventory || [])];
+  }
+
+  getPendingQueue() {
+    if (!this.data) return [];
+    return [...(this.data.pendingQueue || [])];
+  }
+
+  addToPendingQueue(skinId) {
+    if (!this.data) return { success: false, error: "No hay datos de sesión" };
+    const skinIndex = this.data.inventory.findIndex((s) => s.id === skinId);
+    if (skinIndex === -1) return { success: false, error: "Skin no encontrada" };
+    this.data.inventory[skinIndex].status = "pending_withdraw";
+    this.data.pendingQueue = this.data.pendingQueue || [];
+    this.data.pendingQueue.push({
+      id: `pq_${Date.now()}`,
+      skinId: skinId,
+      skinName: this.data.inventory[skinIndex].name,
+      skinPrice: this.data.inventory[skinIndex].price,
+      requestedAt: new Date().toISOString(),
+      status: "pending"
+    });
+    this.persistAndNotify();
+    return { success: true, message: "Solicitud de retiro añadida a la cola." };
+  }
+
+  processPendingQueue(skinId) {
+    if (!this.data) return { success: false, error: "No hay datos de sesión" };
+    this.data.pendingQueue = this.data.pendingQueue || [];
+    const queueIndex = this.data.pendingQueue.findIndex((q) => q.skinId === skinId && q.status === "pending");
+    if (queueIndex === -1) return { success: false, error: "No hay solicitud pendiente" };
+    this.data.pendingQueue[queueIndex].status = "processed";
+    this.data.pendingQueue[queueIndex].processedAt = new Date().toISOString();
+    const skinIndex = this.data.inventory.findIndex((s) => s.id === skinId);
+    if (skinIndex !== -1) {
+      this.data.inventory[skinIndex].status = "withdrawn";
+    }
+    this.persistAndNotify();
+    return { success: true, message: "Retiro procesado correctamente." };
+  }
+
+  addSkinsToInventory(skins) {
+    if (!this.data) {
+      this.data = this.createInitialData();
+    }
+    const items = (Array.isArray(skins) ? skins : [skins]).map((s) => ({
+      id: s.id || `inv_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+      name: s.name || "Skin",
+      weapon: s.weapon || (s.name ? s.name.split("|")[0].trim() : "Weapon"),
+      skin_name: s.skin_name || (s.name ? (s.name.split("|")[1] || s.name).trim() : "Skin"),
+      price: Number(parseFloat(s.price || 1.0).toFixed(2)),
+      rarity: s.rarity || "Mil-Spec",
+      wear: s.wear || "Field-Tested",
+      image: s.image || "",
+      acquiredAt: new Date().toISOString(),
+      status: "in_inventory"
+    }));
+    this.data.inventory = [...items, ...this.data.inventory];
+    this.persistAndNotify();
+    return items;
+  }
+
+  sellSkin(skinId) {
+    if (!this.data) return false;
+    const skinIndex = this.data.inventory.findIndex((s) => s.id === skinId);
+    if (skinIndex === -1) return false;
+    const skin = this.data.inventory[skinIndex];
+    this.data.inventory.splice(skinIndex, 1);
+    this.addBalance(skin.price);
+    return true;
+  }
+
+  sellAllSkins() {
+    if (!this.data) return 0;
+    const total = this.data.inventory.reduce((acc, curr) => acc + Number(curr.price || 0), 0);
+    this.data.inventory = [];
+    if (total > 0) {
+      this.addBalance(total);
+    }
+    return total;
+  }
+
+  withdrawSkin(skinId) {
+    if (!this.data) return { success: false, error: "No hay datos de sesión" };
+    const skinIndex = this.data.inventory.findIndex((s) => s.id === skinId);
+    if (skinIndex === -1) return { success: false, error: "Skin no encontrada" };
+    this.data.inventory[skinIndex].status = "withdrawn";
+    this.persistAndNotify();
+    return { success: true, message: "Skin marcada como retirada en almacenamiento local." };
+  }
+
+  exchangeSkin(skinId) {
+    if (!this.data) return { success: false, error: "No hay datos de sesión" };
+    const skinIndex = this.data.inventory.findIndex((s) => s.id === skinId);
+    if (skinIndex === -1) return { success: false, error: "Skin no encontrada" };
+    const skin = this.data.inventory[skinIndex];
+    const exchangeValue = Number((skin.price * 0.85).toFixed(2));
+    this.data.inventory.splice(skinIndex, 1);
+    this.addBalance(exchangeValue);
+    this.data.history = [
+      {
+        type: "exchange",
+        skinName: skin.name,
+        value: exchangeValue,
+        timestamp: new Date().toISOString()
+      },
+      ...this.data.history.slice(0, 99)
+    ];
+    this.persistAndNotify();
+    return {
+      success: true,
+      value: exchangeValue,
+      message: `Skin intercambiada por ${exchangeValue} en saldo (85% de valor).`
+    };
+  }
+
+  getPendingWithdrawals() {
+    if (!this.data) return [];
+    return this.data.inventory.filter(s => s.status === "pending_withdraw" || s.status === "withdrawing");
+  }
+
+  validateTradeUrl(url) {
+    if (!url) return { valid: false, reason: "Trade URL no proporcionada" };
+    const partnerMatch = url.match(/partner=(\d+)/);
+    const tokenMatch = url.match(/token=([\w-]+)/);
+    if (!partnerMatch || !tokenMatch) {
+      return { valid: false, reason: "Formato de Trade URL invalido. Debe contener partner y token." };
+    }
+    return { valid: true, steamId: partnerMatch[1], token: tokenMatch[1] };
+  }
+
+  getLiveDrops() {
+    if (!this.data) return [];
+    return [...(this.data.liveDrops || [])];
+  }
+
+  addLiveDrop(dropData) {
+    if (!this.data) {
+      this.data = this.createInitialData();
+    }
+    const drop = {
+      id: `drop_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+      user: dropData.user || this.data.user.nombre_usuario,
+      userAvatar: dropData.userAvatar || this.data.user.avatar,
+      item: {
+        name: dropData.item.name,
+        price: Number(parseFloat(dropData.item.price).toFixed(2)),
+        rarity: dropData.item.rarity,
+        image: dropData.item.image
+      },
+      caseName: dropData.caseName || "Caja",
+      timestamp: new Date().toISOString()
+    };
+    this.data.liveDrops = [drop, ...this.data.liveDrops.slice(0, 49)];
+    this.persistAndNotify();
+    return drop;
+  }
+
+  getAdminSettings() {
+    if (!this.data) return null;
+    return { ...this.data.adminSettings };
+  }
+
+  updateAdminSettings(newSettings) {
+    if (!this.data) return null;
+    this.data.adminSettings = { ...this.data.adminSettings, ...newSettings };
+    this.persistAndNotify();
+    return this.data.adminSettings;
+  }
+
+  resetAll() {
+    localStorage.removeItem(STORAGE_KEY);
+    this.data = null;
+    this.persistAndNotify();
+  }
+
+  hasSession() {
+    try {
+      // Priority 1: JWT token in localStorage (set by AuthContext on real login/OAuth)
+      const token = localStorage.getItem("token");
+      if (token && token.length > 10) {
+        return true;
+      }
+      // Priority 2: Check for stored user data that is NOT a guest
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw || raw === 'undefined' || raw === 'null' || raw.trim() === '') return false;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object' || !parsed.user) return false;
+      if (parsed.user.email && parsed.user.email !== "guest@skinmarket.es") return true;
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
+  destroySession() {
+    localStorage.removeItem("token");
+    localStorage.removeItem(STORAGE_KEY);
+    this.data = null;
+    this.persistAndNotify();
+  }
+}
+
+export const StorageService = new StorageServiceClass();
+ 
+
+============================================================================== 
+RUTA: src\services\PriceEngine.js 
+============================================================================== 
+// ═══════════════════════════════════════════════════════════════════════════════
+// PriceEngine.js — Motor de Precios Multi-Fuente en Cascada (Frontend)
+// Inspirado en arquitecturas de KeyDrop / SkinClub / CSGOBig
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// GARANTÍA CERO CRASHES:
+//   Ninguna función, componente ni render debe recibir jamás undefined/null.
+//   Si todas las fuentes fallan, se aplica el precio base ponderado por rareza.
+//
+// Cascada de resolución (frontend):
+//   Fuente 1 (Primaria)      -> Caché local en memoria (<2ms)
+//   Fuente 2 (API Index)     -> Backend /api/prices/resolve (que a su vez consulta
+//                              PriceEmpire / CSGOBackpack / Steam Market)
+//   Fuente 3 (Steam Direct)  -> (delegado al backend)
+//   Fuente 4 (Fallback Matrix) -> Matriz local pre-calculada (skin_prices.json)
+//   Garantía final           -> Precio base ponderado por rareza (NUNCA null/undefined)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ═══ CS2 Official Rarity Colors (Valve) ═══════════════════════════════════════
+export const CS2_RARITY_COLORS = {
+  "Consumer Grade": "#B0C3D9",
+  "Industrial Grade": "#5E98D9",
+  "Mil-Spec Grade": "#4B69FF",
+  "Restricted": "#8847FF",
+  "Classified": "#D32CE6",
+  "Covert": "#EB4B4B",
+  "Exceedingly Rare": "#FFD700",
+  "Extraordinary": "#FFD700",
+  "Contraband": "#FFD700",
+  "★": "#FFD700",
+  "★ Karambit": "#FFD700",
+  "★ Gloves": "#FFD700",
+};
+
+// ═══ Base Price Matrix by Rarity (Fallback de Seguridad) ══════════════════════
+// Precios base ponderados por rareza — usados cuando TODO lo demás falla.
+// Garantiza que NUNCA se devuelva null/undefined/0 inválido.
+const RARITY_BASE_PRICES = {
+  "Consumer Grade": 0.15,
+  "Industrial Grade": 0.35,
+  "Mil-Spec Grade": 1.20,
+  "Restricted": 4.50,
+  "Classified": 18.00,
+  "Covert": 65.00,
+  "Exceedingly Rare": 350.00,
+  "Extraordinary": 350.00,
+  "Contraband": 800.00,
+  "★": 400.00,
+  "★ Karambit": 600.00,
+  "★ Gloves": 300.00,
+};
+
+// ═══ Wear Multipliers (CS2 official float degradation) ════════════════════════
+const WEAR_MULTIPLIERS = {
+  "Factory New": 1.25,
+  "Minimal Wear": 1.10,
+  "Field-Tested": 1.00,
+  "Well-Worn": 0.82,
+  "Battle-Scarred": 0.70,
+};
+
+// ═══ In-Memory High-Performance Cache (TTL: 5 minutos) ════════════════════════
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
+const priceCache = new Map(); // key: "marketHashName|wear" -> { price, timestamp, source }
+
+// ═══ Local Price Matrix (cargada lazy desde /skin_prices.json) ════════════════
+let localPriceMatrix = null;
+let localMatrixLoaded = false;
+let localMatrixLoadPromise = null;
+
+/**
+ * Carga la matriz local de precios desde /skin_prices.json (lazy, cached).
+ * @returns {Promise<Object>} La matriz de precios local
+ */
+export async function loadPriceMatrix() {
+  if (localMatrixLoaded && localPriceMatrix) return localPriceMatrix;
+  if (localMatrixLoadPromise) return localMatrixLoadPromise;
+
+  localMatrixLoadPromise = (async () => {
+    try {
+      const response = await fetch("/skin_prices.json", {
+        headers: { Accept: "application/json" },
+      });
+      if (response.ok) {
+        localPriceMatrix = await response.json();
+        localMatrixLoaded = true;
+      } else {
+        localPriceMatrix = {};
+        localMatrixLoaded = true;
+      }
+    } catch {
+      localPriceMatrix = {};
+      localMatrixLoaded = true;
+    }
+    localMatrixLoadPromise = null;
+    return localPriceMatrix;
+  })();
+
+  return localMatrixLoadPromise;
+}
+
+// ═══ Helpers ═════════════════════════════════════════════════════════════════
+
+/**
+ * Normaliza un nombre de rareza a la clave canónica de CS2.
+ * @param {string} rarity - Rareza cruda (puede venir de Steam, DB, etc.)
+ * @returns {string} Rareza canónica
+ */
+export function normalizeRarity(rarity) {
+  if (!rarity || typeof rarity !== "string") return "Mil-Spec Grade";
+  const r = rarity.trim();
+
+  // Detección de cuchillos/guantes (★)
+  if (r.includes("★") || r.toLowerCase().includes("knife") || r.toLowerCase().includes("gloves") || r.toLowerCase().includes("bayonet")) {
+    return "Exceedingly Rare";
+  }
+  if (r.toLowerCase().includes("contraband")) return "Contraband";
+  if (r.toLowerCase().includes("extraordinary") || r.toLowerCase().includes("exceedingly")) return "Exceedingly Rare";
+  if (r.toLowerCase().includes("covert")) return "Covert";
+  if (r.toLowerCase().includes("classified")) return "Classified";
+  if (r.toLowerCase().includes("restricted")) return "Restricted";
+  if (r.toLowerCase().includes("mil-spec") || r.toLowerCase().includes("milspec") || r.toLowerCase().includes("mil_spec")) return "Mil-Spec Grade";
+  if (r.toLowerCase().includes("industrial")) return "Industrial Grade";
+  if (r.toLowerCase().includes("consumer")) return "Consumer Grade";
+
+  return "Mil-Spec Grade";
+}
+
+/**
+ * Obtiene el color hex oficial de CS2 para una rareza.
+ * @param {string} rarity
+ * @returns {string} Hex color
+ */
+export function getRarityColor(rarity) {
+  const normalized = normalizeRarity(rarity);
+  return CS2_RARITY_COLORS[normalized] || CS2_RARITY_COLORS["Mil-Spec Grade"];
+}
+
+/**
+ * Obtiene el precio base ponderado por rareza (GARANTÍA FINAL).
+ * Aplica multiplicador de desgaste si se proporciona.
+ * NUNCA devuelve null/undefined — siempre un número finito >= 0.10.
+ * @param {string} rarity
+ * @param {string} wear - Opcional (FN, MW, FT, WW, BS)
+ * @returns {number} Precio base garantizado
+ */
+export function getRarityBasePrice(rarity, wear = null) {
+  const normalized = normalizeRarity(rarity);
+  let base = RARITY_BASE_PRICES[normalized] ?? RARITY_BASE_PRICES["Mil-Spec Grade"];
+
+  // Aplicar multiplicador de desgaste
+  if (wear && WEAR_MULTIPLIERS[wear]) {
+    base = base * WEAR_MULTIPLIERS[wear];
+  }
+
+  // Garantía: número finito, mínimo 0.10
+  const safePrice = Number(base);
+  if (!isFinite(safePrice) || isNaN(safePrice) || safePrice < 0.10) {
+    return 0.10;
+  }
+  return parseFloat(safePrice.toFixed(2));
+}
+
+/**
+ * Genera una clave de caché única para market_hash_name + wear.
+ */
+function cacheKey(marketHashName, wear) {
+  return `${marketHashName || "unknown"}|${wear || "default"}`;
+}
+
+/**
+ * Extrae el desgaste (wear) de un market_hash_name.
+ * Ej: "AK-47 | Redline (Field-Tested)" -> "Field-Tested"
+ */
+function extractWearFromName(name) {
+  if (!name) return null;
+  const match = name.match(/\((Factory New|Minimal Wear|Field-Tested|Well-Worn|Battle-Scarred)\)/);
+  return match ? match[1] : null;
+}
+
+// ═══ FUENTE 1: Caché local en memoria (<2ms) ══════════════════════════════════
+function getFromCache(marketHashName, wear) {
+  const key = cacheKey(marketHashName, wear);
+  const cached = priceCache.get(key);
+  if (!cached) return null;
+  if (Date.now() - cached.timestamp > CACHE_TTL_MS) {
+    priceCache.delete(key);
+    return null;
+  }
+  return { price: cached.price, source: "cache", fromCache: true };
+}
+
+function setInCache(marketHashName, wear, price, source) {
+  const key = cacheKey(marketHashName, wear);
+  priceCache.set(key, { price, timestamp: Date.now(), source });
+}
+
+// ═══ FUENTE 4: Fallback Matrix Local (skin_prices.json) ═══════════════════════
+function getFromLocalMatrix(marketHashName, rarity) {
+  if (!localPriceMatrix || typeof localPriceMatrix !== "object") return null;
+
+  // Intentar match exacto por market_hash_name
+  if (marketHashName && localPriceMatrix[marketHashName]) {
+    const entry = localPriceMatrix[marketHashName];
+    const price = typeof entry === "number" ? entry : entry?.price || entry?.median_price;
+    if (isFinite(parseFloat(price)) && parseFloat(price) > 0) {
+      return { price: parseFloat(parseFloat(price).toFixed(2)), source: "local_matrix" };
+    }
+  }
+
+  // Intentar match por nombre sin wear
+  if (marketHashName) {
+    const baseName = marketHashName.replace(/\s*\(.*\)\s*$/, "").trim();
+    if (localPriceMatrix[baseName]) {
+      const entry = localPriceMatrix[baseName];
+      const price = typeof entry === "number" ? entry : entry?.price || entry?.median_price;
+      if (isFinite(parseFloat(price)) && parseFloat(price) > 0) {
+        return { price: parseFloat(parseFloat(price).toFixed(2)), source: "local_matrix" };
+      }
+    }
+  }
+
+  // Intentar match por nombre de arma + rareza
+  if (marketHashName && rarity) {
+    const weapon = marketHashName.split("|")[0]?.trim();
+    const normalizedRarity = normalizeRarity(rarity);
+    const compositeKey = `${weapon}|${normalizedRarity}`;
+    if (localPriceMatrix[compositeKey]) {
+      const entry = localPriceMatrix[compositeKey];
+      const price = typeof entry === "number" ? entry : entry?.price || entry?.median_price;
+      if (isFinite(parseFloat(price)) && parseFloat(price) > 0) {
+        return { price: parseFloat(parseFloat(price).toFixed(2)), source: "local_matrix" };
+      }
+    }
+  }
+
+  return null;
+}
+
+// ═══ FUENTE 2: Backend API (delega al backend PriceEngine) ═════════════════════
+const API_BASE = import.meta.env.VITE_API_URL || "";
+
+async function fetchFromBackend(marketHashName, rarity, wear) {
+  if (!API_BASE) return null;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+  // Construir query params incluyendo rarity y wear para el backend
+  const params = new URLSearchParams({
+    market_hash_name: marketHashName,
+  });
+  if (rarity) params.set("rarity", rarity);
+  if (wear) params.set("wear", wear);
+
+  try {
+    const response = await fetch(
+      `${API_BASE}/api/prices/resolve?${params.toString()}`,
+      {
+        headers: { Accept: "application/json" },
+        signal: controller.signal,
+      }
+    );
+
+    clearTimeout(timeoutId);
+
+    if (response.status === 429) {
+      return null;
+    }
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    if (data && data.price && isFinite(parseFloat(data.price)) && parseFloat(data.price) > 0) {
+      return { price: parseFloat(parseFloat(data.price).toFixed(2)), source: data.source || "backend" };
+    }
+    return null;
+  } catch {
+    clearTimeout(timeoutId);
+    return null;
+  }
+}
+
+// ═══ MOTOR PRINCIPAL: resolvePrice (Cascada completa) ═════════════════════════
+/**
+ * Resuelve el precio de una skin usando la cascada completa de fuentes.
+ * GARANTÍA: NUNCA devuelve null/undefined. Siempre un objeto con price válido.
+ *
+ * @param {Object} params
+ * @param {string} params.marketHashName - Nombre completo (ej: "AK-47 | Redline (Field-Tested)")
+ * @param {string} [params.rarity] - Rareza CS2
+ * @param {string} [params.wear] - Desgaste (FN, MW, FT, WW, BS)
+ * @param {boolean} [params.skipExternal] - Si true, omite APIs externas (modo offline)
+ * @returns {Promise<{price: number, source: string, fromCache: boolean}>}
+ */
+export async function resolvePrice({ marketHashName, rarity, wear, skipExternal = false } = {}) {
+  const safeName = marketHashName || "Unknown Skin";
+  const safeRarity = rarity || "Mil-Spec Grade";
+  const detectedWear = wear || extractWearFromName(safeName);
+
+  // ═══ FUENTE 1: Caché local (<2ms) ══════════════════════════════════════════
+  const cached = getFromCache(safeName, detectedWear);
+  if (cached) {
+    return cached;
+  }
+
+  // ═══ FUENTE 2: Backend API (que a su vez consulta PriceEmpire / CSGOBackpack / Steam) ═══
+  if (!skipExternal) {
+    const backendResult = await fetchFromBackend(safeName, safeRarity, detectedWear);
+    if (backendResult) {
+      setInCache(safeName, detectedWear, backendResult.price, backendResult.source);
+      return backendResult;
+    }
+  }
+
+  // ═══ FUENTE 4: Fallback Matrix Local (skin_prices.json) ══════════════════════
+  // Asegurar que la matriz local esté cargada
+  if (!localMatrixLoaded) {
+    await loadPriceMatrix();
+  }
+
+  const matrixResult = getFromLocalMatrix(safeName, safeRarity);
+  if (matrixResult) {
+    setInCache(safeName, detectedWear, matrixResult.price, matrixResult.source);
+    return matrixResult;
+  }
+
+  // ═══ GARANTÍA FINAL: Precio base ponderado por rareza ══════════════════════
+  const basePrice = getRarityBasePrice(safeRarity, detectedWear);
+  const fallbackResult = { price: basePrice, source: "rarity_base", fromCache: false };
+  setInCache(safeName, detectedWear, basePrice, "rarity_base");
+  return fallbackResult;
+}
+
+// ═══ Resolución sincrona (para uso en render sin await) ══════════════════════
+/**
+ * Resuelve el precio de forma sincrona usando solo caché + matriz local + base.
+ * No consulta APIs externas. Útil para renders que no pueden ser async.
+ * GARANTÍA: NUNCA devuelve null/undefined.
+ *
+ * @param {string} marketHashName
+ * @param {string} [rarity]
+ * @param {string} [wear]
+ * @returns {{price: number, source: string}}
+ */
+export function resolvePriceSync(marketHashName, rarity, wear) {
+  const safeName = marketHashName || "Unknown Skin";
+  const safeRarity = rarity || "Mil-Spec Grade";
+  const detectedWear = wear || extractWearFromName(safeName);
+
+  // Fuente 1: Caché
+  const cached = getFromCache(safeName, detectedWear);
+  if (cached) return cached;
+
+  // Fuente 4: Matriz local (solo si ya está cargada)
+  if (localMatrixLoaded) {
+    const matrixResult = getFromLocalMatrix(safeName, safeRarity);
+    if (matrixResult) {
+      setInCache(safeName, detectedWear, matrixResult.price, matrixResult.source);
+      return matrixResult;
+    }
+  }
+
+  // Garantía final: base por rareza
+  const basePrice = getRarityBasePrice(safeRarity, detectedWear);
+  setInCache(safeName, detectedWear, basePrice, "rarity_base");
+  return { price: basePrice, source: "rarity_base" };
+}
+
+// ═══ Batch Resolution (para múltiples skins a la vez) ═════════════════════════
+/**
+ * Resuelve precios para un lote de skins en paralelo.
+ * @param {Array<{marketHashName: string, rarity?: string, wear?: string}>} skins
+ * @returns {Promise<Array<{price: number, source: string}>>}
+ */
+export async function resolvePricesBatch(skins) {
+  if (!Array.isArray(skins) || skins.length === 0) return [];
+  return Promise.all(
+    skins.map((skin) =>
+      resolvePrice({
+        marketHashName: skin.marketHashName || skin.name,
+        rarity: skin.rarity,
+        wear: skin.wear,
+      })
+    )
+  );
+}
+
+// ═══ Cache Management ════════════════════════════════════════════════════════
+export function clearPriceCache() {
+  priceCache.clear();
+}
+
+export function getCacheStats() {
+  return {
+    cacheSize: priceCache.size,
+    cacheTtlMs: CACHE_TTL_MS,
+    localMatrixLoaded,
+    localMatrixEntries: localPriceMatrix ? Object.keys(localPriceMatrix).length : 0,
+  };
+}
+
+// ═══ Default Export (singleton) ═══════════════════════════════════════════════
+export default {
+  resolvePrice,
+  resolvePriceSync,
+  resolvePricesBatch,
+  getRarityColor,
+  getRarityBasePrice,
+  normalizeRarity,
+  CS2_RARITY_COLORS,
+  loadPriceMatrix,
+  clearPriceCache,
+  getCacheStats,
+};
+ 
+
+============================================================================== 
+RUTA: src\constants\cases.js 
+============================================================================== 
+// Constantes y datos para cajas de skins
+// Professional case system with realistic economy and RTP-balanced probabilities
+
+// ─── Case 3D Container Images (HD professional style) ──────
+// Using professional case container images instead of emoji icons
+const CASE_CONTAINER_ECO = "/case_eco.png";
+const CASE_CONTAINER_MID = "/case_mid.png";
+const CASE_CONTAINER_PREMIUM = "/case_premium.png";
+const CASE_CONTAINER_COVERT = "/case_covert.svg";
+const CASE_CONTAINER_KNIFE = "/case_knife.svg";
+const CASE_CONTAINER_VIP = "/case_vip.svg";
+const CASE_CONTAINER_RARE = "/case_rare.svg";
+const CASE_CONTAINER_LEGENDARY = "/case_legendary.svg";
+
+// ─── Container Image Mapping by Category ──────────────
+const CONTAINER_BY_CATEGORY = {
+  económica: CASE_CONTAINER_ECO,
+  intermedia: CASE_CONTAINER_MID,
+  premium: CASE_CONTAINER_PREMIUM,
+  limited: CASE_CONTAINER_COVERT,
+  risk: CASE_CONTAINER_KNIFE
+};
+
+const getContainerForCase = (caseObj) => {
+  // Daily cases have their own progression
+  if (caseObj.category === "daily") {
+    if (caseObj.level >= 170) return CASE_CONTAINER_LEGENDARY;
+    if (caseObj.level >= 80) return CASE_CONTAINER_KNIFE;
+    if (caseObj.level >= 50) return CASE_CONTAINER_VIP;
+    if (caseObj.level >= 15) return CASE_CONTAINER_RARE;
+    return CASE_CONTAINER_ECO;
+  }
+  return CONTAINER_BY_CATEGORY[caseObj.category] || CASE_CONTAINER_ECO;
+};
+
+// ─── Probability Configuration per Case Tier ──────────────
+// RTP (Return to Player) is balanced to ~90% for eco, ~88% for mid, ~85% for premium
+// This means for every €1 spent, the expected return is €0.90 / €0.88 / €0.85
+// Probabilities are inversely proportional to skin price (cheaper = more likely)
+
+export const CASE_PROBABILITIES = {
+  económica: {
+    // Eco cases: high chance of cheap skins, tiny chance of mid-tier
+    mil_spec: 80,      // 80% — Blue skins (€0.10 - €2)
+    restricted: 15,    // 15% — Purple skins (€2 - €10)
+    classified: 4,     // 4%  — Pink skins (€10 - €50)
+    covert: 0.9,       // 0.9% — Red skins (€50 - €200)
+    extraordinary: 0.1 // 0.1% — Gold/Knife (€200+)
+  },
+  intermedia: {
+    // Mid cases: balanced distribution
+    mil_spec: 60,      // 60%
+    restricted: 25,    // 25%
+    classified: 10,    // 10%
+    covert: 4,         // 4%
+    extraordinary: 1   // 1%
+  },
+  premium: {
+    // Premium cases: better chance at high-tier
+    mil_spec: 40,      // 40%
+    restricted: 30,    // 30%
+    classified: 18,    // 18%
+    covert: 8,         // 8%
+    extraordinary: 4   // 4%
+  },
+  limited: {
+    // Limited cases: best odds for rare items
+    mil_spec: 25,      // 25%
+    restricted: 30,    // 30%
+    classified: 25,    // 25%
+    covert: 12,        // 12%
+    extraordinary: 8   // 8%
+  },
+  risk: {
+    // Risk Zone: high volatility — 75% RTP, extreme variance
+    // 50% chance of losing (mil-spec cheap), 30% mid, 15% good, 5% jackpot
+    mil_spec: 50,      // 50% — Cheap blues (€0.10 - €2)
+    restricted: 30,    // 30% — Purple (€2 - €15)
+    classified: 12,    // 12% — Pink (€15 - €60)
+    covert: 5,         // 5%  — Red (€60 - €300)
+    extraordinary: 3   // 3%  — Gold/Knife (€300+)
+  }
+};
+
+// ─── SKIN CATALOGS BY CASE TIER ──────────────────────────
+// Each tier has a curated list of real CS2 skins with realistic prices
+// Higher tiers have better skins and higher max prices
+
+export const SKIN_CATALOGS = {
+  económica: {
+    weapons: ["Glock-18", "USP-S", "P2000", "MP9", "MAC-10", "MP7", "UMP-45", "P90", "PP-Bizon", "Nova", "XM1014", "MAG-7", "Sawed-Off", "Negev", "M249"],
+    skins: [
+      "Groundwater", "Candy Apple", "Forest DDPAT", "Bone Mask", "Anodized Navy", "Sandstorm", "Blue Streak", "Urban DDPAT",
+      "Pink DDPAT", "Mudder", "Cobalt Quartz", "Scorpion", "Silver", "Nuclear Threat", "The Emperor", "Bismuth",
+      "Neon Rider", "Urban Shock", "Harvester", "Impire", "Bunsen Burner", "Torn", "Fade", "Ergo",
+      "Bullet Queen", "Cortex", "Sweeper", "Night", "Tread", "Slate", "Flame", "Acid Wash"
+    ],
+    priceRange: [0.10, 3.00],
+    avgPrice: 0.80
+  },
+
+  intermedia: {
+    weapons: ["AK-47", "M4A4", "M4A1-S", "AWP", "FAMAS", "Galil AR", "SSG 08", "SG 553", "AUG", "G3SG1", "SCAR-20", "Desert Eagle", "Tec-9", "Five-SeveN", "CZ75-Auto"],
+    skins: [
+      "Redline", "Vulcan", "Asiimov", "Hyper Beast", "Neon Rider", "Bloodsport", "Phantom Disruptor", "Mecha Industries",
+      "Safari Mesh", "Boreal Forest", "Sand Dune", "Predator", "Tornado", "Scorched", "Jungle", "Urban", "Army", "Contractor",
+      "Wasteland Rebel", "Fuel Injector", "Frontside Misty", "Aqua Terrace", "Sunset Storm", "Printstream", "Monkey Business",
+      "Neon Revolution", "X-Ray", "Vice", "Empress", "Wild Lotus", "Desolate Space", "Atheris", "Cobra Strike"
+    ],
+    priceRange: [3.00, 25.00],
+    avgPrice: 8.00
+  },
+
+  premium: {
+    weapons: ["AK-47", "M4A4", "M4A1-S", "AWP", "Desert Eagle", "USP-S", "Glock-18", "P250", "Five-SeveN", "Tec-9"],
+    skins: [
+      "Asiimov", "Hyper Beast", "Neon Rider", "Bloodsport", "Phantom Disruptor", "Mecha Industries", "Wasteland Rebel",
+      "Fuel Injector", "Frontside Misty", "Aqua Terrace", "Sunset Storm", "Printstream", "Monkey Business", "Wild Lotus",
+      "Neon Revolution", "X-Ray", "Cortex", "Duality", "Atheris", "Vice", "Cobra Strike", "Jungle Slipstream",
+      "Empress", "The Empress", "Poseidon", "Medusa", "Knight", "Stainless", "Hot Rod", "Blaze",
+      "Kill Confirmed", "Fever Dream", "Blue Gem", "Royal Paladin", "Exo", "Deft"
+    ],
+    priceRange: [15.00, 150.00],
+    avgPrice: 45.00
+  },
+
+  limited: {
+    weapons: ["AK-47", "M4A4", "M4A1-S", "AWP", "Desert Eagle", "USP-S", "Glock-18", "★ Karambit", "★ Butterfly Knife", "★ Flip Knife", "★ Talon Knife", "★ M9 Bayonet", "★ Bowie Knife", "★ Huntsman Knife", "★ Falchion Knife", "★ Shadow Daggers", "★ Ursus Knife", "★ Navaja Knife", "★ Stiletto Knife", "★ Classic Knife", "★ Survival Knife", "★ Nomad Knife", "★ Skeleton Knife", "★ Paracord Knife"],
+    skins: [
+      "Dragon Lore", "Howl", "Medusa", "Gungnir", "Souvenir AWP | Dragon Lore",
+      "Prince", "Princess", "Empress", "The Empress",
+      "Doppler", "Fade", "Marble Fade", "Crimson Web", "Case Hardened", "Tiger Tooth", "Lore",
+      "Gamma Doppler", "Autotronic", "Black Laminate", "Ultraviolet",
+      "Doppler Phase 2", "Doppler Phase 4", "Emerald", "Ruby", "Sapphire",
+      "Slaughter", "Night", "Damascus Steel", "Urban Masked",
+      "Fade", "Tiger Tooth", "Marble Fade", "Doppler", "Lore",
+      "Crimson Web", "Ultraviolet", "Autotronic", "Gamma Doppler",
+      "Baggage", "Forest DDPAT", "Crimson Web", "Boreal Forest",
+      "Chromatic Aberration", "Spider Lily", "Desolação", "Inheritance", "Contamination"
+    ],
+    priceRange: [50.00, 2500.00],
+    avgPrice: 350.00
+  },
+  risk: {
+    // Risk Zone: high volatility — knives, gloves, or bust
+    weapons: ["AK-47", "AWP", "M4A4", "M4A1-S", "Desert Eagle", "USP-S", "Glock-18", "★ Karambit", "★ Butterfly Knife", "★ M9 Bayonet", "★ Talon Knife", "★ Flip Knife", "★ Shadow Daggers", "★ Specialist Gloves", "★ Sport Gloves", "★ Driver Gloves", "★ Hand Wraps"],
+    skins: [
+      "Asiimov", "Redline", "Vulcan", "Hyper Beast", "Neon Rider", "Dragon Lore", "Howl",
+      "Doppler", "Fade", "Marble Fade", "Crimson Web", "Case Hardened", "Tiger Tooth", "Lore",
+      "Gamma Doppler", "Autotronic", "Black Laminate", "Ultraviolet",
+      "Doppler Phase 2", "Doppler Phase 4", "Emerald", "Ruby", "Sapphire",
+      "Slaughter", "Night", "Damascus Steel", "Urban Masked",
+      "Pandora's Box", "King Snake", "Overprint", "Slingshot", "Hedge Maze",
+      "Chromatic Aberration", "Spider Lily", "Desolação", "Inheritance", "Contamination",
+      "Kill Confirmed", "Fever Dream", "Blue Gem", "Royal Paladin"
+    ],
+    priceRange: [0.50, 500.00],
+    avgPrice: 25.00
+  }
+};
+
+// ─── Level-Based Daily Cases (KeyDrop-style) ─────────────
+// Escalado hasta Nivel 360 - Sistema VIP Supreme
+// Unlocked by user level (based on total deposited volume)
+// Cada caja tiene temática, gradiente, glow y borde ÚNICOS
+export const DAILY_CASES_BY_LEVEL = [
+  {
+    level: 0,
+    name: "DAILY FREE",
+    color: "#10b981",
+    bgGradient: "linear-gradient(135deg, #052e16 0%, #10b981 100%)",
+    badge: "FREE",
+    rtp: 95,
+    minDeposit: 0,
+    caseId: "daily-0",
+    category: "económica",
+    maxSkinPrice: 5.00,
+    knifeChance: 0,
+    gloveChance: 0,
+    description: "Caja diaria gratuita para nuevos usuarios",
+    theme: "Crystal",
+    glowColor: "#10b981",
+    borderGlow: "0 0 30px rgba(16,185,129,0.3)",
+    icon: "diamond"
+  },
+  {
+    level: 5,
+    name: "BRONZE DAILY",
+    color: "#cd7f32",
+    bgGradient: "linear-gradient(135deg, #1a0a00 0%, #cd7f32 100%)",
+    badge: "BRONZE",
+    rtp: 92,
+    minDeposit: 10,
+    caseId: "daily-5",
+    category: "económica",
+    maxSkinPrice: 10.00,
+    knifeChance: 0,
+    gloveChance: 0,
+    description: "Desbloqueado con €10 depositados",
+    theme: "Steampunk",
+    glowColor: "#cd7f32",
+    borderGlow: "0 0 30px rgba(205,127,50,0.3)",
+    icon: "shield"
+  },
+  {
+    level: 15,
+    name: "SILVER DAILY",
+    color: "#c0c0c0",
+    bgGradient: "linear-gradient(135deg, #0a0a1a 0%, #8a9bb5 100%)",
+    badge: "SILVER",
+    rtp: 90,
+    minDeposit: 50,
+    caseId: "daily-15",
+    category: "intermedia",
+    maxSkinPrice: 30.00,
+    knifeChance: 0,
+    gloveChance: 0,
+    description: "Desbloqueado con €50 depositados",
+    theme: "Cyber",
+    glowColor: "#c0c0c0",
+    borderGlow: "0 0 30px rgba(192,192,192,0.3)",
+    icon: "hexagon"
+  },
+  {
+    level: 30,
+    name: "GOLD DAILY",
+    color: "#ffd700",
+    bgGradient: "linear-gradient(135deg, #1a1200 0%, #ffd700 100%)",
+    badge: "GOLD",
+    rtp: 88,
+    minDeposit: 150,
+    caseId: "daily-30",
+    category: "intermedia",
+    maxSkinPrice: 75.00,
+    knifeChance: 0.5,
+    gloveChance: 0,
+    description: "Desbloqueado con €150 depositados - Primera oportunidad de cuchillos",
+    theme: "Ancient",
+    glowColor: "#ffd700",
+    borderGlow: "0 0 40px rgba(255,215,0,0.4)",
+    icon: "crown"
+  },
+  {
+    level: 50,
+    name: "DIAMOND DAILY",
+    color: "#b9f2ff",
+    bgGradient: "linear-gradient(135deg, #001a2e 0%, #5cceff 100%)",
+    badge: "DIAMOND",
+    rtp: 85,
+    minDeposit: 500,
+    caseId: "daily-50",
+    category: "premium",
+    maxSkinPrice: 200.00,
+    knifeChance: 1.5,
+    gloveChance: 0.5,
+    description: "Desbloqueado con €500 depositados - Guantes posibles",
+    theme: "Crystal",
+    glowColor: "#b9f2ff",
+    borderGlow: "0 0 40px rgba(185,242,255,0.4)",
+    icon: "gem"
+  },
+  {
+    level: 80,
+    name: "PLATINUM DAILY",
+    color: "#e5e4e2",
+    bgGradient: "linear-gradient(135deg, #0a0a1e 0%, #b0b0c0 100%)",
+    badge: "PLATINUM",
+    rtp: 83,
+    minDeposit: 1500,
+    caseId: "daily-80",
+    category: "premium",
+    maxSkinPrice: 500.00,
+    knifeChance: 3,
+    gloveChance: 1,
+    description: "Desbloqueado con €1500 depositados - Skins clandestinas posibles",
+    theme: "Frost",
+    glowColor: "#e5e4e2",
+    borderGlow: "0 0 50px rgba(229,228,226,0.4)",
+    icon: "snowflake"
+  },
+  {
+    level: 120,
+    name: "EMERALD DAILY",
+    color: "#50c878",
+    bgGradient: "linear-gradient(135deg, #002a1a 0%, #00e676 100%)",
+    badge: "EMERALD",
+    rtp: 81,
+    minDeposit: 4000,
+    caseId: "daily-120",
+    category: "limited",
+    maxSkinPrice: 1200.00,
+    knifeChance: 5,
+    gloveChance: 2,
+    description: "Desbloqueado con €4000 depositados - Alta probabilidad de items raros",
+    theme: "Dragon",
+    glowColor: "#50c878",
+    borderGlow: "0 0 50px rgba(80,200,120,0.5)",
+    icon: "skull"
+  },
+  {
+    level: 170,
+    name: "RUBY DAILY",
+    color: "#e0115f",
+    bgGradient: "linear-gradient(135deg, #2a0010 0%, #ff1464 100%)",
+    badge: "RUBY",
+    rtp: 79,
+    minDeposit: 10000,
+    caseId: "daily-170",
+    category: "limited",
+    maxSkinPrice: 2500.00,
+    knifeChance: 8,
+    gloveChance: 3,
+    description: "Desbloqueado con €10000 depositados - Cuchillos frecuentes",
+    theme: "Inferno",
+    glowColor: "#e0115f",
+    borderGlow: "0 0 60px rgba(224,17,95,0.5)",
+    icon: "flame"
+  },
+  {
+    level: 230,
+    name: "MASTER DAILY",
+    color: "#ff4500",
+    bgGradient: "linear-gradient(135deg, #1a0500 0%, #ff6a00 100%)",
+    badge: "MASTER",
+    rtp: 77,
+    minDeposit: 25000,
+    caseId: "daily-230",
+    category: "limited",
+    maxSkinPrice: 5000.00,
+    knifeChance: 12,
+    gloveChance: 5,
+    description: "Desbloqueado con €25000 depositados - Skins de élite garantizadas",
+    theme: "Shadow",
+    glowColor: "#ff4500",
+    borderGlow: "0 0 60px rgba(255,69,0,0.6)",
+    icon: "lightning"
+  },
+  {
+    level: 300,
+    name: "LEGENDARY DAILY",
+    color: "#ffd700",
+    bgGradient: "linear-gradient(135deg, #1a0a00 0%, #ffcc00 100%)",
+    badge: "LEGENDARY",
+    rtp: 75,
+    minDeposit: 75000,
+    caseId: "daily-300",
+    category: "limited",
+    maxSkinPrice: 10000.00,
+    knifeChance: 18,
+    gloveChance: 8,
+    description: "Desbloqueado con €75000 depositados - Solo para leyendas",
+    theme: "Heavenly",
+    glowColor: "#ffd700",
+    borderGlow: "0 0 80px rgba(255,215,0,0.6)",
+    icon: "star"
+  },
+  {
+    level: 360,
+    name: "VIP SUPREME",
+    color: "#ff00ff",
+    bgGradient: "linear-gradient(135deg, #1a0030 0%, #ff00ff 100%)",
+    badge: "SUPREME",
+    rtp: 72,
+    minDeposit: 200000,
+    caseId: "daily-360",
+    category: "limited",
+    maxSkinPrice: 25000.00,
+    knifeChance: 25,
+    gloveChance: 12,
+    description: "Nivel maximo - Cuchillos y guantes de alto valor muy frecuentes",
+    theme: "Cosmic",
+    glowColor: "#ff00ff",
+    borderGlow: "0 0 100px rgba(255,0,255,0.7)",
+    icon: "skull"
+  }
+];
+
+// ─── Case Definitions with Professional Naming ───────────
+export const CASE_IMAGES = {
+  // Económicas — Temas profesionales CS2 style (0.50€ - 2.50€)
+  económica: [
+    { name: "Starter Case", color: "#6366f1", bgGradient: "linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)", badge: "ECO", rtp: 90 },
+    { name: "Crystal Vault", color: "#3b82f6", bgGradient: "linear-gradient(135deg, #1e293b 0%, #1e40af 100%)", badge: "ECO", rtp: 90 },
+    { name: "Frost Discovery", color: "#0891b2", bgGradient: "linear-gradient(135deg, #082f49 0%, #0e7490 100%)", badge: "ECO", rtp: 90 },
+    { name: "Neon Dawn", color: "#06b6d4", bgGradient: "linear-gradient(135deg, #042f2e 0%, #0891b2 100%)", badge: "ECO", rtp: 90 },
+    { name: "Forest Spirit", color: "#10b981", bgGradient: "linear-gradient(135deg, #052e16 0%, #065f46 100%)", badge: "ECO", rtp: 90 },
+    { name: "Ember Glow", color: "#f59e0b", bgGradient: "linear-gradient(135deg, #451a03 0%, #92400e 100%)", badge: "ECO", rtp: 90 },
+    { name: "Sunset Ray", color: "#ec4899", bgGradient: "linear-gradient(135deg, #500724 0%, #9d174d 100%)", badge: "ECO", rtp: 90 },
+    { name: "Twilight Keeper", color: "#a855f7", bgGradient: "linear-gradient(135deg, #2e1065 0%, #6b21a8 100%)", badge: "ECO", rtp: 90 },
+    { name: "Phantom Case", color: "#8b5cf6", bgGradient: "linear-gradient(135deg, #1e1b4b 0%, #5b21b6 100%)", badge: "ECO", rtp: 90 },
+    { name: "Thunder Strike", color: "#fbbf24", bgGradient: "linear-gradient(135deg, #422006 0%, #a16207 100%)", badge: "ECO", rtp: 90 },
+    { name: "Iron Clad", color: "#94a3b8", bgGradient: "linear-gradient(135deg, #1e293b 0%, #475569 100%)", badge: "ECO", rtp: 90 },
+    { name: "Copper Wire", color: "#b45309", bgGradient: "linear-gradient(135deg, #451a03 0%, #78350f 100%)", badge: "ECO", rtp: 90 },
+  ],
+
+  // Intermedias — Temas guerrero/táctico (5.00€ - 25.00€)
+  intermedia: [
+    { name: "Sentinel Guardian", color: "#2563eb", bgGradient: "linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%)", badge: "MID", rtp: 88 },
+    { name: "Warrior's Path", color: "#dc2626", bgGradient: "linear-gradient(135deg, #7f1d1d 0%, #dc2626 100%)", badge: "MID", rtp: 88 },
+    { name: "Phantom Strike", color: "#6366f1", bgGradient: "linear-gradient(135deg, #312e81 0%, #6366f1 100%)", badge: "MID", rtp: 88 },
+    { name: "Specter Eyes", color: "#059669", bgGradient: "linear-gradient(135deg, #064e3b 0%, #059669 100%)", badge: "MID", rtp: 88 },
+    { name: "Dragon Warden", color: "#b91c1c", bgGradient: "linear-gradient(135deg, #450a0a 0%, #991b1b 100%)", badge: "MID", rtp: 88 },
+    { name: "Phoenix Flame", color: "#f59e0b", bgGradient: "linear-gradient(135deg, #78350f 0%, #f59e0b 100%)", badge: "MID", rtp: 88 },
+    { name: "Thunder Bolt", color: "#ca8a04", bgGradient: "linear-gradient(135deg, #422006 0%, #ca8a04 100%)", badge: "MID", rtp: 88 },
+    { name: "Steel Resolve", color: "#475569", bgGradient: "linear-gradient(135deg, #1e293b 0%, #475569 100%)", badge: "MID", rtp: 88 },
+    { name: "Tactical Ops", color: "#1e3a8a", bgGradient: "linear-gradient(135deg, #172554 0%, #1e3a8a 100%)", badge: "MID", rtp: 88 },
+    { name: "Hunter's Mark", color: "#14532d", bgGradient: "linear-gradient(135deg, #052e16 0%, #14532d 100%)", badge: "MID", rtp: 88 },
+    { name: "Rogue Spirit", color: "#4c1d95", bgGradient: "linear-gradient(135deg, #2e1065 0%, #4c1d95 100%)", badge: "MID", rtp: 88 },
+    { name: "Eagle Eye", color: "#1e40af", bgGradient: "linear-gradient(135deg, #172554 0%, #1e40af 100%)", badge: "MID", rtp: 88 },
+    { name: "Storm Front", color: "#1e3a8a", bgGradient: "linear-gradient(135deg, #0c1838 0%, #2563eb 100%)", badge: "MID", rtp: 88 },
+    { name: "Inferno Core", color: "#991b1b", bgGradient: "linear-gradient(135deg, #450a0a 0%, #ef4444 100%)", badge: "MID", rtp: 88 },
+  ],
+
+  // Premium — Temas leyenda/infinito (50.00€ - 300.00€)
+  premium: [
+    { name: "Elder Legends", color: "#b91c1c", bgGradient: "linear-gradient(135deg, #450a0a 0%, #b91c1c 100%)", badge: "PREMIUM", rtp: 85 },
+    { name: "Mythical Dragon", color: "#7c3aed", bgGradient: "linear-gradient(135deg, #3b0764 0%, #7c3aed 100%)", badge: "PREMIUM", rtp: 85 },
+    { name: "Cosmic Infinity", color: "#2563eb", bgGradient: "linear-gradient(135deg, #0c1838 0%, #2563eb 100%)", badge: "PREMIUM", rtp: 85 },
+    { name: "Supreme Overlord", color: "#991b1b", bgGradient: "linear-gradient(135deg, #450a0a 0%, #991b1b 100%)", badge: "PREMIUM", rtp: 85 },
+    { name: "Golden Dynasty", color: "#ca8a04", bgGradient: "linear-gradient(135deg, #422006 0%, #ca8a04 100%)", badge: "PREMIUM", rtp: 85 },
+    { name: "Celestial Throne", color: "#7c3aed", bgGradient: "linear-gradient(135deg, #2e1065 0%, #7c3aed 100%)", badge: "PREMIUM", rtp: 85 },
+    { name: "Tycoon's Vault", color: "#065f46", bgGradient: "linear-gradient(135deg, #022c22 0%, #065f46 100%)", badge: "PREMIUM", rtp: 85 },
+    { name: "Alpha Predator", color: "#450a0a", bgGradient: "linear-gradient(135deg, #1c0a0a 0%, #450a0a 100%)", badge: "PREMIUM", rtp: 85 },
+    { name: "God Mode", color: "#1e3a8a", bgGradient: "linear-gradient(135deg, #172554 0%, #1e3a8a 100%)", badge: "PREMIUM", rtp: 85 },
+    { name: "Immortal Soul", color: "#312e81", bgGradient: "linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)", badge: "PREMIUM", rtp: 85 },
+    { name: "Nexus Point", color: "#0f766e", bgGradient: "linear-gradient(135deg, #042f2e 0%, #0f766e 100%)", badge: "PREMIUM", rtp: 85 },
+    { name: "Omega Strike", color: "#701a75", bgGradient: "linear-gradient(135deg, #3b0764 0%, #701a75 100%)", badge: "PREMIUM", rtp: 85 },
+  ],
+
+  // Limited — Temas únicos/coleccionista (50.00€ - 300.00€)
+  limited: [
+    { name: "Collector's Edition", color: "#10b981", bgGradient: "linear-gradient(135deg, #022c22 0%, #10b981 100%)", badge: "LIMITED", rtp: 82 },
+    { name: "Diamond Jubilee", color: "#0ea5e9", bgGradient: "linear-gradient(135deg, #082f49 0%, #0ea5e9 100%)", badge: "LIMITED", rtp: 82 },
+    { name: "Gold Rush", color: "#ca8a04", bgGradient: "linear-gradient(135deg, #422006 0%, #facc15 100%)", badge: "LIMITED", rtp: 82 },
+    { name: "High Roller", color: "#dc2626", bgGradient: "linear-gradient(135deg, #450a0a 0%, #dc2626 100%)", badge: "LIMITED", rtp: 82 },
+    { name: "Whale's Dream", color: "#0369a1", bgGradient: "linear-gradient(135deg, #082f49 0%, #0369a1 100%)", badge: "LIMITED", rtp: 82 },
+    { name: "Founders Box", color: "#1e40af", bgGradient: "linear-gradient(135deg, #172554 0%, #1e40af 100%)", badge: "LIMITED", rtp: 82 },
+    { name: "Legacy Crate", color: "#78350f", bgGradient: "linear-gradient(135deg, #451a03 0%, #78350f 100%)", badge: "LIMITED", rtp: 82 },
+    { name: "Time Capsule", color: "#1e1b4b", bgGradient: "linear-gradient(135deg, #0c0a1e 0%, #4338ca 100%)", badge: "LIMITED", rtp: 82 },
+  ],
+
+  // Risk Zone — Alta volatilidad (10.00€ - 150.00€)
+  risk: [
+    { name: "Russian Roulette", color: "#ef4444", bgGradient: "linear-gradient(135deg, #1a0000 0%, #dc2626 100%)", badge: "RISK", rtp: 75 },
+    { name: "All or Nothing", color: "#f97316", bgGradient: "linear-gradient(135deg, #1a0500 0%, #ea580c 100%)", badge: "RISK", rtp: 75 },
+    { name: "Double or Quits", color: "#eab308", bgGradient: "linear-gradient(135deg, #1a1200 0%, #ca8a04 100%)", badge: "RISK", rtp: 75 },
+    { name: "Chaos Theory", color: "#a855f7", bgGradient: "linear-gradient(135deg, #1a0030 0%, #9333ea 100%)", badge: "RISK", rtp: 75 },
+    { name: "Devil's Deal", color: "#dc2626", bgGradient: "linear-gradient(135deg, #2a0000 0%, #b91c1c 100%)", badge: "RISK", rtp: 75 },
+    { name: "Lucky Shot", color: "#f59e0b", bgGradient: "linear-gradient(135deg, #1a0a00 0%, #d97706 100%)", badge: "RISK", rtp: 75 },
+    { name: "Mortal Coil", color: "#7c3aed", bgGradient: "linear-gradient(135deg, #1a0030 0%, #7c3aed 100%)", badge: "RISK", rtp: 75 },
+    { name: "Last Stand", color: "#b91c1c", bgGradient: "linear-gradient(135deg, #1a0000 0%, #991b1b 100%)", badge: "RISK", rtp: 75 },
+  ]
+};
+
+// Función para obtener una caja aleatoria según la categoría
+export const getCaseImage = (category) => {
+  if (!CASE_IMAGES[category]) return { name: "Mystery Case", color: "#6366f1", bgGradient: "linear-gradient(135deg, #1e1b4b 0%, #6366f1 100%)" };
+  const cases = CASE_IMAGES[category];
+  return cases[Math.floor(Math.random() * cases.length)];
+};
+
+// ─── Helper: Generate unique preview skins per case ──────────
+// Uses the SKIN_CATALOGS to create 4 unique preview skins per case
+// No two cases get the same combination
+const generatePreviewSkins = (caseObj, caseIndex, category) => {
+  const catalog = SKIN_CATALOGS[category] || SKIN_CATALOGS.económica;
+  const previews = [];
+  const usedCombos = new Set();
+  const seedStr = `${caseObj.id || caseObj.name}_${caseIndex}`;
+  let seed = 0;
+  for (let i = 0; i < seedStr.length; i++) {
+    seed = ((seed << 5) - seed) + seedStr.charCodeAt(i);
+    seed |= 0;
+  }
+
+  // Deterministic "random" based on case seed + index
+  const seededRandom = (offset) => {
+    const x = Math.sin(seed + offset * 9973) * 10000;
+    return x - Math.floor(x);
+  };
+
+  // Pick 1 featured skin (mid-to-high range) and 3 secondary skins
+  for (let i = 0; i < 4; i++) {
+    let attempts = 0;
+    let weapon, skinName, combo;
+
+    do {
+      const wIndex = Math.floor(seededRandom(i * 7 + attempts * 13 + caseIndex) * catalog.weapons.length);
+      const sIndex = Math.floor(seededRandom(i * 11 + attempts * 17 + caseIndex + 1) * catalog.skins.length);
+      weapon = catalog.weapons[wIndex];
+      skinName = catalog.skins[sIndex];
+      combo = `${weapon}|${skinName}`;
+      attempts++;
+    } while (usedCombos.has(combo) && attempts < 50);
+
+    usedCombos.add(combo);
+
+    // Price proportional to position: first is featured (higher), rest are lower
+    const priceRatio = i === 0 ? 0.7 + seededRandom(i * 5 + caseIndex) * 0.3 : 0.1 + seededRandom(i * 3 + caseIndex) * 0.4;
+    const price = parseFloat((catalog.priceRange[0] + (catalog.priceRange[1] - catalog.priceRange[0]) * priceRatio).toFixed(2));
+
+    const rarities = ["Mil-Spec Grade", "Restricted", "Classified", "Covert"];
+    const rarity = i === 0 ? rarities[Math.min(2 + Math.floor(seededRandom(i * 23 + caseIndex) * 2), 3)]
+      : rarities[Math.min(Math.floor(seededRandom(i * 19 + caseIndex) * 2), 2)];
+
+    previews.push({
+      id: `preview-${caseObj.id || `case-${caseIndex}`}-${i}`,
+      name: `${weapon} | ${skinName}`,
+      price,
+      rarity,
+      weapon,
+      skin_name: skinName,
+      image: ""
+    });
+  }
+
+  return previews;
+};
+
+// ─── Generate all cases with logical pricing ──────────────
+// Prices are set to ensure RTP balance:
+// - Económica: €0.50 - €3.50 (avg €1.50)
+// - Intermedia: €3.00 - €8.00 (avg €5.00)
+// - Premium: €10.00 - €30.00 (avg €20.00)
+// - Limited: €30.00 - €100.00 (avg €50.00)
+export const generateAllCases = () => {
+  const cases = [];
+  let globalIndex = 0;
+
+  // Económicas — Fixed logical prices
+  const ecoPrices = [0.50, 0.75, 1.00, 1.25, 1.50, 1.75, 2.00, 2.25, 2.50, 2.75, 3.00, 3.50];
+  CASE_IMAGES.económica.forEach((caseImg, idx) => {
+    const caseObj = {
+      id: `econ-${idx}`,
+      name: caseImg.name,
+      imageSrc: CASE_CONTAINER_ECO,
+      price: ecoPrices[idx] || 1.50,
+      category: "económica",
+      color: caseImg.color,
+      bgGradient: caseImg.bgGradient,
+      rarity: "mil-spec",
+      image: CASE_CONTAINER_ECO,
+      rtp: 90,
+      badge: caseImg.badge || "ECO"
+    };
+    // Assign distinct container
+    caseObj.image = getContainerForCase(caseObj);
+    caseObj.imageSrc = caseObj.image;
+    // Generate unique preview skins
+    caseObj.previewSkins = generatePreviewSkins(caseObj, globalIndex++, "económica");
+    cases.push(caseObj);
+  });
+
+  // Intermedias
+  const midPrices = [3.00, 3.50, 4.00, 4.50, 5.00, 5.50, 6.00, 6.50, 7.00, 7.50, 8.00, 8.50, 9.00, 9.50];
+  CASE_IMAGES.intermedia.forEach((caseImg, idx) => {
+    const caseObj = {
+      id: `inter-${idx}`,
+      name: caseImg.name,
+      imageSrc: CASE_CONTAINER_MID,
+      price: midPrices[idx] || 5.00,
+      category: "intermedia",
+      color: caseImg.color,
+      bgGradient: caseImg.bgGradient,
+      rarity: "classified",
+      image: CASE_CONTAINER_MID,
+      rtp: 88,
+      badge: caseImg.badge || "MID"
+    };
+    caseObj.image = getContainerForCase(caseObj);
+    caseObj.imageSrc = caseObj.image;
+    caseObj.previewSkins = generatePreviewSkins(caseObj, globalIndex++, "intermedia");
+    cases.push(caseObj);
+  });
+
+  // Premium
+  const premPrices = [10.00, 12.00, 15.00, 18.00, 20.00, 22.00, 25.00, 28.00, 30.00, 35.00, 40.00, 45.00];
+  CASE_IMAGES.premium.forEach((caseImg, idx) => {
+    const caseObj = {
+      id: `prem-${idx}`,
+      name: caseImg.name,
+      imageSrc: CASE_CONTAINER_PREMIUM,
+      price: premPrices[idx] || 20.00,
+      category: "premium",
+      color: caseImg.color,
+      bgGradient: caseImg.bgGradient,
+      rarity: "covert",
+      image: CASE_CONTAINER_PREMIUM,
+      rtp: 85,
+      badge: caseImg.badge || "PREMIUM"
+    };
+    caseObj.image = getContainerForCase(caseObj);
+    caseObj.imageSrc = caseObj.image;
+    caseObj.previewSkins = generatePreviewSkins(caseObj, globalIndex++, "premium");
+    cases.push(caseObj);
+  });
+
+  // Limited
+  const limitPrices = [30.00, 40.00, 50.00, 60.00, 75.00, 80.00, 90.00, 100.00];
+  CASE_IMAGES.limited.forEach((caseImg, idx) => {
+    const caseObj = {
+      id: `limit-${idx}`,
+      name: caseImg.name,
+      imageSrc: CASE_CONTAINER_COVERT,
+      price: limitPrices[idx] || 50.00,
+      category: "limited",
+      color: caseImg.color,
+      bgGradient: caseImg.bgGradient,
+      rarity: "covert",
+      image: CASE_CONTAINER_COVERT,
+      rtp: 82,
+      badge: caseImg.badge || "LIMITED"
+    };
+    caseObj.image = getContainerForCase(caseObj);
+    caseObj.imageSrc = caseObj.image;
+    caseObj.previewSkins = generatePreviewSkins(caseObj, globalIndex++, "limited");
+    cases.push(caseObj);
+  });
+
+  // Risk Zone — High volatility (10.00€ - 150.00€)
+  const riskPrices = [10.00, 15.00, 20.00, 30.00, 50.00, 75.00, 100.00, 150.00];
+  CASE_IMAGES.risk.forEach((caseImg, idx) => {
+    const caseObj = {
+      id: `risk-${idx}`,
+      name: caseImg.name,
+      imageSrc: CASE_CONTAINER_KNIFE,
+      price: riskPrices[idx] || 20.00,
+      category: "risk",
+      color: caseImg.color,
+      bgGradient: caseImg.bgGradient,
+      rarity: "extraordinary",
+      image: CASE_CONTAINER_KNIFE,
+      rtp: 75,
+      badge: caseImg.badge || "RISK"
+    };
+    caseObj.image = getContainerForCase(caseObj);
+    caseObj.imageSrc = caseObj.image;
+    caseObj.previewSkins = generatePreviewSkins(caseObj, globalIndex++, "risk");
+    cases.push(caseObj);
+  });
+
+  // Daily cases for levels (KeyDrop-style progression)
+  DAILY_CASES_BY_LEVEL.forEach(d => {
+    const dailyCat = d.category || "económica";
+    const caseObj = {
+      id: d.caseId,
+      name: d.name,
+      imageSrc: CASE_CONTAINER_ECO,
+      price: 0.00,
+      category: "daily",
+      color: d.color,
+      bgGradient: d.bgGradient,
+      rarity: d.level === 0 ? "mil-spec" : d.level < 25 ? "classified" : d.level < 50 ? "covert" : "extraordinary",
+      image: CASE_CONTAINER_ECO,
+      minLevel: d.level,
+      rtp: d.rtp,
+      badge: d.badge,
+      maxSkinPrice: d.maxSkinPrice,
+      description: d.description,
+      level: d.level
+    };
+    caseObj.image = getContainerForCase(caseObj);
+    caseObj.imageSrc = caseObj.image;
+    caseObj.previewSkins = generatePreviewSkins(caseObj, globalIndex++, dailyCat);
+    cases.push(caseObj);
+  });
+
+  return cases;
+};
+
+// ─── Generate random skin for case opening ────────────────
+// Uses the skin catalogs to create realistic CS2 skins
+export const generateRandomSkin = (caseCategory) => {
+  const catalog = SKIN_CATALOGS[caseCategory] || SKIN_CATALOGS.económica;
+  const probs = CASE_PROBABILITIES[caseCategory] || CASE_PROBABILITIES.económica;
+
+  // Roll for rarity tier
+  const roll = Math.random() * 100;
+  let rarity, rarityPrice;
+
+  if (roll < probs.covert) {
+    rarity = "Covert";
+    rarityPrice = catalog.priceRange[1] * (0.6 + Math.random() * 0.4);
+  } else if (roll < probs.covert + probs.classified) {
+    rarity = "Classified";
+    rarityPrice = catalog.priceRange[0] + (catalog.priceRange[1] - catalog.priceRange[0]) * (0.3 + Math.random() * 0.4);
+  } else if (roll < probs.covert + probs.classified + probs.restricted) {
+    rarity = "Restricted";
+    rarityPrice = catalog.priceRange[0] + (catalog.priceRange[1] - catalog.priceRange[0]) * (0.1 + Math.random() * 0.3);
+  } else {
+    rarity = "Mil-Spec Grade";
+    rarityPrice = catalog.priceRange[0] + Math.random() * (catalog.priceRange[1] - catalog.priceRange[0]) * 0.2;
+  }
+
+  // Pick random weapon and skin
+  const weapon = catalog.weapons[Math.floor(Math.random() * catalog.weapons.length)];
+  const skinName = catalog.skins[Math.floor(Math.random() * catalog.skins.length)];
+  const wearValues = ["Factory New", "Minimal Wear", "Field-Tested", "Well-Worn", "Battle-Scarred"];
+  const wear = wearValues[Math.floor(Math.random() * wearValues.length)];
+
+  // Special items (knives/gloves) for high-tier cases
+  let finalWeapon = weapon;
+  let finalSkin = skinName;
+  let finalPrice = rarityPrice;
+
+  if (caseCategory === "limited" && Math.random() < 0.08) {
+    // 8% chance for knife/glove in limited cases
+    const specialItems = [
+      { weapon: "★ Karambit", skins: ["Doppler", "Fade", "Marble Fade", "Crimson Web", "Case Hardened"], priceRange: [400, 1500] },
+      { weapon: "★ Butterfly Knife", skins: ["Doppler", "Fade", "Marble Fade", "Crimson Web", "Gamma Doppler"], priceRange: [300, 1200] },
+      { weapon: "★ Flip Knife", skins: ["Doppler", "Fade", "Marble Fade", "Crimson Web"], priceRange: [150, 600] },
+      { weapon: "★ Talon Knife", skins: ["Doppler", "Fade", "Marble Fade", "Crimson Web"], priceRange: [200, 800] },
+      { weapon: "★ Shadow Daggers", skins: ["Doppler", "Fade", "Marble Fade", "Crimson Web"], priceRange: [120, 500] }
+    ];
+    const special = specialItems[Math.floor(Math.random() * specialItems.length)];
+    finalWeapon = special.weapon;
+    finalSkin = special.skins[Math.floor(Math.random() * special.skins.length)];
+    finalPrice = special.priceRange[0] + Math.random() * (special.priceRange[1] - special.priceRange[0]);
+    rarity = "Extraordinary";
+  } else if (caseCategory === "premium" && Math.random() < 0.03) {
+    // 3% chance for gloves in premium cases
+    const gloves = [
+      { name: "★ Specialist Gloves | Fade", price: 250 },
+      { name: "★ Specialist Gloves | Crimson Web", price: 180 },
+      { name: "★ Sport Gloves | Pandora's Box", price: 350 },
+      { name: "★ Driver Gloves | King Snake", price: 220 },
+      { name: "★ Hand Wraps | Overprint", price: 150 }
+    ];
+    const glove = gloves[Math.floor(Math.random() * gloves.length)];
+    finalWeapon = "★ Gloves";
+    finalSkin = glove.name.split(" | ")[1];
+    finalPrice = glove.price;
+    rarity = "Extraordinary";
+  }
+
+  const itemName = `${finalWeapon} | ${finalSkin}`;
+  const price = parseFloat(finalPrice.toFixed(2));
+
+  return {
+    name: itemName,
+    weapon: finalWeapon,
+    skin_name: finalSkin,
+    rarity: rarity,
+    price: price,
+    wear: wear
+  };
+};
+
+// ─── Weighted Random Selection based on skin price ────────
+// Probability is inversely proportional to price.
+// Cheaper skins have higher probability; expensive skins have lower probability.
+// This ensures the RTP stays balanced per case tier.
+export const pickWeightedSkin = (skins, caseCategory) => {
+  if (!skins || skins.length === 0) return null;
+
+  const probs = CASE_PROBABILITIES[caseCategory] || CASE_PROBABILITIES.económica;
+
+  // Sort skins by price ascending (cheapest first)
+  const sorted = [...skins].sort((a, b) => parseFloat(a.price) - parseFloat(b.price));
+  const n = sorted.length;
+
+  // Divide skins into rarity tiers based on price distribution
+  const tiers = {
+    mil_spec: [],      // Cheapest 40%
+    restricted: [],    // Next 30%
+    classified: [],    // Next 20%
+    covert: [],        // Next 8%
+    extraordinary: []  // Most expensive 2%
+  };
+
+  sorted.forEach((skin, i) => {
+    const ratio = i / n;
+    if (ratio < 0.40) tiers.mil_spec.push(skin);
+    else if (ratio < 0.70) tiers.restricted.push(skin);
+    else if (ratio < 0.90) tiers.classified.push(skin);
+    else if (ratio < 0.98) tiers.covert.push(skin);
+    else tiers.extraordinary.push(skin);
+  });
+
+  // Roll for rarity tier
+  const roll = Math.random() * 100;
+  let selectedTier;
+  if (roll < probs.mil_spec) selectedTier = 'mil_spec';
+  else if (roll < probs.mil_spec + probs.restricted) selectedTier = 'restricted';
+  else if (roll < probs.mil_spec + probs.restricted + probs.classified) selectedTier = 'classified';
+  else if (roll < probs.mil_spec + probs.restricted + probs.classified + probs.covert) selectedTier = 'covert';
+  else selectedTier = 'extraordinary';
+
+  // Pick a random skin from the selected tier
+  const tierSkins = tiers[selectedTier];
+  if (tierSkins.length === 0) {
+    // Fallback: if tier is empty, pick from the closest available tier
+    const allTiers = ['mil_spec', 'restricted', 'classified', 'covert', 'extraordinary'];
+    for (const t of allTiers) {
+      if (tiers[t].length > 0) return tiers[t][Math.floor(Math.random() * tiers[t].length)];
+    }
+    return sorted[0];
+  }
+
+  return tierSkins[Math.floor(Math.random() * tierSkins.length)];
+};
+ 
+

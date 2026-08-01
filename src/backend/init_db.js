@@ -27,6 +27,7 @@ const initDb = async () => {
         saldo DECIMAL(15, 2) DEFAULT 0.00 CHECK (saldo >= 0),
         link_intercambio TEXT,
         steam_id VARCHAR(50),
+        google_id VARCHAR(50),
         trade_token VARCHAR(20),
         nivel INTEGER DEFAULT 0,
         experiencia INTEGER DEFAULT 0,
@@ -134,6 +135,7 @@ const initDb = async () => {
   const alterTableQueries = [
     `ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS link_intercambio TEXT;`,
     `ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS steam_id VARCHAR(50);`,
+    `ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS google_id VARCHAR(50);`,
     `ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS trade_token VARCHAR(20);`,
     `ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS nivel INTEGER DEFAULT 0;`,
     `ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS experiencia INTEGER DEFAULT 0;`,
