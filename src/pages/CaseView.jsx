@@ -426,7 +426,7 @@ export default function CaseView() {
                   {results.filter(Boolean).map((skin, idx) => {
                     const skinName = skin?.name || "Skin desconocida";
                     const skinRarity = skin?.rarity || "Mil-Spec Grade";
-                    const safePrice = Number(resolvePriceSync(skinName, skinRarity, skin?.wear)?.price || skin?.price || 0).toFixed(2);
+                    const safePrice = Number(skin?.price ?? resolvePriceSync(skinName, skinRarity, skin?.wear)?.price ?? 0).toFixed(2);
                     const color = getRarityColor(skinRarity);
                     return (
                       <div
@@ -717,7 +717,7 @@ export default function CaseView() {
                   <div style={{ color: "white", fontSize: "0.85rem", fontWeight: "bold", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {skin.name}
                   </div>
-                  <div style={{ color: "#fff", fontWeight: "900", fontSize: "1.1rem", marginTop: "8px" }}>€{Number(resolvePriceSync(skin.name, skin.rarity, skin.wear)?.price || skin.price || 0).toFixed(2)}</div>
+                  <div style={{ color: "#fff", fontWeight: "900", fontSize: "1.1rem", marginTop: "8px" }}>€{Number(skin.price ?? resolvePriceSync(skin.name, skin.rarity, skin.wear)?.price ?? 0).toFixed(2)}</div>
                 </div>
               );
             })}
