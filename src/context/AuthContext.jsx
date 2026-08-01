@@ -1,5 +1,5 @@
 // src/context/AuthContext.jsx
-import { createContext, useEffect, useState, useCallback } from "react";
+import { createContext, useEffect, useState, useCallback, useMemo } from "react";
 import { StorageService } from "../services/StorageService";
 
 export const AuthContext = createContext(null);
@@ -8,25 +8,10 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
     const token = localStorage.getItem("token");
     if (token && token.length > 10) {
-      // JWT token exists — attempt to load cached user data
       const storedUser = StorageService.getUser();
       if (storedUser && storedUser.email && storedUser.email !== "guest@skinmarket.es") {
         return storedUser;
       }
-      // Return a minimal auth placeholder — full data fetched via /api/me
-      return {
-        id: "pending",
-        nombre_usuario: "Cargando...",
-        email: "pending@auth",
-        balance: 0,
-        saldo: 0,
-        nivel: 0,
-        experiencia: 0,
-        steam_id: null,
-        link_intercambio: null,
-        role: "user",
-        inventory: []
-      };
     }
     return null;
   });
@@ -51,22 +36,30 @@ export function AuthProvider({ children }) {
           return res.json();
         })
         .then(userData => {
-          if (userData) {
+          if (userData && userData.email) {
             StorageService.updateUser({
-              nombre_usuario: userData.nombre_usuario || userData.name,
+              nombre_usuario: userData.nombre_usuario || userData.name || "Usuario",
               email: userData.email,
-              saldo: userData.saldo || 0,
-              balance: userData.saldo || userData.balance || 0,
-              nivel: userData.nivel || userData.level || 0,
-              experiencia: userData.experiencia || 0,
+              saldo: Number(userData.saldo || 0),
+              balance: Number(userData.saldo || userData.balance || 0),
+              nivel: Number(userData.nivel || userData.level || 0),
+              experiencia: Number(userData.experiencia || 0),
               steam_id: userData.steam_id || null,
               link_intercambio: userData.link_intercambio || null
             });
             setUser(StorageService.getUser());
+          } else {
+            localStorage.removeItem('token');
+            StorageService.destroySession();
+            setUser(null);
+            setInventory([]);
           }
         })
         .catch(() => {
-          // Token exists but backend fetch failed — user stays with placeholder data
+          localStorage.removeItem('token');
+          StorageService.destroySession();
+          setUser(null);
+          setInventory([]);
         });
     }
   }, []);
@@ -98,20 +91,32 @@ export function AuthProvider({ children }) {
       });
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
+        localStorage.removeItem('token');
+        StorageService.destroySession();
+        setUser(null);
+        setInventory([]);
         throw new Error(errData.error || "Credenciales inválidas");
       }
       const data = await response.json();
+      if (!data?.token || !data?.user?.email) {
+        localStorage.removeItem('token');
+        StorageService.destroySession();
+        setUser(null);
+        setInventory([]);
+        throw new Error("Respuesta de login inválida");
+      }
       localStorage.setItem("token", data.token);
       setTokenState(data.token);
       StorageService.updateUser({
         ...data.user,
-        nombre_usuario: data.user.nombre_usuario,
+        nombre_usuario: data.user.nombre_usuario || "Usuario",
         email: data.user.email,
-        saldo: data.user.saldo,
-        balance: data.user.saldo,
-        nivel: data.user.nivel || 0,
-        experiencia: data.user.experiencia || 0
+        saldo: Number(data.user.saldo || 0),
+        balance: Number(data.user.saldo || data.user.balance || 0),
+        nivel: Number(data.user.nivel || 0),
+        experiencia: Number(data.user.experiencia || 0)
       });
+      setUser(StorageService.getUser());
       return data.user;
     } finally {
       setLoading(false);
@@ -130,7 +135,12 @@ export function AuthProvider({ children }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nombre_usuario, email, password })
       });
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (err) {
+        data = { error: `Server error (status ${response.status})` };
+      }
       if (response.ok && data.success) {
         localStorage.setItem("token", data.token);
         setTokenState(data.token);
@@ -299,6 +309,18 @@ export function AuthProvider({ children }) {
     return newBal !== false;
   }, []);
 
+  /**
+   * Award XP to the current user. Locally persists via StorageService.
+   * Backend awards XP server-side on /api/cases/open and /api/battles/*,
+   * but this helper keeps the local UI in sync for guest/local sessions.
+   * Rule: 1€ spent = 100 XP.
+   * @param {number} xpAmount - XP to add
+   * @returns {number} New total XP
+   */
+  const awardXP = useCallback((xpAmount) => {
+    return StorageService.awardXP(xpAmount);
+  }, []);
+
   const claimDaily = useCallback(async () => {
     const token = localStorage.getItem("token");
     if (!token) {
@@ -377,17 +399,21 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  const userWithInventory = user ? {
+  // Memoize the merged user+inventory object to prevent unnecessary re-renders
+  // of all consumers when only internal state references change.
+  const isAuthenticated = Boolean(user && user.email && user.email !== "guest@skinmarket.es");
+  const userWithInventory = useMemo(() => user ? {
     ...user,
     inventory,
     balance: Number(user.balance ?? user.saldo ?? 0),
     saldo: Number(user.saldo ?? user.balance ?? 0)
-  } : null;
+  } : null, [user, inventory]);
 
   return (
     <AuthContext.Provider
       value={{
         user: userWithInventory,
+        isAuthenticated,
         inventory,
         loading,
         login,
@@ -400,6 +426,7 @@ export function AuthProvider({ children }) {
         depositSkins,
         updateProfile,
         addToBalance,
+        awardXP,
         fetchInventory,
         claimDaily,
         recoverPassword,

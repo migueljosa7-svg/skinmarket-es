@@ -1,8 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/useAuth";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
+const GOOGLE_CLIENT_ID =
+  import.meta.env.VITE_GOOGLE_CLIENT_ID ||
+  "583240562119-2duavhuv66dkgnlq46pofakrc3c13nvr.apps.googleusercontent.com";
 
 function validatePassword(password) {
   if (!password || password.length < 8) return { valid: false, error: "La contrasena debe tener al menos 8 caracteres" };
@@ -27,10 +30,108 @@ export default function Login() {
   const [recoveryMessage, setRecoveryMessage] = useState("");
   const [socialLoading, setSocialLoading] = useState(null);
   const [rememberMe, setRememberMe] = useState(false);
+  const googleInitializedRef = useRef(false);
+  const googleScriptPromiseRef = useRef(null);
 
   const { login, register, recoverPassword } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
+  const loadGoogleScript = () => {
+    if (window.google) {
+      return Promise.resolve();
+    }
+    if (googleScriptPromiseRef.current) {
+      return googleScriptPromiseRef.current;
+    }
+    const existing = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
+    googleScriptPromiseRef.current = new Promise((resolve, reject) => {
+      if (window.google) {
+        return resolve();
+      }
+      const onLoad = () => {
+        if (window.google) {
+          resolve();
+        } else {
+          reject(new Error('Google Sign-In no se inicializó correctamente.'));
+        }
+      };
+      const onError = () => reject(new Error('Error al cargar Google Sign-In.'));
+      if (existing) {
+        existing.addEventListener('load', onLoad);
+        existing.addEventListener('error', onError);
+      } else {
+        const script = document.createElement('script');
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.async = true;
+        script.defer = true;
+        script.addEventListener('load', onLoad);
+        script.addEventListener('error', onError);
+        document.head.appendChild(script);
+      }
+    });
+    return googleScriptPromiseRef.current;
+  };
+
+  const initGoogleSignIn = async () => {
+    try {
+      await loadGoogleScript();
+      if (!window.google || !window.google.accounts || !window.google.accounts.id) {
+        throw new Error('Google Sign-In no está disponible.');
+      }
+      if (!googleInitializedRef.current) {
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          ux_mode: 'popup',
+          cancel_on_tap_outside: true,
+          use_fedcm_for_prompt: false,
+          callback: async function (response) {
+            var idToken = response?.credential;
+            if (!idToken) {
+              setError('No se pudo obtener el token de Google.');
+              setSocialLoading(null);
+              return;
+            }
+            try {
+              var res = await fetch(API_BASE + '/api/auth/google', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ idToken: idToken })
+              });
+              var data = await res.json();
+              if (res.ok && data.token) {
+                localStorage.setItem('token', data.token);
+                window.dispatchEvent(new CustomEvent('auth-token-updated', { detail: { token: data.token } }));
+                var mod = await import('../services/StorageService');
+                mod.StorageService.updateUser({
+                  nombre_usuario: data.user.nombre_usuario,
+                  email: data.user.email,
+                  saldo: data.user.saldo,
+                  balance: data.user.saldo,
+                  nivel: data.user.nivel || 0,
+                  experiencia: data.user.experiencia || 0
+                });
+                setSuccess(true);
+                setTimeout(function () { navigate('/dashboard'); }, 500);
+              } else {
+                setError(data.error || 'Error al iniciar sesion con Google');
+                setSocialLoading(null);
+              }
+            } catch {
+              setError('Error de conexion.');
+              setSocialLoading(null);
+            }
+          }
+        });
+        googleInitializedRef.current = true;
+      }
+      window.google.accounts.id.prompt();
+      setSocialLoading(null);
+    } catch (err) {
+      setError(err.message || 'Error al inicializar Google Sign-In.');
+      setSocialLoading(null);
+    }
+  };
 
   useEffect(() => {
     const tokenFromUrl = searchParams.get("token");
@@ -118,59 +219,16 @@ useEffect(function () {
     window.location.href = API_BASE + "/api/auth/steam";
   };
 
-  const hasGoogleClientId = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
-
   const handleGoogleLogin = function () {
     setSocialLoading("google");
-    var clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    var clientId = GOOGLE_CLIENT_ID;
     if (!clientId) {
       setError("Google Sign-In no configurado (falta VITE_GOOGLE_CLIENT_ID). Contacta al administrador.");
       setSocialLoading(null);
       setTimeout(function () { setError(""); }, 4000);
       return;
     }
-    if (!window.google) {
-      var script = document.createElement("script");
-      script.src = "https://accounts.google.com/gsi/client";
-      script.async = true;
-      script.defer = true;
-      script.onload = initGoogleSignIn;
-      script.onerror = function () { setError("Error al cargar Google Sign-In. Verifica tu conexion."); setSocialLoading(null); };
-      document.head.appendChild(script);
-    } else {
-      initGoogleSignIn();
-    }
-  };
-
-  const initGoogleSignIn = function () {
-    try {
-      var clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-      window.google.accounts.id.initialize({
-        client_id: clientId,
-        callback: async function (response) {
-          var idToken = response.credential;
-          if (!idToken) { setError("No se pudo obtener el token de Google."); setSocialLoading(null); return; }
-          try {
-            var res = await fetch(API_BASE + "/api/auth/google", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ idToken: idToken }) });
-            var data = await res.json();
-            if (res.ok && data.token) {
-              localStorage.setItem("token", data.token);
-              window.dispatchEvent(new CustomEvent("auth-token-updated", { detail: { token: data.token } }));
-              var mod = await import("../services/StorageService");
-              mod.StorageService.updateUser({ nombre_usuario: data.user.nombre_usuario, email: data.user.email, saldo: data.user.saldo, balance: data.user.saldo, nivel: data.user.nivel || 0, experiencia: data.user.experiencia || 0 });
-              setSuccess(true);
-              setTimeout(function () { navigate("/dashboard"); }, 500);
-            } else { setError(data.error || "Error al iniciar sesion con Google"); setSocialLoading(null); }
-          } catch { setError("Error de conexion."); setSocialLoading(null); }
-        }
-      });
-      window.google.accounts.id.prompt(function (notification) {
-        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-          setSocialLoading(null);
-          setError("Google Sign-In cancelado.");
-        }
-      });
-    } catch { setError("Error al inicializar Google Sign-In."); setSocialLoading(null); }
+    initGoogleSignIn();
   };
 
   return (
@@ -194,29 +252,28 @@ useEffect(function () {
               <button
                 type="button"
                 onClick={handleGoogleLogin}
-                disabled={socialLoading !== null || !hasGoogleClientId}
-                title={!hasGoogleClientId ? "Google Sign-In no configurado (falta VITE_GOOGLE_CLIENT_ID)" : "Iniciar sesion con Google"}
+                disabled={socialLoading !== null}
+                data-use_fedcm_for_prompt="false"
+                title="Iniciar sesion con Google"
                 style={{
                   width: "100%",
                   padding: "14px",
                   borderRadius: "12px",
-                  background: socialLoading === "google" ? "rgba(255,255,255,0.05)" : (!hasGoogleClientId ? "rgba(255,255,255,0.05)" : "white"),
-                  color: !hasGoogleClientId ? "rgba(255,255,255,0.4)" : "#1a1a1a",
+                  background: socialLoading === "google" ? "rgba(255,255,255,0.05)" : "white",
+                  color: "#1a1a1a",
                   border: "1px solid rgba(255,255,255,0.1)",
                   fontWeight: "900",
                   fontSize: "0.9rem",
-                  cursor: (socialLoading !== null || !hasGoogleClientId) ? "not-allowed" : "pointer",
+                  cursor: socialLoading !== null ? "not-allowed" : "pointer",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   gap: "10px",
-                  opacity: !hasGoogleClientId ? 0.6 : 1
+                  opacity: socialLoading === "google" ? 0.7 : 1
                 }}
               >
                 {socialLoading === "google" ? (
                   <><span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>⟳</span> Conectando...</>
-                ) : !hasGoogleClientId ? (
-                  <>GOOGLE (NO CONFIGURADO)</>
                 ) : (
                   <>CONTINUAR CON GOOGLE</>
                 )}
@@ -240,18 +297,18 @@ useEffect(function () {
           {view === "register" && (
             <div>
               <label style={{ fontSize: "0.7rem", fontWeight: "900", color: "rgba(255,255,255,0.4)", display: "block", marginBottom: "6px" }}>NOMBRE DE USUARIO</label>
-              <input type="text" placeholder="Tu apodo (3-30 caracteres)" value={nombreUsuario} onChange={function (e) { setNombreUsuario(e.target.value); }} maxLength={30} style={{ width: "100%", padding: "14px", borderRadius: "12px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", color: "white", outline: "none" }} />
+              <input autoComplete="username" type="text" placeholder="Tu apodo (3-30 caracteres)" value={nombreUsuario} onChange={function (e) { setNombreUsuario(e.target.value); }} maxLength={30} style={{ width: "100%", padding: "14px", borderRadius: "12px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", color: "white", outline: "none" }} />
             </div>
           )}
           <div>
             <label style={{ fontSize: "0.7rem", fontWeight: "900", color: "rgba(255,255,255,0.4)", display: "block", marginBottom: "6px" }}>CORREO ELECTRONICO</label>
-            <input type="email" placeholder="tu@email.com" value={email} onChange={function (e) { setEmail(e.target.value); }} maxLength={254} style={{ width: "100%", padding: "14px", borderRadius: "12px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", color: "white", outline: "none" }} />
+            <input autoComplete="email" type="email" placeholder="tu@email.com" value={email} onChange={function (e) { setEmail(e.target.value); }} maxLength={254} style={{ width: "100%", padding: "14px", borderRadius: "12px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", color: "white", outline: "none" }} />
           </div>
           {view !== "recover" && (
             <div>
               <label style={{ fontSize: "0.7rem", fontWeight: "900", color: "rgba(255,255,255,0.4)", display: "block", marginBottom: "6px" }}>CONTRASENA</label>
               <div style={{ position: "relative" }}>
-                <input type={showPassword ? "text" : "password"} placeholder="********" value={password} onChange={function (e) { setPassword(e.target.value); }} style={{ width: "100%", padding: "14px", borderRadius: "12px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", color: "white", outline: "none" }} />
+                <input autoComplete={view === "login" ? "current-password" : "new-password"} type={showPassword ? "text" : "password"} placeholder="********" value={password} onChange={function (e) { setPassword(e.target.value); }} style={{ width: "100%", padding: "14px", borderRadius: "12px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", color: "white", outline: "none" }} />
                 <button type="button" onClick={function () { setShowPassword(!showPassword); }} style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: "0.8rem" }}>{showPassword ? "Ocultar" : "Ver"}</button>
               </div>
               {view === "register" && <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.3)", marginTop: "6px" }}>Minimo 8 caracteres, 1 mayuscula, 1 numero y 1 caracter especial.</div>}
@@ -260,7 +317,7 @@ useEffect(function () {
           {view === "register" && (
             <div>
               <label style={{ fontSize: "0.7rem", fontWeight: "900", color: "rgba(255,255,255,0.4)", display: "block", marginBottom: "6px" }}>CONFIRMAR CONTRASENA</label>
-              <input type="password" placeholder="********" value={confirmPassword} onChange={function (e) { setConfirmPassword(e.target.value); }} style={{ width: "100%", padding: "14px", borderRadius: "12px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", color: "white", outline: "none" }} />
+              <input autoComplete="new-password" type="password" placeholder="********" value={confirmPassword} onChange={function (e) { setConfirmPassword(e.target.value); }} style={{ width: "100%", padding: "14px", borderRadius: "12px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", color: "white", outline: "none" }} />
             </div>
           )}
           <button type="submit" disabled={loading} style={{ padding: "16px", background: "#f5ac3b", color: "black", border: "none", borderRadius: "14px", fontWeight: "900", fontSize: "1rem", cursor: "pointer", marginTop: "10px" }}>

@@ -274,19 +274,14 @@ passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((obj, done) => done(null, obj));
 
 if (process.env.STEAM_API_KEY) {
-try {
-    // 1. Fallback directo con la URL de producción de Render
-    const defaultBackend = 'https://skinmarket-backend.onrender.com';
-    const baseUrl = process.env.BACKEND_URL || (typeof BACKEND_URL !== 'undefined' ? BACKEND_URL : defaultBackend);
-
-    const steamReturnURL = process.env.STEAM_RETURN_URL || `${baseUrl.replace(/\/$/, '')}/api/auth/steam/return`;
-    const steamRealm = process.env.STEAM_REALM || `${baseUrl.replace(/\/$/, '')}/`;
-    const steamApiKey = process.env.STEAM_API_KEY || 'B5A7EC248F64FF19CE0DE175F28792AB';
+  try {
+    const steamReturnURL = process.env.STEAM_RETURN_URL || `${BACKEND_URL}/api/auth/steam/return`;
+    const steamRealm = process.env.STEAM_REALM || (BACKEND_URL.endsWith('/') ? BACKEND_URL : `${BACKEND_URL}/`);
 
     passport.use(new SteamStrategy({
       returnURL: steamReturnURL,
       realm: steamRealm,
-      apiKey: steamApiKey
+      apiKey: process.env.STEAM_API_KEY
     }, async (identifier, profile, done) => {
       try {
         const steamId = profile.id;

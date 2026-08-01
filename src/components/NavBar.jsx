@@ -1,9 +1,16 @@
+// ─── NavBar.jsx ───────────────────────────────────────────────────
+// NAVBAR RESPONSIVO — CSS puro / Inline Styles
+// Desktop (≥1024px): Logo izquierda → menú central → saldo+iconos+mute+salir derecha
+// Móvil (<1024px): Logo izquierda → saldo compacto → ☰ → drawer lateral ordenado
+// ───────────────────────────────────────────────────────────────────────
+
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import { useState } from "react";
-import { FaTrophy, FaShoppingBag, FaUser, FaSignOutAlt, FaPlus, FaBars, FaTimes, FaVolumeUp, FaVolumeMute } from "react-icons/fa";
-import { GiTwoCoins } from "react-icons/gi";
+import { FaTrophy, FaShoppingBag, FaUser, FaSignOutAlt, FaPlus, FaBars, FaTimes, FaVolumeUp, FaVolumeMute, FaRocket } from "react-icons/fa";
+import { GiTwoCoins, GiLevelFour } from "react-icons/gi";
 import RechargeModal from "./RechargeModal";
+import LevelProgressBar from "./LevelProgressBar";
 import { sound } from "../utils/audio";
 
 const NAV_ITEMS = [
@@ -11,6 +18,7 @@ const NAV_ITEMS = [
   { to: "/upgrade", label: "UPGRADE" },
   { to: "/contracts", label: "CONTRATOS" },
   { to: "/battles", label: "BATALLAS" },
+  { to: "/airdrop", label: "AIRDROP" },
   { to: "/ranking", label: "RANKING" },
 ];
 
@@ -37,63 +45,310 @@ export default function Navbar() {
     setIsMuted(!newState);
   };
 
+  // ─── Inline Style Objects ──────────────────────────────────────────
+  const navStyle = {
+    position: "sticky",
+    top: 0,
+    zIndex: 50,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "0 16px",
+    height: "64px",
+    background: "#0c0d10",
+    borderBottom: "1px solid rgba(255,255,255,0.05)",
+    backdropFilter: "blur(16px)",
+    WebkitBackdropFilter: "blur(16px)",
+    minWidth: 0,
+    width: "100%",
+    boxSizing: "border-box"
+  };
+
+  const logoLinkStyle = {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "8px",
+    fontSize: "1.1rem",
+    fontWeight: 900,
+    color: "white",
+    textDecoration: "none",
+    letterSpacing: "-0.02em",
+    flexShrink: 0
+  };
+
+  const logoSquareStyle = {
+    width: "28px",
+    height: "28px",
+    background: "#f5ac3b",
+    borderRadius: "8px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontWeight: 900,
+    color: "black",
+    fontSize: "0.8rem",
+    boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+    flexShrink: 0
+  };
+
+  const desktopMenuStyle = {
+    display: "none",
+    alignItems: "center",
+    gap: "4px",
+    flexShrink: 1,
+    overflow: "visible"
+  };
+
+  const desktopNavLinkBase = {
+    textDecoration: "none",
+    fontSize: "0.75rem",
+    fontWeight: 600,
+    padding: "8px 10px",
+    borderRadius: "8px",
+    transition: "background 0.2s ease, color 0.2s ease",
+    flexShrink: 0,
+    whiteSpace: "nowrap"
+  };
+
+  const rightSectionStyle = {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    flexShrink: 0
+  };
+
+  const balanceBoxStyle = {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    padding: "6px 10px",
+    background: "rgba(245,172,59,0.1)",
+    borderRadius: "12px",
+    border: "1px solid rgba(245,172,59,0.2)",
+    flexShrink: 0
+  };
+
+  const balanceTextStyle = {
+    fontWeight: 900,
+    color: "#f5ac3b",
+    fontSize: "0.75rem",
+    whiteSpace: "nowrap"
+  };
+
+  const rechargeBtnStyle = {
+    width: "28px",
+    height: "28px",
+    borderRadius: "12px",
+    background: "#f5ac3b",
+    color: "black",
+    border: "none",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0
+  };
+
+  const iconLinkBase = {
+    width: "32px",
+    height: "32px",
+    borderRadius: "12px",
+    background: "rgba(255,255,255,0.05)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "white",
+    textDecoration: "none",
+    transition: "background 0.2s ease, transform 0.2s ease",
+    fontSize: "0.8rem",
+    flexShrink: 0
+  };
+
+  const muteBtnBase = {
+    width: "28px",
+    height: "28px",
+    borderRadius: "12px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+    border: "1px solid",
+    cursor: "pointer",
+    transition: "all 0.2s ease"
+  };
+
+  const logoutBtnStyle = {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    padding: "6px 10px",
+    borderRadius: "12px",
+    border: "none",
+    background: "rgba(239,68,68,0.1)",
+    color: "#f87171",
+    fontWeight: 900,
+    cursor: "pointer",
+    fontSize: "0.75rem",
+    flexShrink: 0,
+    transition: "background 0.2s ease"
+  };
+
+  const loginBtnStyle = {
+    padding: "10px 20px",
+    borderRadius: "12px",
+    border: "none",
+    background: "#f5ac3b",
+    color: "black",
+    fontWeight: 900,
+    cursor: "pointer",
+    fontSize: "0.75rem",
+    boxShadow: "0 4px 15px rgba(245,172,59,0.2)",
+    transition: "transform 0.2s ease"
+  };
+
+  const hamburgerStyle = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "8px",
+    background: "rgba(255,255,255,0.05)",
+    border: "1px solid rgba(255,255,255,0.1)",
+    borderRadius: "12px",
+    cursor: "pointer",
+    color: "white",
+    flexShrink: 0
+  };
+
+  // Media query style block
+  const mediaQueryStyles = `
+    @media (min-width: 1024px) {
+      .sm-nav { height: 80px; padding: 0 40px; }
+      .sm-logo { font-size: 1.3rem; gap: 12px; }
+      .sm-logo-square { width: 32px; height: 32px; font-size: 1rem; }
+      .sm-desktop-menu { display: flex; }
+      .sm-nav-link { font-size: 0.8rem; padding: 8px 12px; }
+      .sm-balance { padding: 8px 14px; }
+      .sm-balance-text { font-size: 0.8rem; }
+      .sm-recharge-btn { width: 32px; height: 32px; }
+      .sm-icon-link { width: 36px; height: 36px; font-size: 0.85rem; }
+      .sm-mute-btn { width: 32px; height: 32px; }
+      .sm-logout-btn { padding: 8px 14px; font-size: 0.8rem; }
+      .sm-login-btn { padding: 12px 28px; font-size: 0.85rem; }
+      .sm-hamburger { display: none; }
+    }
+    @media (max-width: 1023px) {
+      .sm-desktop-menu { display: none; }
+      .sm-desktop-icons { display: none; }
+      .sm-nav-link-mobile { display: block; }
+    }
+    .sm-nav-link:hover { background: rgba(255,255,255,0.05); color: white; }
+    .sm-nav-link.active { background: rgba(255,255,255,0.1); color: white; font-weight: 700; }
+    .sm-icon-link:hover { background: rgba(255,255,255,0.1); transform: translateY(-2px); }
+    .sm-logout-btn:hover { background: rgba(239,68,68,0.2); color: #ef4444; }
+    .sm-login-btn:hover { transform: translateY(-2px); }
+    .sm-recharge-btn:hover { transform: scale(1.05); }
+    .sm-recharge-btn:active { transform: scale(0.95); }
+    .sm-drawer-link:hover { background: rgba(255,255,255,0.05); color: white; }
+    .sm-drawer-link.active { background: rgba(255,255,255,0.1); color: white; font-weight: 700; }
+    .sm-drawer-logout:hover { background: rgba(239,68,68,0.2); }
+    .sm-overlay { animation: smFadeIn 0.2s ease; }
+    .sm-drawer-panel { animation: smSlideDown 0.25s ease; }
+    @keyframes smFadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes smSlideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+  `;
+
   return (
     <>
-      <nav className="flex flex-wrap md:flex-nowrap justify-between items-center px-3 sm:px-6 lg:px-10 py-2.5 md:py-0 min-h-[64px] md:h-20 bg-[#0c0d10] border-b border-white/5 sticky top-0 z-50 backdrop-blur-xl min-w-0 overflow-visible w-full">
-        {/* Left Side: Brand & Main Navigation */}
-        <div className="flex items-center gap-3 sm:gap-6 lg:gap-10 flex-shrink-0 min-w-0 overflow-visible">
-          <Link to="/" className="inline-flex items-center gap-2 sm:gap-3 text-lg sm:text-xl lg:text-2xl font-black text-white no-underline tracking-tight flex-shrink-0">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 bg-[#f5ac3b] rounded-lg flex items-center justify-center font-black text-black text-sm sm:text-base shadow-sm">S</div>
-            <span>SKINMART<span className="text-[#f5ac3b]">ES</span></span>
+      <style>{mediaQueryStyles}</style>
+      <nav className="sm-nav" style={navStyle}>
+        {/* Left Side: Brand */}
+        <div style={{ display: "flex", alignItems: "center", gap: "24px", flexShrink: 0, overflow: "visible" }}>
+          <Link to="/" className="sm-logo" style={logoLinkStyle}>
+            <div className="sm-logo-square" style={logoSquareStyle}>S</div>
+            <span>SKINMART<span style={{ color: "#f5ac3b" }}>ES</span></span>
           </Link>
 
+          {/* Desktop Menu */}
           {user && (
-            <div className="hidden lg:flex items-center gap-1 xl:gap-2 flex-shrink min-w-0 overflow-visible">
-              {NAV_ITEMS.map((item) => (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  className={`no-underline text-xs xl:text-sm font-semibold px-2.5 xl:px-3 py-2 rounded-lg transition-colors flex-shrink-0 ${
-                    location.pathname.startsWith(item.to)
-                      ? "bg-white/10 text-white font-bold"
-                      : "text-white/70 hover:text-white hover:bg-white/5"
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              ))}
+            <div className="sm-desktop-menu" style={desktopMenuStyle}>
+              {NAV_ITEMS.map((item) => {
+                const isActive = location.pathname.startsWith(item.to);
+                return (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    className={`sm-nav-link${isActive ? " active" : ""}`}
+                    style={{
+                      ...desktopNavLinkBase,
+                      color: isActive ? "white" : "rgba(255,255,255,0.7)"
+                    }}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
             </div>
           )}
         </div>
 
-        {/* Right Side: User Controls, Balance, Profile & Action Buttons */}
-        <div className="flex items-center gap-2 sm:gap-3 lg:gap-5 flex-shrink-0 min-w-0 overflow-visible">
+        {/* Right Side: Controls */}
+        <div className="sm-desktop-icons" style={rightSectionStyle}>
           {user ? (
             <>
+              {/* Level Badge + XP Bar */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  flexShrink: 0,
+                  padding: "4px 10px",
+                  background: "rgba(245,172,59,0.06)",
+                  borderRadius: "12px",
+                  border: "1px solid rgba(245,172,59,0.12)"
+                }}
+              >
+                <GiLevelFour style={{ color: "#f5ac3b", fontSize: "0.9rem", flexShrink: 0 }} />
+                <div style={{ textAlign: "left", minWidth: "0" }}>
+                  <div style={{ fontSize: "0.6rem", fontWeight: 900, color: "#f5ac3b", lineHeight: 1, marginBottom: "2px", letterSpacing: "0.5px" }}>
+                    NIVEL {user?.nivel ?? user?.level ?? 0}
+                  </div>
+                  <LevelProgressBar
+                    experiencia={user?.experiencia || 0}
+                    nivel={user?.nivel || user?.level || 0}
+                    showLabel={false}
+                    compact={true}
+                    width="80px"
+                  />
+                </div>
+              </div>
+
               {/* Balance & Recharge */}
-              <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-                <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 bg-[#f5ac3b]/10 rounded-xl border border-[#f5ac3b]/20 flex-shrink-0">
-                  <GiTwoCoins className="text-[#f5ac3b] text-sm sm:text-base flex-shrink-0" />
-                  <span className="font-black text-[#f5ac3b] text-xs sm:text-sm whitespace-nowrap">
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+                <div className="sm-balance" style={balanceBoxStyle}>
+                  <GiTwoCoins style={{ color: "#f5ac3b", fontSize: "0.85rem", flexShrink: 0 }} />
+                  <span className="sm-balance-text" style={balanceTextStyle}>
                     {Number(user?.balance ?? user?.saldo ?? 0).toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
                   </span>
                 </div>
                 <button
                   onClick={() => setRechargeOpen(true)}
-                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-[#f5ac3b] text-black border-none cursor-pointer flex items-center justify-center flex-shrink-0 hover:scale-105 active:scale-95 transition-transform"
+                  className="sm-recharge-btn"
+                  style={rechargeBtnStyle}
                   title="Recargar saldo"
                 >
-                  <FaPlus className="text-xs sm:text-sm" />
+                  <FaPlus style={{ fontSize: "0.7rem" }} />
                 </button>
               </div>
 
-              {/* Desktop Icon Links (Ranking, Inventory, Profile) */}
-              <div className="hidden md:flex items-center gap-2 flex-shrink-0">
+{/* Desktop Icon Links */}
+              <div className="sm-desktop-icons-row" style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
                 {ICON_LINKS.map((item) => (
                   <Link
                     key={item.to}
                     to={item.to}
-                    className="w-8 h-8 lg:w-10 lg:h-10 rounded-xl bg-white/5 flex items-center justify-center color-white text-white no-underline hover:bg-white/10 hover:-translate-y-0.5 active:translate-y-0 transition-all text-xs lg:text-sm flex-shrink-0"
+                    className="sm-icon-link"
+                    style={iconLinkBase}
                     title={item.label}
                   >
                     <item.icon />
@@ -101,66 +356,114 @@ export default function Navbar() {
                 ))}
               </div>
 
-              {/* Mute Audio Toggle */}
+              {/* Mute Toggle (Desktop) */}
               <button
                 onClick={handleToggleMute}
-                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center flex-shrink-0 border cursor-pointer transition-all ${
-                  isMuted
-                    ? "bg-red-500/10 border-red-500/20 text-red-400"
-                    : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-                }`}
+                className="sm-mute-btn"
+                style={{
+                  ...muteBtnBase,
+                  background: isMuted ? "rgba(239,68,68,0.1)" : "rgba(16,185,129,0.1)",
+                  borderColor: isMuted ? "rgba(239,68,68,0.2)" : "rgba(16,185,129,0.2)",
+                  color: isMuted ? "#f87171" : "#34d399"
+                }}
                 title={isMuted ? "Activar sonido" : "Silenciar sonido"}
               >
-                {isMuted ? <FaVolumeMute className="text-xs sm:text-sm" /> : <FaVolumeUp className="text-xs sm:text-sm" />}
+                {isMuted ? <FaVolumeMute style={{ fontSize: "0.7rem" }} /> : <FaVolumeUp style={{ fontSize: "0.7rem" }} />}
               </button>
 
-              {/* Logout Button ("Salir") */}
+              {/* Logout */}
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-1.5 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl border-none bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 font-black cursor-pointer text-xs sm:text-sm flex-shrink-0 transition-all"
-                title="Cerrar sesion"
+                className="sm-logout-btn"
+                style={logoutBtnStyle}
+                title="Cerrar sesión"
               >
-                <FaSignOutAlt className="text-xs sm:text-sm" />
-                <span className="hidden sm:inline">SALIR</span>
+                <FaSignOutAlt style={{ fontSize: "0.7rem" }} />
+                <span>SALIR</span>
               </button>
             </>
           ) : (
-            <Link to="/login" className="no-underline flex-shrink-0">
-              <button className="px-5 sm:px-8 py-2.5 sm:py-3 rounded-xl border-none bg-[#f5ac3b] text-black font-black cursor-pointer shadow-lg shadow-[#f5ac3b]/20 hover:-translate-y-0.5 active:translate-y-0 transition-all text-xs sm:text-sm">
+            <Link to="/login" style={{ textDecoration: "none", flexShrink: 0 }}>
+              <button className="sm-login-btn" style={loginBtnStyle}>
                 LOGIN
               </button>
             </Link>
           )}
 
-          {/* Mobile Menu Toggle Button */}
+          {/* Mobile Hamburger */}
           {user && (
             <button
-              className="lg:hidden flex items-center justify-center p-2 text-white bg-white/5 rounded-xl border border-white/10 cursor-pointer flex-shrink-0"
+              className="sm-hamburger"
+              style={hamburgerStyle}
               onClick={() => setMobileOpen(!mobileOpen)}
-              aria-label={mobileOpen ? "Cerrar menu" : "Abrir menu"}
+              aria-label={mobileOpen ? "Cerrar menú" : "Abrir menú"}
             >
-              {mobileOpen ? <FaTimes className="text-base sm:text-lg" /> : <FaBars className="text-base sm:text-lg" />}
+              {mobileOpen ? <FaTimes style={{ fontSize: "0.9rem" }} /> : <FaBars style={{ fontSize: "0.9rem" }} />}
             </button>
           )}
         </div>
       </nav>
 
-      {/* Mobile Menu Overlay & Drawer */}
+      {/* Mobile Drawer */}
       {mobileOpen && user && (
         <>
           <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
+            className="sm-overlay"
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.6)",
+              backdropFilter: "blur(8px)",
+              WebkitBackdropFilter: "blur(8px)",
+              zIndex: 40
+            }}
             onClick={() => setMobileOpen(false)}
           />
-          <div className="fixed top-[64px] sm:top-[80px] left-0 right-0 bg-[#0c0d10] border-b border-white/10 p-5 z-40 lg:hidden flex flex-col gap-2 shadow-2xl animate-in slide-in-from-top duration-200">
-            {/* Quick Profile & Inventory icons for mobile drawer */}
-            <div className="flex items-center justify-around pb-3 mb-2 border-b border-white/5 md:hidden">
+          <div
+            className="sm-drawer-panel"
+            style={{
+              position: "fixed",
+              top: "64px",
+              left: 0,
+              right: 0,
+              background: "#0c0d10",
+              borderBottom: "1px solid rgba(255,255,255,0.1)",
+              padding: "20px",
+              zIndex: 40,
+              display: "flex",
+              flexDirection: "column",
+              gap: "8px",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.5)"
+            }}
+          >
+            {/* Mobile icon links row */}
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-around",
+              paddingBottom: "12px",
+              marginBottom: "8px",
+              borderBottom: "1px solid rgba(255,255,255,0.05)"
+            }}>
               {ICON_LINKS.map((item) => (
                 <Link
                   key={item.to}
                   to={item.to}
                   onClick={() => setMobileOpen(false)}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 text-white no-underline text-sm font-semibold hover:bg-white/10"
+                  className="sm-drawer-link"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    padding: "8px 14px",
+                    borderRadius: "10px",
+                    background: "rgba(255,255,255,0.05)",
+                    color: "white",
+                    textDecoration: "none",
+                    fontSize: "0.8rem",
+                    fontWeight: 600,
+                    transition: "background 0.2s ease"
+                  }}
                 >
                   <item.icon />
                   <span>{item.label}</span>
@@ -168,27 +471,54 @@ export default function Navbar() {
               ))}
             </div>
 
-            {NAV_ITEMS.map((item) => (
-              <Link
-                key={item.to}
-                to={item.to}
-                onClick={() => setMobileOpen(false)}
-                className={`no-underline text-base font-semibold px-4 py-3 rounded-xl transition-colors ${
-                  location.pathname.startsWith(item.to)
-                    ? "bg-white/10 text-white font-bold"
-                    : "text-white/70 hover:text-white hover:bg-white/5"
-                }`}
-              >
-                {item.label}
-              </Link>
-            ))}
+            {/* Navigation items */}
+            {NAV_ITEMS.map((item) => {
+              const isActive = location.pathname.startsWith(item.to);
+              return (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  onClick={() => setMobileOpen(false)}
+                  className={`sm-drawer-link${isActive ? " active" : ""}`}
+                  style={{
+                    textDecoration: "none",
+                    fontSize: "0.95rem",
+                    fontWeight: 600,
+                    padding: "12px 16px",
+                    borderRadius: "12px",
+                    color: isActive ? "white" : "rgba(255,255,255,0.7)",
+                    background: isActive ? "rgba(255,255,255,0.1)" : "transparent",
+                    transition: "background 0.2s ease, color 0.2s ease"
+                  }}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
 
-            <div className="border-t border-white/10 pt-3 mt-2">
+            {/* Logout */}
+            <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: "12px", marginTop: "8px" }}>
               <button
                 onClick={() => { setMobileOpen(false); handleLogout(); }}
-                className="w-full py-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 font-black text-sm cursor-pointer flex items-center justify-center gap-2 transition-all"
+                className="sm-drawer-logout"
+                style={{
+                  width: "100%",
+                  padding: "12px",
+                  borderRadius: "12px",
+                  background: "rgba(239,68,68,0.1)",
+                  border: "1px solid rgba(239,68,68,0.2)",
+                  color: "#f87171",
+                  fontWeight: 900,
+                  fontSize: "0.85rem",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                  transition: "background 0.2s ease"
+                }}
               >
-                <FaSignOutAlt /> CERRAR SESION
+                <FaSignOutAlt /> CERRAR SESIÓN
               </button>
             </div>
           </div>
@@ -199,3 +529,4 @@ export default function Navbar() {
     </>
   );
 }
+

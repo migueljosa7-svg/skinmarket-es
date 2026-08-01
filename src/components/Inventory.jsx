@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { useAuth } from "../context/useAuth";
-import { getRarityColor } from "../constants/colors.js";
+import { getRarityColor, resolvePriceSync } from "../services/PriceEngine.js";
 import { handleImageError, getSkinImageUrl } from "../services/ImageService";
 import { useToast } from "./Toast";
 import { motion as Motion, AnimatePresence } from "framer-motion";
@@ -378,7 +378,7 @@ export default function Inventory() {
                   />
                   <div style={{ color: color, fontSize: "0.65rem", fontWeight: "900", marginBottom: "4px" }}>{skin.rarity?.toUpperCase() || "MIL-SPEC"}</div>
                   <div style={{ fontSize: "0.85rem", fontWeight: "bold", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{skin.name}</div>
-                  <div style={{ color: "#f5ac3b", fontWeight: "900", fontSize: "1.1rem", marginTop: "6px" }}>€{Number(skin.price || 0).toFixed(2)}</div>
+                  <div style={{ color: "#f5ac3b", fontWeight: "900", fontSize: "1.1rem", marginTop: "6px" }}>€{Number(resolvePriceSync(skin.name, skin.rarity, skin.wear)?.price || skin.price || 0).toFixed(2)}</div>
 
                   {!isPending && (
                     <>
@@ -636,7 +636,7 @@ export default function Inventory() {
                         fontWeight: "900",
                         fontSize: "1rem"
                       }}>
-                        €{Number(item.price || 0).toFixed(2)}
+                        €{Number(resolvePriceSync(item.name, item.rarity, item.wear)?.price || item.price || 0).toFixed(2)}
                       </div>
                       {item.market_hash_name && (
                         <div style={{

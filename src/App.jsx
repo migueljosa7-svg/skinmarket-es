@@ -52,6 +52,7 @@ const Privacy = lazyWithRetry(() => import("./pages/Privacy"));
 const Terms = lazyWithRetry(() => import("./pages/Terms"));
 const About = lazyWithRetry(() => import("./pages/About"));
 const FAQ = lazyWithRetry(() => import("./pages/FAQ"));
+const Airdrop = lazyWithRetry(() => import("./pages/Airdrop"));
 
 export default function App() {
   return (
@@ -76,6 +77,7 @@ export default function App() {
                     <Route path="/cases" element={<ProtectedRoute><Cases /></ProtectedRoute>} />
                     <Route path="/case/:id" element={<ProtectedRoute><CaseView /></ProtectedRoute>} />
                     <Route path="/battles" element={<ProtectedRoute><Battles /></ProtectedRoute>} />
+                    <Route path="/airdrop" element={<ProtectedRoute><Airdrop /></ProtectedRoute>} />
                     <Route path="/ranking" element={<Ranking />} />
                     <Route path="/upgrade" element={<ProtectedRoute><Upgrade /></ProtectedRoute>} />
                     <Route path="/contracts" element={<ProtectedRoute><Contracts /></ProtectedRoute>} />

@@ -4,189 +4,17 @@
 // Collapsible sections, search, sort, favorites, daily roulette
 // ───────────────────────────────────────────────────────────────────────
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useFetchSkins } from "../hooks/useFetchSkins";
 import { useAuth } from "../context/useAuth";
 import { useToast } from "../components/Toast";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence } from "framer-motion";
 import { Search, Gift, ChevronDown, ChevronUp, Grid3X3, Layers, Star, Zap, Award, Heart, Eye, EyeOff, Flame, Sparkles, Shield, Sword, Gem, Skull, Gamepad2, Ticket, Crosshair, Crown, ShoppingBag, Coins, Users } from "lucide-react";
 import { FiGrid, FiLayers, FiStar, FiZap, FiAward, FiSearch, FiChevronDown, FiGift, FiEye, FiEyeOff, FiHeart } from "react-icons/fi";
 import CaseCardRenderer from "../components/CaseCardRenderer";
-import { getRarityColor } from "../constants/colors";
-import { handleImageError, getSkinImageUrl } from "../services/ImageService";
+import DailyRouletteModal from "../components/DailyRouletteModal";
 import { CASE_SPECIFIC_IMAGES } from "../hooks/useCaseImage";
-
-// ─── Daily Roulette Modal ──────────────────────────────────────────
-const DailyRouletteModal = ({ isOpen, onClose, rewardAmount, skinsPool }) => {
-  const [isSpinning, setIsSpinning] = useState(false);
-  const [hasRevealed, setHasRevealed] = useState(false);
-  const [reel, setReel] = useState([]);
-  const containerRef = useRef(null);
-
-  useEffect(() => {
-    if (isOpen && !isSpinning && !hasRevealed && skinsPool.length > 0) {
-      const newReel = [];
-      for (let i = 0; i < 50; i++) {
-        newReel.push(skinsPool[Math.floor(Math.random() * skinsPool.length)]);
-      }
-      const winnerSkin = skinsPool.find((s) => s.price >= rewardAmount) || skinsPool[0];
-      newReel.push(winnerSkin);
-      for (let i = 0; i < 5; i++) {
-        newReel.push(skinsPool[Math.floor(Math.random() * skinsPool.length)]);
-      }
-
-      const frame = requestAnimationFrame(() => {
-        setReel(newReel);
-      });
-
-      const t1 = setTimeout(() => {
-        setIsSpinning(true);
-        if (containerRef.current) {
-          const cardWidth = 160;
-          const winnerIndex = newReel.length - 6;
-          const offset = winnerIndex * cardWidth - (window.innerWidth < 600 ? 100 : 250);
-          containerRef.current.style.transition = "transform 5.5s cubic-bezier(0.1, 0.7, 0.1, 1)";
-          containerRef.current.style.transform = `translateX(-${offset}px)`;
-        }
-      }, 300);
-
-      const t2 = setTimeout(() => {
-        setHasRevealed(true);
-      }, 6000);
-
-      return () => {
-        cancelAnimationFrame(frame);
-        clearTimeout(t1);
-        clearTimeout(t2);
-      };
-    }
-  }, [isOpen, isSpinning, hasRevealed, skinsPool, rewardAmount]);
-
-  if (!isOpen) return null;
-
-  return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.85)",
-        zIndex: 1000,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        backdropFilter: "blur(10px)",
-        color: "white"
-      }}
-    >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: "850px",
-          background: "#16191e",
-          borderRadius: "32px",
-          border: "1px solid rgba(255,255,255,0.05)",
-          padding: "35px",
-          position: "relative",
-          overflow: "hidden"
-        }}
-      >
-        <h2 style={{ color: "white", textAlign: "center", marginBottom: "25px", fontWeight: "900", letterSpacing: "2px" }}>
-          RECOMPENSA DIARIA
-        </h2>
-
-        <div
-          style={{
-            height: "180px",
-            background: "#0c0d10",
-            border: "2px solid rgba(255,255,255,0.05)",
-            borderRadius: "20px",
-            position: "relative",
-            overflow: "hidden",
-            display: "flex",
-            alignItems: "center"
-          }}
-        >
-          <div
-            style={{
-              position: "absolute",
-              left: "50%",
-              top: 0,
-              bottom: 0,
-              width: "4px",
-              background: "#f5ac3b",
-              zIndex: 10,
-              transform: "translateX(-50%)",
-              boxShadow: "0 0 20px #f5ac3b"
-            }}
-          />
-
-          <div ref={containerRef} style={{ display: "flex", gap: "10px", paddingLeft: "50%", transition: "none" }}>
-            {reel.map((skin, i) => {
-              const dailyCardKey = `daily-${skin?.id || skin?.name || 'unknown'}-${i}`;
-              return (
-                <div
-                  key={dailyCardKey}
-                  style={{
-                    minWidth: "150px",
-                    height: "150px",
-                    background: "rgba(255,255,255,0.03)",
-                    borderRadius: "16px",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    padding: "10px",
-                    borderWidth: "0 0 4px 0",
-                    borderStyle: "solid",
-                    borderColor: getRarityColor(skin?.rarity || "Common")
-                  }}
-                >
-                  <img
-                    src={getSkinImageUrl(skin?.name, skin?.image)}
-                    alt={skin?.name}
-                    onError={(e) => handleImageError(e, skin)}
-                    style={{ width: "80px", height: "auto", marginBottom: "8px", opacity: skin?.image ? 1 : 0.3 }} />
-                  <div style={{ fontSize: "0.65rem", color: "rgba(255,255,255,0.5)", fontWeight: "bold", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {skin?.name}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {hasRevealed && (
-          <div style={{ textAlign: "center", marginTop: "25px" }}>
-            <div style={{ color: "#10b981", fontSize: "2.2rem", fontWeight: "900", marginBottom: "8px" }}>
-              +€{rewardAmount.toFixed(2)}
-            </div>
-            <div style={{ color: "rgba(255,255,255,0.5)", marginBottom: "20px", fontWeight: "bold" }}>AÑADIDOS A TU SALDO</div>
-            <button
-              onClick={() => {
-                setHasRevealed(false);
-                setIsSpinning(false);
-                onClose();
-              }}
-              style={{
-                padding: "14px 35px",
-                borderRadius: "14px",
-                background: "#f5ac3b",
-                color: "black",
-                border: "none",
-                fontWeight: "900",
-                fontSize: "1rem",
-                cursor: "pointer"
-              }}
-            >
-              ¡RECLAMAR RECOMPENSA!
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
 
 // ─── FULL 21 CATEGORY CATALOG (KeyDrop Style) ─────────────────────
 const KEYDROP_CATEGORIES = [
@@ -568,12 +396,67 @@ const CATEGORY_STYLE_MAP = {
   youtubers_cases: "anime"
 };
 
+// ─── Deterministic hash (string → number 0..65535) ─────────────────
+const hashStr = (s) => {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) { h = ((h << 5) - h) + s.charCodeAt(i); h |= 0; }
+  return Math.abs(h);
+};
+
+// ─── Assign hero skin + 4 unique previews from allSkins ─────────
+const USED_SKIN_INDICES = new Set();
+
+const assignSkinsToCase = (caseObj, allSkins, catDef) => {
+  if (!allSkins || allSkins.length < 5) return caseObj;
+
+  const seed = hashStr(catDef.id + "-" + caseObj.name + "-" + catDef.color);
+  const total = allSkins.length;
+
+  // Pick 5 distinct indices deterministically
+  const indices = [];
+  let attempts = 0;
+  while (indices.length < 5 && attempts < total * 2) {
+    const idx = (seed + indices.length * 7919 + attempts * 104729) % total;
+    attempts++;
+    if (!indices.includes(idx) && !USED_SKIN_INDICES.has(idx)) {
+      indices.push(idx);
+    }
+  }
+  // Fallback if not enough unique found
+  while (indices.length < 5) {
+    const idx = (seed + indices.length * 31337) % total;
+    if (!indices.includes(idx)) indices.push(idx);
+  }
+
+  // First index = hero skin (featured weapon), rest = previews
+  const heroIdx = indices[0];
+  const previewIdxs = indices.slice(1, 5);
+
+  const heroSkin = allSkins[heroIdx];
+  USED_SKIN_INDICES.add(heroIdx);
+
+  const previewSkins = previewIdxs.map((pi) => {
+    USED_SKIN_INDICES.add(pi);
+    return allSkins[pi];
+  });
+
+  return {
+    ...caseObj,
+    heroSkin: heroSkin
+      ? { id: heroSkin.id, name: heroSkin.name, price: heroSkin.price, rarity: heroSkin.rarity, image: heroSkin.image }
+      : null,
+    previewSkins: previewSkins.map((s) => ({
+      id: s.id, name: s.name, price: s.price, rarity: s.rarity, image: s.image
+    }))
+  };
+};
+
 // ─── Generate case objects for a category ─────────────────────────
-const generateCategoryCases = (catDef) => {
+const generateCategoryCases = (catDef, allSkins) => {
   return catDef.cases.map((c, idx) => {
     // Assign unique image from CASE_SPECIFIC_IMAGES mapping
     const caseImage = CASE_SPECIFIC_IMAGES[c.name] || null;
-    return {
+    const caseObj = {
       id: `${catDef.id}-${idx}`,
       name: c.name,
       price: c.price,
@@ -581,10 +464,13 @@ const generateCategoryCases = (catDef) => {
       image: caseImage,
       imageSrc: caseImage,
       color: catDef.color,
+      glowColor: catDef.color,
       badge: catDef.label,
       gold: c.gold || null,
+      heroSkin: null,
       previewSkins: []
     };
+    return assignSkinsToCase(caseObj, allSkins, catDef);
   });
 };
 
@@ -605,11 +491,11 @@ export default function Cases() {
   const allKeyDropCases = useMemo(() => {
     const cases = [];
     KEYDROP_CATEGORIES.forEach((cat) => {
-      const catCases = generateCategoryCases(cat);
+      const catCases = generateCategoryCases(cat, allSkins);
       cases.push(...catCases);
     });
     return cases;
-  }, []);
+  }, [allSkins]);
 
   // Merge both: use KeyDrop catalog for display, original for backend integration
   const allCases = useMemo(() => {
@@ -646,8 +532,8 @@ export default function Cases() {
         filtered = filtered.filter((c) => c.name.toLowerCase().includes(searchTerm.toLowerCase()));
       }
       filtered.sort((a, b) => {
-        if (sortBy === "price-asc") return parseFloat(a.price) - parseFloat(b.price);
-        if (sortBy === "price-desc") return parseFloat(b.price) - parseFloat(a.price);
+        if (sortBy === "price-asc") return parseFloat(a?.price || 0) - parseFloat(b?.price || 0);
+        if (sortBy === "price-desc") return parseFloat(b?.price || 0) - parseFloat(a?.price || 0);
         if (sortBy === "alpha-asc") return a.name.localeCompare(b.name);
         if (sortBy === "alpha-desc") return b.name.localeCompare(a.name);
         return 0;
