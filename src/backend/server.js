@@ -288,8 +288,12 @@ if (process.env.STEAM_API_KEY) {
     // CRITICAL FIX: Use process.env.BACKEND_URL explicitly for Steam returnURL and realm
     // Fall back to local development if BACKEND_URL is missing or empty.
     const backendUrlForSteam = (process.env.BACKEND_URL && process.env.BACKEND_URL.trim()) || 'http://localhost:3001';
-    const steamReturnURL = `${backendUrlForSteam.replace(/\/+$/, '')}/api/auth/steam/return`;
-    const steamRealm = `${backendUrlForSteam.replace(/\/+$/, '')}/`;
+    const steamReturnURL = (process.env.STEAM_RETURN_URL && process.env.STEAM_RETURN_URL.trim())
+      ? process.env.STEAM_RETURN_URL.trim().replace(/\/+$/, '')
+      : `${backendUrlForSteam.replace(/\/+$/, '')}/api/auth/steam/return`;
+    const steamRealm = (process.env.STEAM_REALM && process.env.STEAM_REALM.trim())
+      ? process.env.STEAM_REALM.trim().replace(/\/+$/, '') + '/'
+      : `${backendUrlForSteam.replace(/\/+$/, '')}/`;
 
     passport.use(new SteamStrategy({
       returnURL: steamReturnURL,

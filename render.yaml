@@ -83,6 +83,10 @@ services:
       # ── Steam Credentials (Configurar en el Dashboard de Render) ──
       - key: STEAM_API_KEY
         value: TU_STEAM_API_KEY_AQUI
+      - key: STEAM_REALM
+        value: "https://skinmarket-backend.onrender.com/"
+      - key: STEAM_RETURN_URL
+        value: "https://skinmarket-backend.onrender.com/api/auth/steam/return"
       - key: BOT_USERNAME
         value: tu_usuario_steam
       - key: BOT_PASSWORD
