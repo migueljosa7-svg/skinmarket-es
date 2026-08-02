@@ -98,10 +98,13 @@ export function setupSteamStrategy(passport, db, log, logAction, jwtSecret, env)
 
         result = { rows: [createdUser] };
       } else {
+        const userId = result.rows[0].usuario_id;
         await db.query(
           "UPDATE usuarios SET avatar = COALESCE(NULLIF($1, ''), avatar) WHERE usuario_id = $2",
-          [steamAvatar, result.rows[0].usuario_id]
+          [steamAvatar, userId]
         );
+        // Re-fetch the user so the returned object contains the updated avatar
+        result = await db.query('SELECT * FROM usuarios WHERE usuario_id = $1', [userId]);
       }
 
       await logAction(result.rows[0].usuario_id, 'LOGIN_STEAM', { steamId, email: result.rows[0].email });
