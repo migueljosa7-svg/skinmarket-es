@@ -44,27 +44,56 @@ if (!databaseUrl) {
     console.error('[DB] DATABASE_URL no está configurada o está vacía.');
 }
 
-// For Render PostgreSQL, append sslmode=require to the connection string if not present.
-// This helps avoid "SSL connection has been closed unexpectedly" on cold starts.
-function ensureSslMode(connStr) {
-    if (!connStr || (isProduction || isRenderDatabase)) {
-        // node-postgres uses the `ssl` option directly; sslmode is handled by pg's
-        // connectionString parsing for the `?sslmode=` param. Adding it is harmless
-        // and helps some pooled/proxied setups.
-        try {
-            const url = new URL(connStr);
-            if (!url.searchParams.has('sslmode') && (isProduction || isRenderDatabase)) {
-                url.searchParams.set('sslmode', 'require');
+// ─── DATABASE_URL SANITIZATION (WHATWG URL API) ─────────────────
+// IMPORTANTE (root cause del fallo SSL en Render):
+// pg-connection-string (usado internamente por node-postgres) interpreta los
+// parámetros `sslmode`/`ssl` de la cadena de conexión. Con sslmode=require
+// (o similar) hace dos cosas perjudiciales:
+//   1. Emite la advertencia de deprecación de pg-connection-string.
+//   2. Establece `config.ssl = {}` (objeto vacío) que SOBRESCRIBE nuestra
+//      config explícita `ssl: { rejectUnauthorized: false }` al hacer
+//      `Object.assign({}, config, parse(connectionString))` en pg.
+//      Eso re-activa la verificación del certificado TLS contra la CA interna
+//      de Render → el handshake falla → "SSL connection has been closed
+//      unexpectedly" / "Connection terminated unexpectedly".
+//
+// Solución: eliminar TODOS los parámetros ssl* de la cadena y manejar SSL
+// exclusivamente mediante la opción `ssl` del Pool (rejectUnauthorized: false).
+function sanitizeDatabaseUrl(connStr) {
+    if (!connStr) return connStr;
+    try {
+        const url = new URL(connStr);
+        // Elimina parámetros que interferirían con la config SSL explícita
+        for (const key of ['sslmode', 'ssl', 'sslrootcert', 'sslcert', 'sslkey', 'sslpassword']) {
+            if (url.searchParams.has(key)) {
+                url.searchParams.delete(key);
             }
-            return url.toString();
-        } catch {
-            return connStr;
         }
+        // En producción/Render forzamos SSL siempre (nunca sslmode=disable)
+        if (isProduction || isRenderDatabase) {
+            url.protocol = url.protocol.startsWith('postgres') ? url.protocol : 'postgresql:';
+        }
+        return url.toString();
+    } catch {
+        // Si no se puede parsear, devolver la cadena limpia sin parámetros SSL
+        // mediante regex conservadora (fallback seguro).
+        return connStr.replace(/([?&])(sslmode|ssl|sslrootcert|sslcert|sslkey|sslpassword)=[^&]*/gi, '$1').replace(/[?&]$/, '');
     }
-    return connStr;
 }
 
-const finalDatabaseUrl = ensureSslMode(databaseUrl);
+const finalDatabaseUrl = sanitizeDatabaseUrl(databaseUrl);
+
+// Log SSL configuration applied (solo host/parámetros, nunca credenciales)
+if (finalDatabaseUrl) {
+    try {
+        const dbUrl = new URL(finalDatabaseUrl);
+        console.log('[DB] Configuración SSL aplicada:', {
+            ssl: useSSL,
+            sslParamsInUrl: dbUrl.searchParams.has('sslmode') || dbUrl.searchParams.has('ssl'),
+            host: dbUrl.hostname
+        });
+    } catch { /* noop */ }
+}
 
 const pool = new Pool({
     connectionString: finalDatabaseUrl,
@@ -72,6 +101,10 @@ const pool = new Pool({
     connectionTimeoutMillis: 15000,
     idleTimeoutMillis: 30000,
     max: 10,
+    // Keep-alive activo para evitar que Render/RDS cierre sockets idle
+    // ("Connection terminated unexpectedly" por timeout de infraestructura)
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10000,
     // Allow more time for Render free-tier PostgreSQL to wake from sleep
     statement_timeout: 30000,
     query_timeout: 30000
@@ -97,7 +130,15 @@ export async function waitForDatabase({ maxRetries = 5, baseDelayMs = 2000 } = {
             }
             return true;
         } catch (err) {
-            console.warn(`[DB] Intento ${attempt}/${maxRetries} de conexión falló: ${err.message}`);
+            const msg = err.message || String(err);
+            // Clasificar el error para un diagnóstico claro en los logs de Render
+            let errorType = 'CONEXIÓN_GENERAL';
+            if (/SSL|TLS|handshake|certificate|ECONNRESET/i.test(msg)) {
+                errorType = 'SSL_HANDSHAKE';
+            } else if (/terminated|timeout|ETIMEDOUT|ECONNREFUSED|ENOTFOUND/i.test(msg)) {
+                errorType = 'COLD_START_DB';
+            }
+            console.warn(`[DB] Intento ${attempt}/${maxRetries} de conexión falló [${errorType}]: ${msg}`);
             if (attempt === maxRetries) {
                 throw err;
             }

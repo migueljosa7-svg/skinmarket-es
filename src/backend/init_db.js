@@ -181,7 +181,11 @@ const initDb = async () => {
       await db.query(q);
     }
     process.exit(0);
-  } catch {
+  } catch (err) {
+    // Log the actual error so Render shows why migrations failed
+    // (e.g. SSL handshake, cold start, timeout) without swallowing it.
+    console.error('[INIT_DB] Error durante la inicialización/migraciones:', err.message || err);
+    if (err.stack) console.error('[INIT_DB] Stack:', err.stack);
     process.exit(1);
   }
 };

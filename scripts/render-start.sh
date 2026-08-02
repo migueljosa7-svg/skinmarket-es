@@ -103,16 +103,21 @@ fi
 echo ""
 echo "[4b/5] Verificando parseo de DATABASE_URL..."
 # Use Node.js with WHATWG URL API for safe, precise parsing (handles postgresql:// and postgres://)
+# Also detect residual sslmode/ssl params which interfere with the explicit
+# ssl: { rejectUnauthorized: false } option in db.js (pg-connection-string override).
 PARSED=$(node -e "
 try {
   const url = new URL(process.env.DATABASE_URL);
   if (!url.hostname || !url.pathname) throw new Error('Invalid URL components');
+  const sslParams = ['sslmode', 'ssl', 'sslrootcert', 'sslcert', 'sslkey', 'sslpassword']
+    .filter(k => url.searchParams.has(k));
   console.log(JSON.stringify({
     user: decodeURIComponent(url.username || ''),
     pass: (url.password || '').substring(0, 3) + '***',
     host: url.hostname,
     port: url.port || '5432',
-    dbname: url.pathname.replace(/^\//, '').split('?')[0]
+    dbname: url.pathname.replace(/^\//, '').split('?')[0],
+    residualSslParams: sslParams
   }));
 } catch (err) {
   console.error('ERROR: Cannot parse DATABASE_URL:', err.message);
@@ -120,6 +125,15 @@ try {
 }
 ")
 echo "  ✓ DATABASE_URL parseada correctamente: $PARSED"
+
+# Warning if residual SSL params are present (db.js strips them, but warn the operator)
+if echo "$PARSED" | grep -q 'residualSslParams\":\[' && ! echo "$PARSED" | grep -q 'residualSslParams\":\[\]'; then
+  echo ""
+  echo "  ⚠️  DATABASE_URL contiene parámetros sslmode/ssl residuales."
+  echo "     db.js los elimina automáticamente y usa ssl: { rejectUnauthorized: false }."
+  echo "     Recomendado: configurar DATABASE_URL en Render SIN sslmode para evitar"
+  echo "     la advertencia de deprecación de pg-connection-string."
+fi
 
 # ── 5. Start the backend server ───────────────────
 echo ""
