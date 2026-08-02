@@ -258,7 +258,7 @@ export default function CaseView() {
     setReel(newReel);
     setResults(savedSkins);
     setIsSpinning(true);
-  }, [user, toast, awardXP, caseData.price, caseData.id, caseData.name, caseData.category, jokerMode, quantity, validSkins]);
+}, [user, toast, awardXP, caseData, jokerMode, quantity, validSkins]);
 
   const handleSpinComplete = useCallback(() => {
     setIsSpinning(false);
