@@ -2433,6 +2433,49 @@ if (fs.existsSync(distPath)) {
 try {
   await waitForDatabase({ maxRetries: 8, baseDelayMs: 3000 });
   log(LOG_LEVELS.INFO, 'SYSTEM', '✅ Base de datos conectada. Iniciando HTTP server...');
+
+  // ─── BUG 1 MIGRATION: Re-resolve REAL Steam hashes for legacy inventory ──
+  // Items created before the skinImageService fix have FAKE hashes from the
+  // old generateIconUrlHash() persisted in the `inventario` table. Those
+  // hashes 404 on every Steam CDN. On startup we scan on_site items whose
+  // image/icon_url is a Steam CDN URL and re-resolve the genuine hash from
+  // the CSGO-API database, then update the row. This heals existing data
+  // without requiring users to re-open cases.
+  try {
+    const legacyResult = await db.query(
+      `SELECT item_id, name, market_hash_name, image, icon_url
+       FROM inventario
+       WHERE status = 'on_site'
+         AND (image LIKE '%/economy/image/%' OR icon_url IS NOT NULL AND icon_url != '')`
+    );
+    const legacyItems = legacyResult.rows || [];
+    if (legacyItems.length > 0) {
+      log(LOG_LEVELS.INFO, 'SYSTEM', `[MIGRACION] Re-resolviendo hashes reales para ${legacyItems.length} items legacy...`);
+      let fixed = 0;
+      for (const item of legacyItems) {
+        try {
+          const marketHashName = item.market_hash_name || item.name;
+          const iconHash = await skinImageService.getSkinIconHash(marketHashName) || await skinImageService.getSkinIconHash(item.name);
+          if (iconHash) {
+            const imageHD = buildAkamaiImageUrl(iconHash);
+            await db.query(
+              "UPDATE inventario SET image = $1, icon_url = $2 WHERE item_id = $3",
+              [imageHD, iconHash, item.item_id]
+            );
+            fixed++;
+          }
+        } catch (itemErr) {
+          // Skip individual failures — don't block startup
+          log(LOG_LEVELS.WARN, 'MIGRACION', `No se pudo re-resolver hash para item ${item.item_id}:`, itemErr.message);
+        }
+      }
+      log(LOG_LEVELS.INFO, 'SYSTEM', `[MIGRACION] ✅ ${fixed}/${legacyItems.length} items actualizados con hashes reales de Steam.`);
+    } else {
+      log(LOG_LEVELS.INFO, 'SYSTEM', '[MIGRACION] No hay items legacy con hashes falsos que migrar.');
+    }
+  } catch (migrateErr) {
+    log(LOG_LEVELS.WARN, 'SYSTEM', '[MIGRACION] No se pudo ejecutar la migración de imágenes (no bloquea el arranque):', migrateErr.message);
+  }
 } catch (err) {
   log(LOG_LEVELS.ERROR, 'SYSTEM', '❌ No se pudo conectar a la base de datos tras varios intentos.', err.message);
   // Still start the server (degraded mode) so health checks respond
