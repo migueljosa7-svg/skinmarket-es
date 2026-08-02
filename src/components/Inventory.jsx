@@ -5,6 +5,8 @@ import { handleImageError, getSkinImageUrl } from "../services/ImageService";
 import { useToast } from "./Toast";
 import { motion as Motion, AnimatePresence } from "framer-motion";
 
+const API_BASE = import.meta.env.VITE_API_URL || "";
+
 /* ─────────────────────────────────────────────
    TRADE URL VALIDATION MODAL
 ───────────────────────────────────────────── */
@@ -246,8 +248,32 @@ export default function Inventory() {
 
   // Save trade URL from modal
   const handleSaveTradeUrl = useCallback(async (url) => {
+    // Persist locally first (keeps UI in sync even if backend fails)
     updateProfile(url, user?.steam_id || "");
-    toast.success("✅ Trade URL guardada correctamente. Puedes retirar ahora.");
+
+    // Persist on the backend so /api/inventory/withdraw can read steam_id + trade_token
+    const token = localStorage.getItem("token");
+    let serverSaved = false;
+    if (token) {
+      try {
+        const response = await fetch(`${API_BASE}/api/update-profile`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ link_intercambio: url })
+        });
+        if (response.ok) {
+          serverSaved = true;
+        }
+      } catch {
+        // Network failure — fall back to local-only and show warning
+      }
+    }
+
+    if (serverSaved) {
+      toast.success("✅ Trade URL guardada correctamente. Puedes retirar ahora.");
+    } else {
+      toast.warning("⚠️ Trade URL guardada solo localmente. El retiro real a Steam requiere conexión con el servidor.");
+    }
 
     // If there was a pending withdraw, retry it
     if (pendingWithdrawId) {
@@ -256,8 +282,10 @@ export default function Inventory() {
         toast.success(res.message || "Oferta enviada a Steam.");
       } else {
         const errorMessages = {
+          'TRADE_URL_MISSING': '❌ Trade URL no guardada en el servidor. Inicia sesión e inténtalo de nuevo.',
           'ITEM_OUT_OF_STOCK': '❌ El bot no tiene esta skin. Intenta venderla o intercambiarla.',
           'RATE_LIMIT_EXCEEDED': '⏳ Steam limitando. Espera 5 min.',
+          'CONFIG_MISSING': '❌ El bot de Steam no está configurado. Contacta al administrador.',
           'BOT_UNAVAILABLE': '❌ Bot no disponible. Usa "Intercambiar".'
         };
         toast.error(errorMessages[res.code] || res.message || "Error al retirar.");

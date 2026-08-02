@@ -12,6 +12,12 @@
 - [x] `LoginSuccess.jsx` - Add `avatar: userData.avatar` to updateUser (OAuth callback)
 - [x] `Dashboard.jsx` - Avatar renders with fallback (already wired, verified)
 
+## ✅ Fix 3: Trade URL persistence in server + retiro flow
+- [x] `Inventory.jsx` - Added `API_BASE` constant for VITE_API_URL
+- [x] `Inventory.jsx` - `handleSaveTradeUrl` now calls `/api/update-profile` on backend BEFORE retrying withdraw
+- [x] `Inventory.jsx` - Better error messages for CONFIG_MISSING, TRADE_URL_MISSING in retry flow
+
 ## ✅ Testing (manual - run app to verify)
 - [x] Verify app loads without crash
 - [x] Verify avatar displays in Dashboard
+- [x] Build compiles without errors (Inventory.jsx → dist)
