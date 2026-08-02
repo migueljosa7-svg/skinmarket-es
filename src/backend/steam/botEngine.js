@@ -319,13 +319,19 @@ try {
 
             // Create and send the offer (bot has the item in its own inventory)
             _log(`[BOT ENGINE] 📤 Creando oferta para: ${itemInBot.market_hash_name || itemName}`);
-            const offerId = await this._createAndSendOffer(partnerSteamID64, tradeToken, [itemInBot]);
+            const offerResult = await this._createAndSendOffer(partnerSteamID64, tradeToken, [itemInBot]);
+            // _createAndSendOffer now resolves with { offerId, confirmed, status }
+            const offerId = (offerResult && typeof offerResult === 'object') ? offerResult.offerId : offerResult;
 
             _log(`[BOT ENGINE] ✅ Oferta #${offerId} enviada exitosamente a ${partnerSteamID64}`);
             this._refreshSessionTTL();
             return {
                 success: true,
                 offerId: offerId,
+                // _createAndSendOffer now only resolves AFTER Steam Guard confirms the
+                // offer, so the offer is always fully confirmed at this point.
+                offerStatus: (offerResult && typeof offerResult === 'object' && offerResult.status) || 'confirmed',
+                confirmed: !!(offerResult && typeof offerResult === 'object' && offerResult.confirmed),
                 message: 'Oferta de intercambio enviada a tu cuenta de Steam.'
             };
         } catch (err) {
@@ -781,25 +787,64 @@ try {
             offer.send((err, status) => {
                 if (err) return reject(err);
 
-                // Autoconfirmación Instantánea (Steam Guard 2FA)
-                this.community.acceptConfirmationGroup(
-                    this.credentials.identitySecret,
-                    offer.id,
-                    (confirmErr) => {
-                        if (confirmErr) {
-                            _error('[BOT ERROR] Error al autoconfirmar oferta en Steam Guard:', confirmErr);
-                        } else {
-                            _log('[BOT INFO] Oferta confirmada con éxito en Steam Guard:', offer.id);
-                        }
-                    }
-                );
-
                 if (status === 'pending') {
                     _log(`[BOT ENGINE] 🔐 Oferta #${offer.id} pendiente de confirmación 2FA...`);
                 } else {
                     _log(`[BOT ENGINE] ✅ Oferta #${offer.id} enviada (estado: ${status})`);
                 }
-                resolve(offer.id);
+
+                // ─── STEAM GUARD CONFIRMATION (FIX) ─────────────────────
+                // The offer is NOT delivered until the bot confirms it via the
+                // mobile authenticator. Previously this ran fire-and-forget, so
+                // the promise resolved before Steam actually sent the offer —
+                // and if the confirmation silently failed, the user never got it.
+                // Now we await acceptConfirmationGroup with up to 3 retries and
+                // only resolve AFTER the confirmation succeeds.
+                const maxConfirmAttempts = 3;
+                let confirmAttempt = 0;
+
+                const attemptConfirmation = () => {
+                    confirmAttempt++;
+                    this.community.acceptConfirmationGroup(
+                        this.credentials.identitySecret,
+                        offer.id,
+                        (confirmErr) => {
+                            if (confirmErr) {
+                                _error(
+                                    `[BOT ENGINE] ❌ Error al autoconfirmar oferta #${offer.id} en Steam Guard (intento ${confirmAttempt}/${maxConfirmAttempts}):`,
+                                    confirmErr.message || confirmErr
+                                );
+
+                                if (confirmAttempt < maxConfirmAttempts) {
+                                    // Wait a moment then retry — Steam Guard can lag
+                                    setTimeout(attemptConfirmation, 3000 * confirmAttempt);
+                                } else {
+                                    // Confirmation failed after all retries. Try to
+                                    // cancel the pending offer so the item isn't stuck.
+                                    _error(
+                                        `[BOT ENGINE] 🔴 No se pudo confirmar la oferta #${offer.id} tras ${maxConfirmAttempts} intentos. Cancelando oferta...`
+                                    );
+                                    offer.cancel((cancelErr) => {
+                                        if (cancelErr) {
+                                            _error('[BOT ENGINE] ⚠️ Error al cancelar la oferta no confirmada:', cancelErr.message || cancelErr);
+                                        }
+                                        reject(new Error(`STEAM_GUARD_CONFIRMATION_FAILED: No se pudo confirmar la oferta #${offer.id} en Steam Guard tras ${maxConfirmAttempts} intentos.`));
+                                    });
+                                }
+                                return;
+                            }
+
+                            _log(`[BOT ENGINE] ✅ Oferta #${offer.id} CONFIRMADA en Steam Guard`);
+                            resolve({
+                                offerId: offer.id,
+                                confirmed: true,
+                                status: 'confirmed'
+                            });
+                        }
+                    );
+                };
+
+                attemptConfirmation();
             });
         });
     }

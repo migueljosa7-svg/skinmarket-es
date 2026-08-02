@@ -60,6 +60,11 @@ export function AuthProvider({ children }) {
               link_intercambio: userData.link_intercambio || null,
               avatar: userData.avatar || null
             });
+            // Bug 3 fix: sync server inventory into local cache so the UI
+            // shows the same inventory after login/logout cycles.
+            if (Array.isArray(userData.inventory)) {
+              StorageService.setInventory(userData.inventory);
+            }
             setUser(StorageService.getUser());
           }
         })
@@ -263,6 +268,17 @@ StorageService.updateUser({
       });
       const data = await response.json();
       if (response.ok && data.success) {
+        // Bug 3 fix: handle autoFallback (bot down/no config → skin sold for balance)
+        if (data.autoFallback) {
+          StorageService.sellSkin(skinId);
+          return {
+            success: true,
+            autoFallback: true,
+            fallbackType: data.fallbackType || 'sell',
+            newBalance: data.newBalance,
+            message: data.message || "Skin vendida automáticamente en saldo."
+          };
+        }
         StorageService.withdrawSkin(skinId);
         return { success: true, offerId: data.offerId, message: data.message || "Oferta enviada a Steam." };
       }

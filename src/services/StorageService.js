@@ -193,9 +193,37 @@ loadInitialData() {
     return Math.floor((parseFloat(euros) || 0) * 100);
   }
 
-  getInventory() {
+getInventory() {
     if (!this.data) return [];
     return [...(this.data.inventory || [])];
+  }
+
+  /**
+   * Replace the entire inventory with a new set of items (Bug 3 fix).
+   * Called after fetching /api/me on login/register/mount so the local
+   * cache stays in sync with the server inventory.
+   * @param {Array} items - New inventory array from the server
+   */
+  setInventory(items) {
+    if (!this.data) {
+      this.data = this.createInitialData();
+    }
+    this.data.inventory = Array.isArray(items) ? items.map(item => ({
+      id: item.id || item.item_id,
+      name: item.name || "Skin",
+      weapon: item.weapon || (item.name ? item.name.split("|")[0].trim() : "Weapon"),
+      skin_name: item.skin_name || (item.name ? (item.name.split("|")[1] || item.name).trim() : "Skin"),
+      price: Number(parseFloat(item.price || 1.0).toFixed(2)),
+      rarity: item.rarity || "Mil-Spec",
+      wear: item.wear || "Field-Tested",
+      image: item.image || "",
+      icon_url: item.icon_url || "",
+      market_hash_name: item.market_hash_name || "",
+      status: item.status || "in_inventory",
+      acquiredAt: item.acquiredAt || new Date().toISOString(),
+      marketable: item.marketable !== false
+    })) : [];
+    this.persistAndNotify();
   }
 
   getPendingQueue() {
@@ -264,6 +292,22 @@ loadInitialData() {
     const skin = this.data.inventory[skinIndex];
     this.data.inventory.splice(skinIndex, 1);
     this.addBalance(skin.price);
+    return true;
+  }
+
+  /**
+   * Destroy/consume a skin WITHOUT crediting any balance (Bug 4 fix).
+   * Used when a skin is lost in an upgrade/contract — the consumed skins
+   * are removed from inventory but their value must NOT be refunded.
+   * @param {string} skinId - Inventory item id to remove
+   * @returns {boolean} True if removed
+   */
+  destroySkin(skinId) {
+    if (!this.data) return false;
+    const skinIndex = this.data.inventory.findIndex((s) => s.id === skinId);
+    if (skinIndex === -1) return false;
+    this.data.inventory.splice(skinIndex, 1);
+    this.persistAndNotify();
     return true;
   }
 

@@ -22,6 +22,7 @@ import p2pMarketService from "./services/p2pMarketService.js";
 import fs from "fs";
 import crypto from "crypto";
 import PriceEngine from "./services/PriceEngine.js";
+import skinImageService from "./services/skinImageService.js";
 
 // SECURITY: Environment variable loading strategy
 // - Production: NEVER load .env files, use ONLY system environment variables (from Render)
@@ -801,7 +802,7 @@ app.get("/api/me", authenticateToken, async (req, res) => {
     const calculatedLevel = calculateLevel(totalDepositado);
 
     const inventoryResult = await db.query(
-      "SELECT item_id as id, name, price, image, rarity, marketable, status, market_hash_name, wear, assetid FROM inventario WHERE usuario_id = $1 AND status != 'sold' AND status != 'withdrawn'",
+      "SELECT item_id as id, name, price, image, icon_url, rarity, marketable, status, market_hash_name, wear, assetid FROM inventario WHERE usuario_id = $1 AND status != 'sold' AND status != 'withdrawn' AND status != 'destroyed'",
       [req.user.id]
     );
 
@@ -900,8 +901,10 @@ app.post("/api/claim-daily", authenticateToken, dailyCaseLimiter, async (req, re
     const itemName = `${randomWeapon} | ${randomSkin}`;
     const itemPrice = parseFloat(((rarityPrices[rarity] || 1) * (0.5 + Math.random() * 1.5)).toFixed(2));
 
-    const iconHash = generateIconUrlHash(itemName, Date.now());
-    const imageHD = buildAkamaiImageUrl(iconHash);
+    // REAL Steam image hash via CSGO-API (fixes 404 images on daily rewards)
+    const marketHashName = `${itemName} (${randomWear})`;
+    const iconHash = await skinImageService.getSkinIconHash(marketHashName) || await skinImageService.getSkinIconHash(itemName);
+    const imageHD = iconHash ? buildAkamaiImageUrl(iconHash) : "";
 
     const serverSeed = crypto.randomBytes(32).toString('hex');
     const clientSeed = crypto.randomBytes(16).toString('hex');
@@ -1237,8 +1240,10 @@ app.post("/api/cases/open", authenticateToken, caseOpenLimiter, async (req, res)
       const itemName = `${weapon} | ${skinName}`;
       const itemPrice = parseFloat(rarityPrice.toFixed(2));
 
-      const iconHash = generateIconUrlHash(itemName, Date.now() + i);
-      const imageHD = buildAkamaiImageUrl(iconHash);
+      // REAL Steam image hash via CSGO-API (fixes 404 images on case drops)
+      const marketHashName = `${itemName} (${randomWear})`;
+      const iconHash = await skinImageService.getSkinIconHash(marketHashName) || await skinImageService.getSkinIconHash(itemName);
+      const imageHD = iconHash ? buildAkamaiImageUrl(iconHash) : "";
 
       // Provably Fair seeds
       const serverSeed = crypto.randomBytes(32).toString('hex');
@@ -1405,7 +1410,7 @@ app.post("/api/inventory/withdraw-fallback", authenticateToken, async (req, res)
 app.get("/api/inventory", authenticateToken, async (req, res) => {
   try {
     const result = await db.query(
-      "SELECT item_id as id, name, price, image, rarity, marketable, status, market_hash_name, wear, assetid FROM inventario WHERE usuario_id = $1 AND status != 'sold' AND status != 'withdrawn'",
+      "SELECT item_id as id, name, price, image, icon_url, rarity, marketable, status, market_hash_name, wear, assetid FROM inventario WHERE usuario_id = $1 AND status != 'sold' AND status != 'withdrawn' AND status != 'destroyed'",
       [req.user.id]
     );
     res.json(result.rows.map(item => ({ ...item, price: item.price ?? 0.00 })));
@@ -1419,10 +1424,10 @@ app.post("/api/inventory/add", authenticateToken, async (req, res) => {
     const addedItems = [];
     for (const item of items) {
       const result = await db.query(
-        `INSERT INTO inventario (usuario_id, name, price, image, rarity, marketable, market_hash_name, wear, weapon, skin_name)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-         RETURNING item_id as id, name, price, image, rarity, marketable, status`,
-        [req.user.id, item.name, item.price, item.image, item.rarity, item.marketable !== false, item.market_hash_name || item.name, item.wear || "Field-Tested", item.weapon || "", item.skin_name || ""]
+        `INSERT INTO inventario (usuario_id, name, price, image, icon_url, rarity, marketable, market_hash_name, wear, weapon, skin_name)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+         RETURNING item_id as id, name, price, image, icon_url, rarity, marketable, status`,
+        [req.user.id, item.name, item.price, item.image, item.icon_url || "", item.rarity, item.marketable !== false, item.market_hash_name || item.name, item.wear || "Field-Tested", item.weapon || "", item.skin_name || ""]
       );
       addedItems.push(result.rows[0]);
     }
@@ -1460,6 +1465,86 @@ app.post("/api/inventory/sell", authenticateToken, async (req, res) => {
       return res.status(404).json({ error: err.message });
     }
     res.status(500).json({ error: "Error al vender objeto" });
+  }
+});
+
+// ─── DESTROY SKIN (Bug 4 fix: upgrade/contract loss) ──────────
+// Consumes a skin from the user's inventory WITHOUT crediting any balance.
+// This is the server-side counterpart of StorageService.destroySkin().
+// Used when a skin is lost in an upgrade — its value must NOT be refunded.
+app.post("/api/inventory/destroy", authenticateToken, async (req, res) => {
+  const { itemId } = req.body;
+  if (!itemId) return res.status(400).json({ error: "itemId requerido" });
+  try {
+    const itemResult = await db.query(
+      "SELECT * FROM inventario WHERE item_id = $1 AND usuario_id = $2 AND status = 'on_site'",
+      [itemId, req.user.id]
+    );
+    if (itemResult.rows.length === 0) {
+      return res.status(404).json({ error: "Objeto no encontrado o ya procesado" });
+    }
+    const item = itemResult.rows[0];
+    await db.query("UPDATE inventario SET status = 'destroyed' WHERE item_id = $1", [itemId]);
+    await logAction(req.user.id, 'DESTRUIR_ITEM', { itemId, itemName: item.name, price: item.price });
+    res.json({
+      success: true,
+      itemId,
+      message: `Skin ${item.name} consumida sin reembolso.`
+    });
+  } catch {
+    res.status(500).json({ error: "Error al destruir objeto" });
+  }
+});
+
+// ─── UPGRADE COMPLETE (Bug 4 fix: no money on loss) ─────────
+// Called by the frontend when an upgrade/contract round finishes.
+// - consumedItemIds: the bet skins (ALWAYS destroyed, NO refund)
+// - wonItem: (optional) the new skin when the upgrade succeeds
+// Both cases run in a single atomic transaction.
+app.post("/api/upgrade/complete", authenticateToken, async (req, res) => {
+  const { consumedItemIds, wonItem } = req.body;
+  try {
+    const consumed = Array.isArray(consumedItemIds) ? consumedItemIds : [];
+    const result = await db.withTransaction(async (client) => {
+      // 1) Consume each bet skin WITHOUT crediting balance
+      for (const itemId of consumed) {
+        const itemResult = await client.query(
+          "SELECT * FROM inventario WHERE item_id = $1 AND usuario_id = $2 AND status = 'on_site' FOR UPDATE",
+          [itemId, req.user.id]
+        );
+        if (itemResult.rows.length > 0) {
+          await client.query("UPDATE inventario SET status = 'destroyed' WHERE item_id = $1", [itemId]);
+        }
+      }
+
+      // 2) If the upgrade succeeded, add the won skin to inventory
+      if (wonItem && wonItem.name) {
+        const itemPrice = parseFloat(wonItem.price || 0);
+        const marketHashName = wonItem.market_hash_name || wonItem.name;
+        let imageHD = wonItem.image || "";
+        if (!imageHD && wonItem.name) {
+          const iconHash = await skinImageService.getSkinIconHash(marketHashName) || await skinImageService.getSkinIconHash(wonItem.name);
+          imageHD = iconHash ? buildAkamaiImageUrl(iconHash) : "";
+        }
+        const insertResult = await client.query(
+          `INSERT INTO inventario (usuario_id, name, price, image, icon_url, rarity, marketable, wear, weapon, skin_name, market_hash_name, status)
+           VALUES ($1, $2, $3, $4, $5, $6, true, $7, $8, $9, $10, 'on_site')
+           RETURNING item_id as id, name, price, image, icon_url, rarity, marketable, status`,
+          [req.user.id, wonItem.name, itemPrice, imageHD, wonItem.icon_url || "", wonItem.rarity || "Mil-Spec Grade",
+           wonItem.wear || "Field-Tested", wonItem.weapon || "", wonItem.skin_name || "", marketHashName]
+        );
+        await recordTransaction(req.user.id, 'mejora', 0, 'inventario_sitio', `Upgrade ganada: ${wonItem.name} (€${itemPrice})`);
+        return { success: true, wonItem: insertResult.rows[0], consumed: consumed.length };
+      }
+
+      // 3) Upgrade failed — skins are gone, no refund
+      await recordTransaction(req.user.id, 'mejora_perdida', 0, 'inventario_sitio', `Upgrade fallida - ${consumed.length} skin(s) consumidas`);
+      return { success: true, consumed: consumed.length, message: "Upgrade fallida: skins consumidas sin reembolso." };
+    });
+    res.json(result);
+  } catch (err) {
+    log(LOG_LEVELS.ERROR, 'UPGRADE', 'Error al procesar la mejora:', err.message);
+    res.status(500).json({ error: "Error al procesar la mejora" });
   }
 });
 
@@ -1559,16 +1644,31 @@ app.post("/api/inventory/withdraw", authenticateToken, withdrawLimiter, async (r
 
         await db.query("UPDATE inventario SET status = 'withdrawn' WHERE item_id = $1", [itemId]);
         await recordTransaction(req.user.id, 'retiro', item.price, 'steam_trade', `Retiro real: ${item.name} - Offer ID: ${result.offerId}`);
-        await logAction(req.user.id, 'RETIRAR_ITEM_REAL', { itemId, itemName: item.name, offerId: result.offerId, marketHashName: item.market_hash_name });
+        await logAction(req.user.id, 'RETIRAR_ITEM_REAL', { itemId, itemName: item.name, offerId: result.offerId, marketHashName: item.market_hash_name, offerStatus: result.offerStatus || 'confirmed' });
+
+        // Report the offer status to the frontend (Bug 2 fix):
+        // offerStatus is 'confirmed' because _createAndSendOffer only resolves
+        // AFTER Steam Guard confirmation succeeds. This lets the UI show an
+        // accurate "offer sent & confirmed" state instead of a generic message.
+        const offerStatus = result.offerStatus || 'confirmed';
 
         if (req.app.get('io')) {
           req.app.get('io').to(req.user.id.toString()).emit('withdrawal_update', {
-            itemId, status: 'withdrawn', offerId: result.offerId,
-            message: `Oferta #${result.offerId} enviada a Steam. Revisa tu inventario de ofertas.`
+            itemId, status: 'withdrawn', offerId: result.offerId, offerStatus,
+            message: offerStatus === 'confirmed'
+              ? `Oferta #${result.offerId} enviada y confirmada en Steam. Revisa tu inventario de ofertas.`
+              : `Oferta #${result.offerId} enviada a Steam. Revisa tu inventario de ofertas.`
           });
         }
 
-        return res.json({ success: true, offerId: result.offerId, message: `Oferta #${result.offerId} enviada a Steam. Revisa tu inventario.` });
+        return res.json({
+          success: true,
+          offerId: result.offerId,
+          offerStatus,
+          message: offerStatus === 'confirmed'
+            ? `Oferta #${result.offerId} enviada y confirmada en Steam. Revisa tu inventario.`
+            : `Oferta #${result.offerId} enviada a Steam. Revisa tu inventario.`
+        });
       }
 
 // Bot responded but failed — auto-fallback to sell for ANY bot error

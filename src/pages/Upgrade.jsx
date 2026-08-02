@@ -252,10 +252,39 @@ export default function Upgrade() {
     setIsSpinning(false);
     if (pendingResult) {
       // ─── KEYDROP-STYLE: DESTROY original skin(s) on BOTH success and failure ──
-      // The original skin(s) are ALWAYS consumed (removed from inventory)
+      // The original skin(s) are ALWAYS consumed (removed from inventory).
+      // Bug 4 fix: use destroySkin (NO balance credit) instead of sellSkin.
       selectedIds.forEach((id) => {
-        StorageService.sellSkin(id);
+        StorageService.destroySkin(id);
       });
+
+      // Sync to backend (Bug 4): destroy consumed items + add won item server-side
+      const token = localStorage.getItem("token");
+      if (token) {
+        const API = import.meta.env.VITE_API_URL || "";
+        const wonSkin = pendingResult.success ? pendingResult.wonSkins[0] : null;
+        fetch(`${API}/api/upgrade/complete`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            consumedItemIds: selectedIds,
+            wonItem: wonSkin ? {
+              name: wonSkin.name,
+              price: wonSkin.price,
+              rarity: wonSkin.rarity,
+              wear: wonSkin.wear,
+              weapon: wonSkin.weapon,
+              skin_name: wonSkin.skin_name,
+              image: wonSkin.image,
+              icon_url: wonSkin.icon_url,
+              market_hash_name: wonSkin.market_hash_name
+            } : null
+          })
+        }).catch(() => { });
+      }
 
       if (pendingResult.success) {
         // ─── KEYDROP-STYLE: On SUCCESS — add the new skin to inventory ──
