@@ -100,7 +100,7 @@ const pool = new Pool({
     ssl: useSSL,
     connectionTimeoutMillis: 15000,
     idleTimeoutMillis: 30000,
-    max: 10,
+    max: 2,
     // Keep-alive activo para evitar que Render/RDS cierre sockets idle
     // ("Connection terminated unexpectedly" por timeout de infraestructura)
     keepAlive: true,

@@ -180,12 +180,27 @@ const initDb = async () => {
     for (const q of seedQueries) {
       await db.query(q);
     }
+    
+    // Close the pool completely before exiting to avoid hanging connections
+    // that would block the main server startup on Render free tier
+    console.log('[INIT_DB] Cerrando pool de base de datos...');
+    await db.pool.end();
+    console.log('[INIT_DB] Pool cerrado correctamente. Inicialización completada.');
     process.exit(0);
   } catch (err) {
     // Log the actual error so Render shows why migrations failed
     // (e.g. SSL handshake, cold start, timeout) without swallowing it.
     console.error('[INIT_DB] Error durante la inicialización/migraciones:', err.message || err);
     if (err.stack) console.error('[INIT_DB] Stack:', err.stack);
+    
+    // Attempt to close pool even on error
+    try {
+      console.log('[INIT_DB] Cerrando pool tras error...');
+      await db.pool.end();
+    } catch (closeErr) {
+      console.error('[INIT_DB] Error al cerrar pool:', closeErr.message);
+    }
+    
     process.exit(1);
   }
 };
