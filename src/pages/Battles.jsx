@@ -164,10 +164,10 @@ export default function Battles() {
       }
 
       validSkins.forEach((skin) => {
-        const price = Math.max(0.5, skin.price || 0.5);
+const price = Math.max(0.5, skin?.price || 0.5);
         let weight = Math.max(1, Math.floor((800 / (price * 10)) * weightMultiplier));
         for (let i = 0; i < weight; i++) {
-          weighted.push({ ...skin, price: parseFloat(parseFloat(skin.price).toFixed(2)) });
+          weighted.push({ ...skin, price: parseFloat(parseFloat(skin?.price || 0).toFixed(2)) });
         }
       });
 
@@ -176,7 +176,7 @@ export default function Battles() {
         id: `${skin.id}-${Date.now()}-${Math.random()}`,
         name: skin.name,
         image: skin.image,
-        price: parseFloat(skin.price.toFixed(2)),
+price: parseFloat((skin?.price || 0).toFixed(2)),
         rarity: skin.rarity,
       };
     },
@@ -326,7 +326,7 @@ export default function Battles() {
           const drop = openBoxRandomly(cData, vSkins, forceGoodDrop, forceBadDrop, p.level);
           if (drop) {
             p.results.push(drop);
-            p.total = parseFloat((p.total + drop.price).toFixed(2));
+            p.total = parseFloat((p.total + (drop?.price || 0)).toFixed(2));
           }
         });
       });
@@ -718,7 +718,7 @@ export default function Battles() {
                         <div style={{ fontSize: '0.6rem', color: '#f5ac3b', fontWeight: '900' }}>EQUIPO 1</div>
                         <div style={{ fontSize: '1.2rem', fontWeight: '900' }}>
                           {battleState.players.filter(p => p.teamId === 1).reduce((s, p) =>
-                            s + p.results.slice(0, animState.visibleRounds).reduce((rs, r) => rs + r.price, 0), 0).toFixed(2)}€
+                            s + p.results.slice(0, animState.visibleRounds).reduce((rs, r) => rs + (r?.price || 0), 0), 0).toFixed(2)}€
                         </div>
                       </div>
                       <div style={{ fontSize: '1.2rem', fontWeight: '900', color: 'rgba(255,255,255,0.2)' }}>VS</div>
@@ -726,7 +726,7 @@ export default function Battles() {
                         <div style={{ fontSize: '0.6rem', color: '#ef4444', fontWeight: '900' }}>EQUIPO 2</div>
                         <div style={{ fontSize: '1.2rem', fontWeight: '900' }}>
                           {battleState.players.filter(p => p.teamId === 2).reduce((s, p) =>
-                            s + p.results.slice(0, animState.visibleRounds).reduce((rs, r) => rs + r.price, 0), 0).toFixed(2)}€
+                            s + p.results.slice(0, animState.visibleRounds).reduce((rs, r) => rs + (r?.price || 0), 0), 0).toFixed(2)}€
                         </div>
                       </div>
                     </div>
@@ -954,7 +954,7 @@ export default function Battles() {
                   const isWinner = battleState.winnerIds.includes(p.id);
                   const currentScore = p.results
                     .slice(0, animState.visibleRounds)
-                    .reduce((s, r) => s + r.price, 0);
+                    .reduce((s, r) => s + (r?.price || 0), 0);
                   return (
                     <div
                       key={p.id}

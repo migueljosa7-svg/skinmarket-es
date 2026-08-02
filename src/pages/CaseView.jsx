@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
-import { generateAllCases, pickWeightedSkin } from "../constants/cases.js";
+import { generateKeydropCases, pickWeightedSkin } from "../constants/cases.js";
 import { useFetchSkins } from "../hooks/useFetchSkins";
 import { getRarityColor, resolvePriceSync } from "../services/PriceEngine.js";
 import { StorageService } from "../services/StorageService";
@@ -10,6 +10,7 @@ import { getSkinImageUrl, handleImageError } from "../services/ImageService";
 import { useToast } from "../components/Toast";
 import ProvablyFairModal from "../components/ProvablyFairModal";
 import SingleMultiRoulette from "../components/RouletteWheel";
+import { CASE_SPECIFIC_IMAGES } from "../hooks/useCaseImage";
 import { FiAlertTriangle, FiShield, FiLock, FiCheckCircle } from "react-icons/fi";
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
@@ -48,8 +49,8 @@ export default function CaseView() {
   const [showProvablyFair, setShowProvablyFair] = useState(false);
   const [jokerMode, setJokerMode] = useState(false);
 
-  const allCases = useMemo(() => generateAllCases(), []);
-  const caseData = allCases.find((c) => c.id === id);
+const allCases = useMemo(() => generateKeydropCases(allSkins, CASE_SPECIFIC_IMAGES), [allSkins]);
+  const caseData = useMemo(() => allCases.find((c) => c.id === id), [allCases, id]);
 
   const validSkins = useMemo(() => {
     if (!allSkins || !caseData) return [];
@@ -157,7 +158,7 @@ export default function CaseView() {
             });
 
             const currentStats = safeUser.stats || {};
-            const totalWon = backendItems.reduce((acc, curr) => acc + curr.price, 0);
+const totalWon = backendItems.reduce((acc, curr) => acc + (curr?.price || 0), 0);
             StorageService.updateUser({
               stats: {
                 ...currentStats,
@@ -233,7 +234,7 @@ export default function CaseView() {
 
     // Update user stats (using safeUser to prevent null refs)
     const currentStats = safeUser.stats || {};
-    const totalWon = expectedResults.reduce((acc, curr) => acc + curr.price, 0);
+const totalWon = expectedResults.reduce((acc, curr) => acc + (curr?.price || 0), 0);
     StorageService.updateUser({
       stats: {
         ...currentStats,

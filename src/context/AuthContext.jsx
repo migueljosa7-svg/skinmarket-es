@@ -111,10 +111,11 @@ export function AuthProvider({ children }) {
       localStorage.removeItem("guest_mode");
       localStorage.setItem("token", data.token);
       setTokenState(data.token);
-      StorageService.updateUser({
+StorageService.updateUser({
         ...data.user,
         nombre_usuario: data.user.nombre_usuario,
         email: data.user.email,
+        avatar: data.user.avatar || null,
         saldo: data.user.saldo,
         balance: data.user.saldo,
         nivel: data.user.nivel || 0,
@@ -149,6 +150,7 @@ export function AuthProvider({ children }) {
           ...data.user,
           nombre_usuario: data.user.nombre_usuario,
           email: data.user.email,
+          avatar: data.user.avatar || null,
           saldo: data.user.saldo,
           balance: data.user.saldo,
           nivel: data.user.nivel || 0,

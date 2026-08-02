@@ -159,6 +159,488 @@ export const SKIN_CATALOGS = {
   }
 };
 
+// ─── KEYDROP CATEGORIES (Full 21 Category Catalog) ─────────────────────
+export const KEYDROP_CATEGORIES = [
+  {
+    id: "limited_edition",
+    label: "LIMITED EDITION",
+    style: "premium",
+    description: "Ediciones limitadas y exclusivas",
+    icon: "gem",
+    color: "#f59e0b",
+    order: 0,
+    cases: [
+      { name: "RED SILK", price: 2.79 },
+      { name: "DOPPLER EFFECT", price: 7.44 },
+      { name: "EMERALD VEIN", price: 17.67 },
+      { name: "CORAL BLADE", price: 53.94 },
+      { name: "SACRED LOTUS", price: 125.55 },
+      { name: "FEEL THE DRAGON", price: 260.40 }
+    ]
+  },
+  {
+    id: "bestsellers",
+    label: "★ BESTSELLERS",
+    style: "battle",
+    description: "Las cajas más populares de la plataforma",
+    icon: "star",
+    color: "#f5ac3b",
+    order: 1,
+    cases: [
+      { name: "STRIKE", price: 4.39 },
+      { name: "ROYAL", price: 11.01 },
+      { name: "STORM", price: 15.27 },
+      { name: "JOKER", price: 36.71 },
+      { name: "DAPHNE", price: 74.40 },
+      { name: "FLAME", price: 186.00 }
+    ]
+  },
+  {
+    id: "holo_cases",
+    label: "HOLO CASES",
+    style: "holo",
+    description: "Cajas holográficas con efectos visuales únicos",
+    icon: "sparkles",
+    color: "#06b6d4",
+    order: 2,
+    cases: [
+      { name: "HYPER", price: 0.74 },
+      { name: "DART", price: 2.60 },
+      { name: "AQUA", price: 5.58 },
+      { name: "POLYCHROME", price: 9.30 },
+      { name: "MARBLED", price: 18.60 },
+      { name: "ENGRAVE", price: 27.90 },
+      { name: "JAINA", price: 46.50 },
+      { name: "KATANA", price: 88.35 },
+      { name: "MANTIS", price: 111.60 },
+      { name: "ANDERS", price: 138.57 },
+      { name: "STRANGE", price: 278.07 },
+      { name: "DAVID", price: 362.70 },
+      { name: "FIESTA", price: 0.74 },
+      { name: "OLEEEE", price: 6.05 },
+      { name: "CORRIDA", price: 12.56 },
+      { name: "SUERTE", price: 46.50 }
+    ]
+  },
+  {
+    id: "brainrot_cases",
+    label: "BRAINROT CASES",
+    style: "anime",
+    description: "Cajas temáticas con diseños únicos y memes",
+    icon: "skull",
+    color: "#ec4899",
+    order: 3,
+    cases: [
+      { name: "CROCODILO", price: 0.93 },
+      { name: "SAHUR", price: 3.72 },
+      { name: "BALLERINA", price: 6.98 },
+      { name: "TRALALERO", price: 11.63 },
+      { name: "SHIMPANZINI", price: 46.50 },
+      { name: "BRR BRR", price: 130.20 }
+    ]
+  },
+  {
+    id: "battle_cases",
+    label: "BATTLE CASES",
+    style: "battle",
+    description: "Cajas de batalla con mecánicas de combate",
+    icon: "sword",
+    color: "#6366f1",
+    order: 4,
+    cases: [
+      { name: "CLOCK", price: 2.79 },
+      { name: "LIQUID", price: 7.44 },
+      { name: "EXPLOSION", price: 12.09 },
+      { name: "FLASH", price: 39.99 },
+      { name: "CHAIN", price: 106.95 },
+      { name: "SILK", price: 274.35 }
+    ]
+  },
+  {
+    id: "case_battles",
+    label: "CASE BATTLES",
+    style: "battle",
+    description: "Enfrentamientos en vivo contra otros jugadores",
+    icon: "shield",
+    color: "#f97316",
+    order: 5,
+    cases: [
+      { name: "5 Rondas", price: 53.97 },
+      { name: "7 Rondas", price: 20.09 },
+      { name: "17 Rondas", price: 316.20 }
+    ]
+  },
+  {
+    id: "premium_cases",
+    label: "PREMIUM CASES",
+    style: "premium",
+    description: "Las cajas más exclusivas de la plataforma",
+    icon: "crown",
+    color: "#a855f7",
+    order: 6,
+    cases: [
+      { name: "SERPENT", price: 55.75 },
+      { name: "CHEAP KNIVES", price: 68.12 },
+      { name: "ARROW", price: 109.99 },
+      { name: "VEST", price: 167.10 },
+      { name: "VICE", price: 220.01 },
+      { name: "BLOODSHOT", price: 293.62 },
+      { name: "LORE", price: 367.02 },
+      { name: "PREMIUM KNIVES", price: 348.75 },
+      { name: "BUTTERFLY", price: 690.53 },
+      { name: "EMERALD", price: 930.00 },
+      { name: "SPORT", price: 1581.00 },
+      { name: "PANDORA", price: 4650.00 }
+    ]
+  },
+  {
+    id: "risk_zone",
+    label: "RISK ZONE",
+    style: "risk",
+    description: "Alto riesgo, alta recompensa",
+    icon: "flame",
+    color: "#ef4444",
+    order: 7,
+    cases: [
+      { name: "TIGER", price: 1.12 },
+      { name: "MASK", price: 2.79 },
+      { name: "ADRENALINE", price: 6.51 },
+      { name: "RADIANT", price: 23.25 },
+      { name: "LOTUS", price: 92.07 },
+      { name: "FLAME", price: 186.00 }
+    ]
+  },
+  {
+    id: "anime_cases",
+    label: "ANIME CASES",
+    style: "anime",
+    description: "Cajas con temática anime y arte ilustrado",
+    icon: "gamepad2",
+    color: "#ff66ff",
+    order: 8,
+    cases: [
+      { name: "FLAMES", price: 0.74 },
+      { name: "SKETCH", price: 1.72 },
+      { name: "DOUBLE SLASH", price: 3.10 },
+      { name: "HOT DAY", price: 3.86 },
+      { name: "CRIMSON RED", price: 9.53 },
+      { name: "PHASED", price: 12.36 },
+      { name: "PINK STAR", price: 14.28 },
+      { name: "ONI", price: 19.58 },
+      { name: "EDGE", price: 34.88 },
+      { name: "ENDLESS JOURNEY", price: 83.24 },
+      { name: "NIGHT CALLS", price: 220.88 }
+    ]
+  },
+  {
+    id: "sticker_cases",
+    label: "STICKER CASES",
+    style: "battle",
+    description: "Cajas especializadas en stickers y pegatinas",
+    icon: "ticket",
+    color: "#14b8a6",
+    order: 9,
+    cases: [
+      { name: "SURGE", price: 0.47 },
+      { name: "APEX", price: 2.79 },
+      { name: "PRIME", price: 6.51 },
+      { name: "ALPHA", price: 13.95 },
+      { name: "IMMORTAL", price: 37.20 }
+    ]
+  },
+  {
+    id: "weapon_cases",
+    label: "WEAPON CASES",
+    style: "battle",
+    description: "Cajas enfocadas en armas específicas",
+    icon: "crosshair",
+    color: "#3b82f6",
+    order: 10,
+    cases: [
+      { name: "MILSPEC", price: 0.23 },
+      { name: "USP-S", price: 1.11 },
+      { name: "RESTRICTED", price: 1.86 },
+      { name: "AWP", price: 3.23 },
+      { name: "M4", price: 3.55 },
+      { name: "AK-47", price: 3.66 },
+      { name: "DESERT EAGLE", price: 4.17 },
+      { name: "COVERT", price: 23.25 },
+      { name: "AGENT", price: 27.90 },
+      { name: "GLOVES", price: 116.25 },
+      { name: "NEW KNIVES", price: 148.80 },
+      { name: "KNIVES", price: 158.10 },
+      { name: "STRAKA", price: 3.67 },
+      { name: "FORG1", price: 10.70 },
+      { name: "VALEK", price: 32.32 }
+    ]
+  },
+  {
+    id: "kings_cases",
+    label: "KINGS CASES",
+    style: "premium",
+    description: "Cajas de reyes con botín premium",
+    icon: "crown",
+    color: "#f59e0b",
+    order: 11,
+    cases: [
+      { name: "DAGGERS", price: 0.56 },
+      { name: "ENERGY", price: 0.56 },
+      { name: "TECH", price: 0.56 },
+      { name: "1% PROFIT", price: 0.65 },
+      { name: "1% KNIFE", price: 1.63 },
+      { name: "SPARK", price: 1.77 },
+      { name: "TOKEN", price: 2.56 },
+      { name: "SIGNAL", price: 2.75 },
+      { name: "SWAP", price: 2.94 },
+      { name: "CAPITAL", price: 2.94 },
+      { name: "PERFECT", price: 3.02 },
+      { name: "LORD", price: 3.66 },
+      { name: "SMART", price: 3.72 },
+      { name: "ROCKET", price: 3.77 },
+      { name: "REVOLUTION", price: 4.98 },
+      { name: "SHARP", price: 7.34 },
+      { name: "SYNERGY", price: 11.59 },
+      { name: "ASIIMOV", price: 13.62 }
+    ]
+  },
+  {
+    id: "farm_cases",
+    label: "FARM CASES",
+    style: "battle",
+    description: "Cajas económicas para farming",
+    icon: "layers",
+    color: "#10b981",
+    order: 12,
+    cases: [
+      { name: "COOP CHAOS", price: 0.14 },
+      { name: "GOLD SHOT", price: 0.19 },
+      { name: "LUCKY CLUCK", price: 0.28 },
+      { name: "SUNSHINE", price: 0.37 },
+      { name: "EGGSPLOSION", price: 0.47 }
+    ]
+  },
+  {
+    id: "our_specials",
+    label: "OUR SPECIALS",
+    style: "anime",
+    description: "Ediciones especiales de la casa",
+    icon: "sparkles",
+    color: "#ff6b6b",
+    order: 13,
+    cases: [
+      { name: "ICE BLAST", price: 0.30 },
+      { name: "BEAST", price: 0.56 },
+      { name: "BANANA", price: 1.00 },
+      { name: "DIABLO", price: 1.04 },
+      { name: "MAFIA", price: 2.79 },
+      { name: "PIKA PIKA", price: 3.39 },
+      { name: "DRAGON", price: 3.61 },
+      { name: "JOKER", price: 36.71 },
+      { name: "LUNA", price: 102.30 },
+      { name: "ELAINE", price: 186.00 }
+    ]
+  },
+  {
+    id: "community_cases",
+    label: "COMMUNITY CASES",
+    style: "battle",
+    description: "Cajas de la comunidad y redes sociales",
+    icon: "users",
+    color: "#8b5cf6",
+    order: 14,
+    cases: [
+      { name: "TELEGRAM", price: 0.50 },
+      { name: "X (Twitter)", price: 0.75 },
+      { name: "META", price: 1.00 },
+      { name: "DISCORD", price: 1.50 },
+      { name: "FACEIT", price: 2.50 }
+    ]
+  },
+  {
+    id: "cajas_gratis",
+    label: "CAJAS GRATIS",
+    style: "battle",
+    description: "Recompensas diarias y por nivel",
+    icon: "gift",
+    color: "#10b981",
+    order: 15,
+    cases: [
+      { name: "NIVEL 50", price: 0.00 },
+      { name: "DAILY FREE CASE", price: 0.00 }
+    ]
+  },
+  {
+    id: "gold_area",
+    label: "GOLD AREA",
+    style: "premium",
+    description: "Cajas comprables con Gold",
+    icon: "coins",
+    color: "#ffd700",
+    order: 16,
+    cases: [
+      { name: "GOLD DIGGER", price: 0.00, gold: 480 },
+      { name: "FOSTER", price: 0.00, gold: 610 },
+      { name: "SHARK", price: 0.00, gold: 680 },
+      { name: "TOPAZ", price: 0.00, gold: 700 },
+      { name: "RUBIN RAIN", price: 0.00, gold: 840 },
+      { name: "PREDATOR", price: 0.00, gold: 1200 },
+      { name: "RUBY", price: 0.00, gold: 1300 },
+      { name: "AMETHYST LIGHT", price: 0.00, gold: 1400 },
+      { name: "OPTIMAL", price: 0.00, gold: 1930 },
+      { name: "BONY", price: 0.00, gold: 2000 },
+      { name: "ATUM", price: 0.00, gold: 2670 },
+      { name: "WRAP", price: 0.00, gold: 4900 },
+      { name: "SOLAR", price: 0.00, gold: 5600 },
+      { name: "MAGENT", price: 0.00, gold: 6200 },
+      { name: "SAMURAI", price: 0.00, gold: 9900 },
+      { name: "ASSAULT", price: 0.00, gold: 13600 },
+      { name: "EMERALD CUT", price: 0.00, gold: 19200 },
+      { name: "RECON", price: 0.00, gold: 35000 }
+    ]
+  },
+  {
+    id: "youtubers_cases",
+    label: "YOUTUBERS CASES",
+    style: "anime",
+    description: "Cajas de creadores de contenido",
+    icon: "video",
+    color: "#ff0000",
+    order: 17,
+    cases: [
+      { name: "HEATONCS", price: 23.25 },
+      { name: "CACHORRO", price: 26.97 },
+      { name: "AMPETER", price: 29.76 },
+      { name: "POKER", price: 37.20 },
+      { name: "BLACK", price: 48.78 },
+      { name: "TARIFA", price: 74.40 }
+    ]
+  }
+];
+
+// ─── Category Style Map ────────────────────────────────────────
+export const CATEGORY_STYLE_MAP = {
+  limited_edition: "premium",
+  bestsellers: "battle",
+  holo_cases: "holo",
+  brainrot_cases: "anime",
+  battle_cases: "battle",
+  case_battles: "battle",
+  premium_cases: "premium",
+  risk_zone: "risk",
+  anime_cases: "anime",
+  sticker_cases: "battle",
+  weapon_cases: "battle",
+  kings_cases: "premium",
+  farm_cases: "battle",
+  our_specials: "anime",
+  community_cases: "battle",
+  cajas_gratis: "battle",
+  gold_area: "premium",
+  youtubers_cases: "anime"
+};
+
+// ─── Deterministic hash (string → number 0..65535) ─────────────────
+export const hashStr = (s) => {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) { h = ((h << 5) - h) + s.charCodeAt(i); h |= 0; }
+  return Math.abs(h);
+};
+
+// ─── Assign hero skin + 4 unique previews from allSkins ─────────
+export const assignSkinsToCase = (caseObj, allSkins, catDef) => {
+  if (!allSkins || allSkins.length < 5) return caseObj;
+
+  const seed = hashStr(catDef.id + "-" + caseObj.name + "-" + catDef.color);
+  const total = allSkins.length;
+
+  const usedIndices = new Set();
+  const indices = [];
+  let attempts = 0;
+  while (indices.length < 5 && attempts < total * 2) {
+    const idx = (seed + indices.length * 7919 + attempts * 104729) % total;
+    attempts++;
+    if (!indices.includes(idx) && !usedIndices.has(idx)) {
+      indices.push(idx);
+    }
+  }
+  while (indices.length < 5) {
+    const idx = (seed + indices.length * 31337) % total;
+    if (!indices.includes(idx)) indices.push(idx);
+  }
+
+  const heroIdx = indices[0];
+  const previewIdxs = indices.slice(1, 5);
+
+  const heroSkin = allSkins[heroIdx];
+  usedIndices.add(heroIdx);
+
+  const previewSkins = previewIdxs
+    .map((pi) => {
+      usedIndices.add(pi);
+      return allSkins[pi];
+    })
+    .filter(Boolean);
+
+  return {
+    ...caseObj,
+    heroSkin: heroSkin
+      ? { id: heroSkin.id, name: heroSkin.name, price: heroSkin.price, rarity: heroSkin.rarity, image: heroSkin.image }
+      : null,
+    previewSkins: previewSkins.map((s) => ({
+      id: s.id, name: s.name, price: s.price, rarity: s.rarity, image: s.image
+    }))
+  };
+};
+
+// ─── Style → rarity mapping for KeyDrop cases ─────────────────
+const STYLE_RARITY_MAP = {
+  premium: "covert",
+  battle: "classified",
+  holo: "classified",
+  anime: "classified",
+  risk: "extraordinary"
+};
+
+// ─── Generate a bgGradient from a color hex ─────────────────
+const generateBgGradient = (color) => {
+  return `linear-gradient(135deg, ${color}22 0%, #0f1115 80%)`;
+};
+
+// ─── Generate case objects for a category ─────────────────────────
+export const generateCategoryCases = (catDef, allSkins, caseSpecificImages) => {
+  return catDef.cases.map((c, idx) => {
+    const caseImage = (caseSpecificImages && caseSpecificImages[c.name]) || null;
+    const rarity = STYLE_RARITY_MAP[catDef.style] || "classified";
+    const caseObj = {
+      id: `${catDef.id}-${idx}`,
+      name: c.name,
+      price: c.price,
+      rarity: rarity,
+      category: catDef.id,
+      bgGradient: generateBgGradient(catDef.color),
+      image: caseImage,
+      imageSrc: caseImage,
+      color: catDef.color,
+      glowColor: catDef.color,
+      badge: catDef.label,
+      gold: c.gold || null,
+      heroSkin: null,
+      previewSkins: []
+    };
+    return assignSkinsToCase(caseObj, allSkins, catDef);
+  });
+};
+
+// ─── Generate all cases from KEYDROP_CATEGORIES ─────────────────
+export const generateKeydropCases = (allSkins, caseSpecificImages) => {
+  const cases = [];
+  KEYDROP_CATEGORIES.forEach((cat) => {
+    const catCases = generateCategoryCases(cat, allSkins, caseSpecificImages);
+    cases.push(...catCases);
+  });
+  return cases;
+};
+
 // ─── Level-Based Daily Cases (KeyDrop-style) ─────────────
 // Escalado hasta Nivel 360 - Sistema VIP Supreme
 // Unlocked by user level (based on total deposited volume)
