@@ -23,13 +23,26 @@ import fs from "fs";
 import crypto from "crypto";
 import PriceEngine from "./services/PriceEngine.js";
 
+// SECURITY: Environment variable loading strategy
+// - Production: NEVER load .env files, use ONLY system environment variables (from Render)
+// - Development: Load .env file for local testing, but NEVER override existing system variables
 const envPath = path.resolve(process.cwd(), '.env');
-const dotenvOverride = process.env.NODE_ENV !== 'production';
-dotenv.config({ path: envPath, override: dotenvOverride });
-if (!fs.existsSync(envPath)) {
-  console.warn('[SYSTEM] .env file not found in project root. Copy .env.example to .env and configure STEAM_API_KEY, JWT_SECRET, DATABASE_URL, BACKEND_URL, FRONTEND_URL, etc.');
-} else if (!dotenvOverride) {
-  console.log('[SYSTEM] Producción detectada; .env no se usará para sobrescribir variables de entorno.');
+const isProduction = process.env.NODE_ENV === 'production';
+
+if (!isProduction) {
+  // Development: load .env file but don't override existing system variables
+  dotenv.config({ path: envPath, override: false });
+  if (fs.existsSync(envPath)) {
+    console.log('[SYSTEM] Desarrollo: .env cargado (sin sobrescribir variables de sistema)');
+  } else {
+    console.warn('[SYSTEM] .env no encontrado. Copia .env.example a .env y configura las variables locales.');
+  }
+} else {
+  // Production: NEVER load .env files - use only Render's system environment variables
+  console.log('[SYSTEM] Producción detectada: usando SOLO variables de entorno del sistema (Render)');
+  if (fs.existsSync(envPath)) {
+    console.warn('[SYSTEM] ADVERTENCIA: Se encontró .env en producción pero NO se cargará por seguridad.');
+  }
 }
 
 // ─────────────────────────────────────────────────
