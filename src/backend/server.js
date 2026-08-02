@@ -650,20 +650,58 @@ app.post("/api/login", loginLimiter, async (req, res) => {
   }
 
   try {
+    log(LOG_LEVELS.INFO, 'LOGIN', `Intento de login para: ${cleanEmail}`);
+    
+    // Verificar que db está disponible
+    if (!db) {
+      log(LOG_LEVELS.ERROR, 'LOGIN', 'Base de datos no disponible (db es undefined)');
+      return res.status(503).json({ error: "Servicio de base de datos no disponible.", code: "DB_UNAVAILABLE" });
+    }
+
     const result = await db.query("SELECT * FROM usuarios WHERE email = $1", [cleanEmail]);
     const user = result.rows[0];
+    
+    log(LOG_LEVELS.INFO, 'LOGIN', `Usuario encontrado: ${user ? 'Sí' : 'No'}`);
+    
     if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+      log(LOG_LEVELS.WARN, 'LOGIN', `Credenciales inválidas para: ${cleanEmail}`);
       return res.status(401).json({ error: "Credenciales inválidas" });
     }
+    
     const token = jwt.sign({ id: user.usuario_id, email: user.email }, JWT_SECRET, { expiresIn: '8h' });
     await logAction(user.usuario_id, 'LOGIN', { email: cleanEmail });
-    res.json({ user: { usuario_id: user.usuario_id, nombre_usuario: user.nombre_usuario, email: user.email, saldo: user.saldo, nivel: user.nivel, experiencia: user.experiencia }, token });
+    
+    log(LOG_LEVELS.INFO, 'LOGIN', `Login exitoso para: ${cleanEmail}`);
+    
+    res.json({ 
+      user: { 
+        usuario_id: user.usuario_id, 
+        nombre_usuario: user.nombre_usuario, 
+        email: user.email, 
+        saldo: user.saldo, 
+        nivel: user.nivel, 
+        experiencia: user.experiencia 
+      }, 
+      token 
+    });
   } catch (err) {
-    log(LOG_LEVELS.ERROR, 'LOGIN', 'Error al iniciar sesión', { error: err.message, stack: err.stack });
+    log(LOG_LEVELS.ERROR, 'LOGIN', 'Error al iniciar sesión', { 
+      error: err.message, 
+      code: err.code,
+      stack: err.stack 
+    });
+    
     if (err.code === 'ECONNREFUSED' || err.code === 'ENOTFOUND' || err.message?.includes('connect')) {
       return res.status(503).json({ error: "No se pudo conectar con la base de datos. Intenta nuevamente más tarde.", code: "DB_CONNECTION_ERROR" });
     }
-    res.status(500).json({ error: "Error al iniciar sesión" });
+    
+    // Devolver más detalles del error en desarrollo
+    const errorResponse = { 
+      error: "Error al iniciar sesión",
+      details: process.env.NODE_ENV !== 'production' ? err.message : undefined
+    };
+    
+    res.status(500).json(errorResponse);
   }
 });
 
