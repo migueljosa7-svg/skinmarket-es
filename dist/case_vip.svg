@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#422006"/>
+      <stop offset="100%" style="stop-color:#78350f"/>
+    </linearGradient>
+    <linearGradient id="top" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#facc15"/>
+      <stop offset="100%" style="stop-color:#ca8a04"/>
+    </linearGradient>
+    <linearGradient id="body" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#451a03"/>
+      <stop offset="100%" style="stop-color:#1c0a00"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="40%" r="50%">
+      <stop offset="0%" style="stop-color:#facc1544"/>
+      <stop offset="100%" style="stop-color:#facc1500"/>
+    </radialGradient>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <ellipse cx="100" cy="80" rx="90" ry="80" fill="url(#glow)"/>
+  <!-- Crown emblem background -->
+  <rect x="45" y="50" width="110" height="130" rx="20" ry="20" fill="url(#body)" stroke="#facc15" stroke-width="2.5" filter="url(#shadow)"/>
+  <path d="M45 70 Q45 50 65 50 L135 50 Q155 50 155 70 L155 85 L45 85 Z" fill="url(#top)" stroke="#facc15" stroke-width="2.5"/>
+  <!-- Crown symbol -->
+  <path d="M72 80 L80 65 L90 75 L100 60 L110 75 L120 65 L128 80 Z" fill="#1c0a00" stroke="#facc15" stroke-width="1.5"/>
+  <line x1="75" y1="80" x2="125" y2="80" stroke="#facc15" stroke-width="1.5"/>
+  <!-- VIP text -->
+  <text x="100" y="97" font-size="11" fill="#facc15" text-anchor="middle" font-family="Arial" font-weight="bold">VIP</text>
+  <!-- Lock -->
+  <rect x="85" y="110" width="30" height="18" rx="5" fill="#1c0a00" stroke="#facc15" stroke-width="1.5"/>
+  <circle cx="100" cy="119" r="4" fill="#facc15"/>
+  <!-- Bands -->
+  <rect x="50" y="135" width="100" height="3" rx="1.5" fill="#facc1544"/>
+  <rect x="50" y="155" width="100" height="3" rx="1.5" fill="#facc1544"/>
+  <rect x="60" y="175" width="15" height="8" rx="3" fill="#1c0a00" stroke="#facc15" stroke-width="1"/>
+  <rect x="125" y="175" width="15" height="8" rx="3" fill="#1c0a00" stroke="#facc15" stroke-width="1"/>
+</svg>
+

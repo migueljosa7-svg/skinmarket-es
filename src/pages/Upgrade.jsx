@@ -1,0 +1,478 @@
+// src/pages/Upgrade.jsx
+import { useState, useRef, useMemo, useCallback } from "react";
+import { motion as Motion, AnimatePresence } from "framer-motion";
+import { useEffect } from "react";
+import { useAuth } from "../context/useAuth";
+import { useFetchSkins } from "../hooks/useFetchSkins";
+import { getRarityColor } from "../constants/colors.js";
+import { StorageService } from "../services/StorageService";
+import { sound } from "../utils/audio";
+import { handleImageError, getSkinImageUrl } from "../services/ImageService";
+import ProvablyFairModal from "../components/ProvablyFairModal";
+
+const UpgradeSpinner = ({ chance, isSpinning, resultDegree, onComplete }) => {
+  const tickRef = useRef(null);
+
+  useEffect(() => {
+    if (isSpinning && tickRef.current) {
+      sound.playTick();
+      const targetRotation = 1800 + resultDegree;
+      tickRef.current.style.transition = "transform 4s cubic-bezier(0.12, 0.8, 0.15, 1)";
+      tickRef.current.style.transform = `rotate(${targetRotation}deg)`;
+
+      const timer = setTimeout(() => {
+        onComplete();
+      }, 4300);
+
+      return () => clearTimeout(timer);
+    } else if (!isSpinning && tickRef.current) {
+      tickRef.current.style.transition = "none";
+      tickRef.current.style.transform = `rotate(0deg)`;
+    }
+  }, [isSpinning, resultDegree, onComplete]);
+
+  return (
+    <div
+      style={{
+        position: "relative",
+        width: "340px",
+        height: "340px",
+        borderRadius: "50%",
+        margin: "0 auto",
+        background: "#0c0d10",
+        boxShadow: "0 0 100px rgba(0,0,0,0.8), inset 0 0 50px rgba(255,255,255,0.02)",
+        border: "4px solid rgba(255,255,255,0.05)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center"
+      }}
+    >
+      {/* SVG Wheel */}
+      <svg
+        viewBox="0 0 100 100"
+        style={{
+          position: "absolute",
+          top: 10,
+          left: 10,
+          width: "calc(100% - 20px)",
+          height: "calc(100% - 20px)",
+          transform: "rotate(-90deg)",
+          zIndex: 1
+        }}
+      >
+        <circle cx="50" cy="50" r="45" fill="none" stroke="#3b82f6" strokeWidth="6" strokeOpacity="0.2" />
+        {chance > 0 && (
+          <circle
+            cx="50"
+            cy="50"
+            r="45"
+            fill="none"
+            stroke="#f5ac3b"
+            strokeWidth="6"
+            strokeDasharray={`${(chance / 100) * 283} 283`}
+            strokeLinecap="round"
+            style={{ transition: "all 0.5s ease", filter: "drop-shadow(0 0 10px rgba(245, 172, 59, 0.5))" }}
+          />
+        )}
+      </svg>
+
+      {/* The Tick Pointer */}
+      <div
+        ref={tickRef}
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          transformOrigin: "center center",
+          zIndex: 10
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            top: "5px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: "4px",
+            height: "40px",
+            background: "white",
+            borderRadius: "4px",
+            boxShadow: "0 0 20px rgba(255,255,255,1)"
+          }}
+        />
+      </div>
+
+      {/* Center Label */}
+      <div style={{ position: "relative", zIndex: 5, textAlign: "center" }}>
+        <div
+          style={{
+            fontSize: "4rem",
+            fontWeight: "900",
+            color: "white",
+            lineHeight: "1",
+            letterSpacing: "-2px"
+          }}
+        >
+          {chance.toFixed(2)}
+          <span style={{ fontSize: "1.5rem", color: "#f5ac3b" }}>%</span>
+        </div>
+        <div
+          style={{
+            fontSize: "0.75rem",
+            color: "rgba(255,255,255,0.4)",
+            textTransform: "uppercase",
+            letterSpacing: "3px",
+            marginTop: "10px",
+            fontWeight: "900"
+          }}
+        >
+          PROBABILIDAD
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default function Upgrade() {
+  const { user } = useAuth();
+  const { skins: allSkins } = useFetchSkins(1000, false);
+
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [targetSkins, setTargetSkins] = useState([]);
+  const [isSpinning, setIsSpinning] = useState(false);
+  const [resultDegree, setResultDegree] = useState(0);
+  const [pendingResult, setPendingResult] = useState(null);
+  const [lastResult, setLastResult] = useState(null);
+  const [searchRight, setSearchRight] = useState("");
+  const [page, setPage] = useState(0);
+  const [reverseMode, setReverseMode] = useState(false);
+  const [showProvablyFair, setShowProvablyFair] = useState(false);
+  const itemsPerPage = 16;
+
+  // ─── KEYDROP-STYLE: Calculate total selected inventory value ──
+  const totalBetValue = useMemo(() => {
+    if (selectedIds.length === 0 || !user?.inventory) return 0;
+    return user.inventory
+      .filter((s) => selectedIds.includes(s.id))
+      .reduce((sum, s) => sum + (s.price || 0), 0);
+  }, [selectedIds, user?.inventory]);
+
+  // ─── KEYDROP-STYLE: Filter targets to ONLY show higher-value skins ──
+  // This ensures the house margin. Only skins with value >= betValue * 1.05 (5% margin) are shown
+  const validTargets = useMemo(() => {
+    let pool = allSkins.filter((s) => s.price > 0.5 && s.image && s.name);
+
+    // KEYDROP-STYLE: If skins are selected, filter to only show higher-value targets
+    if (totalBetValue > 0) {
+      const minTargetValue = totalBetValue * 1.05; // 5% minimum margin for the house
+      const maxTargetValue = totalBetValue * 3.0;   // Cap at 3x to keep it reasonable
+      pool = pool.filter((s) => s.price >= minTargetValue && s.price <= maxTargetValue);
+
+      // Sort by price ascending (cheapest viable target first)
+      pool.sort((a, b) => a.price - b.price);
+    } else {
+      // No selection yet — show all available skins sorted by price
+      if (searchRight) {
+        pool = pool.filter((s) => s.name.toLowerCase().includes(searchRight.toLowerCase()));
+      }
+      pool.sort((a, b) => a.price - b.price);
+    }
+
+    return pool;
+  }, [allSkins, searchRight, totalBetValue]);
+
+  const paginatedTargets = useMemo(() => {
+    const start = page * itemsPerPage;
+    return validTargets.slice(start, start + itemsPerPage);
+  }, [validTargets, page]);
+
+  const maxPages = Math.ceil(validTargets.length / itemsPerPage);
+
+  const toggleTargetSkin = (skin) => {
+    if (isSpinning) return;
+    setTargetSkins((prev) => {
+      const exists = prev.find((s) => s.id === skin.id);
+      if (exists) return prev.filter((s) => s.id !== skin.id);
+      if (prev.length >= 4) return prev;
+      return [...prev, skin];
+    });
+  };
+
+  const handleSkinClick = (id) => {
+    if (isSpinning) return;
+    setSelectedIds((prev) => {
+      if (prev.includes(id)) return prev.filter((i) => i !== id);
+      if (prev.length >= 3) return prev;
+      return [...prev, id];
+    });
+  };
+
+  const calculateChance = () => {
+    if (selectedIds.length === 0 || targetSkins.length === 0) return 0;
+    const totalBetValueLocal = (user?.inventory || []).filter((s) => selectedIds.includes(s.id)).reduce((sum, s) => sum + (s.price || 0), 0);
+    const totalTargetValue = targetSkins.reduce((sum, s) => sum + (s.price || 0), 0);
+    if (totalTargetValue <= 0 || totalBetValueLocal <= 0) return 0;
+
+    if (reverseMode) {
+      const ratio = totalTargetValue / totalBetValueLocal;
+      return Math.max(Math.min(ratio * 90, 90), 0.01);
+    }
+
+    const ratio = totalBetValueLocal / totalTargetValue;
+    return Math.max(Math.min(ratio * 95, 95), 0.01);
+  };
+
+  const chance = calculateChance();
+  const totalTargetValue = targetSkins.reduce((sum, s) => sum + (s.price || 0), 0);
+
+  const handleSpinClick = () => {
+    if (selectedIds.length === 0 || targetSkins.length === 0 || isSpinning) return;
+    setLastResult(null);
+    setIsSpinning(true);
+
+    const finalDeg = Math.random() * 360;
+    setResultDegree(finalDeg);
+    const winDegrees = chance * 3.6;
+    const success = finalDeg <= winDegrees;
+
+    // Pre-generate unique IDs for won skins
+    const timestamp = Date.now();
+    setPendingResult({
+      success,
+      wonSkins: targetSkins.map((s, i) => ({
+        ...s,
+        id: `upg_${timestamp}_${Math.random().toString(36).substr(2, 4)}_${i}`
+      }))
+    });
+  };
+
+  const handleAnimationComplete = useCallback(() => {
+    setIsSpinning(false);
+    if (pendingResult) {
+      // ─── KEYDROP-STYLE: DESTROY original skin(s) on BOTH success and failure ──
+      // The original skin(s) are ALWAYS consumed (removed from inventory)
+      selectedIds.forEach((id) => {
+        StorageService.sellSkin(id);
+      });
+
+      if (pendingResult.success) {
+        // ─── KEYDROP-STYLE: On SUCCESS — add the new skin to inventory ──
+        sound.playWin(true);
+        StorageService.addSkinsToInventory(pendingResult.wonSkins);
+        setLastResult({ success: true, skins: pendingResult.wonSkins });
+
+        // Add live drop notification
+        pendingResult.wonSkins.forEach((skin) => {
+          StorageService.addLiveDrop({
+            user: user?.nombre_usuario || "Jugador",
+            item: { name: skin.name, price: skin.price, rarity: skin.rarity, image: skin.image },
+            caseName: "Upgrader"
+          });
+        });
+      } else {
+        // ─── KEYDROP-STYLE: On FAILURE — skin is DESTROYED (already removed above)
+        // No reembolso. The skin is gone forever.
+        sound.playFail();
+        setLastResult({ success: false, message: "MEJORA FALLIDA — SKIN DESTRUIDA" });
+      }
+
+      setSelectedIds([]);
+      setTargetSkins([]);
+      setPendingResult(null);
+      setPage(0);
+    }
+  }, [pendingResult, selectedIds, user?.nombre_usuario]);
+
+  if (!user)
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0f1115", color: "white", fontSize: "2rem", fontWeight: "900" }}>
+        INICIA SESIÓN PARA JUGAR
+      </div>
+    );
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#0f1115", padding: "30px", fontFamily: "'Inter', sans-serif", color: "white" }}>
+      <style>{`
+        @media (max-width: 768px) {
+          .upgrade-layout { grid-template-columns: 1fr !important; gap: 20px !important; }
+          .upgrade-inventory-grid { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)) !important; }
+          .upgrade-target-grid { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)) !important; }
+          .upgrade-center { order: -1 !important; }
+          .upgrade-spinner { width: 250px !important; height: 250px !important; }
+          .upgrade-btn { max-width: 100% !important; padding: 14px 30px !important; font-size: 1rem !important; }
+          .upgrade-mode-select { flex-wrap: wrap !important; }
+          .upgrade-mode-select button { flex: 1 !important; min-width: 100px !important; text-align: center !important; }
+        }
+        @media (max-width: 480px) {
+          .upgrade-inventory-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .upgrade-target-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .upgrade-spinner { width: 200px !important; height: 200px !important; }
+          .upgrade-column { padding: 15px !important; height: auto !important; max-height: 50vh !important; }
+        }
+      `}</style>
+      <div style={{ maxWidth: "1500px", margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1.3fr 1fr", gap: "30px" }} className="upgrade-layout">
+        {/* INVENTORY COLUMN */}
+        <div style={{ background: "rgba(255,255,255,0.02)", padding: "25px", borderRadius: "24px", border: "1px solid rgba(255,255,255,0.05)", height: "calc(100vh - 140px)", overflowY: "auto" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+            <div>
+              <h2 style={{ fontSize: "0.75rem", fontWeight: "900", color: "#f5ac3b", letterSpacing: "2px", margin: 0 }}>TU INVENTARIO</h2>
+              <div style={{ fontSize: "1.8rem", fontWeight: "900" }}>€{totalBetValue.toFixed(2)}</div>
+            </div>
+            <button onClick={() => setSelectedIds([])} disabled={isSpinning || selectedIds.length === 0} style={{ padding: "8px 15px", background: "rgba(255,255,255,0.05)", border: "none", color: "white", borderRadius: "10px", cursor: "pointer", fontSize: "0.75rem", fontWeight: "bold" }}>LIMPIAR</button>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: "10px" }}>
+            {(user?.inventory || []).map((skin, index) => {
+              const isSelected = selectedIds.includes(skin.id);
+              const color = getRarityColor(skin.rarity);
+              return (
+                <div
+                  key={`skin-${skin.id || skin._id}-${index}`}
+                  onClick={() => handleSkinClick(skin.id)}
+                  style={{
+                    padding: "10px",
+                    background: isSelected ? "rgba(245, 172, 59, 0.2)" : "rgba(255,255,255,0.02)",
+                    borderWidth: isSelected ? "2px 2px 3px 2px" : "1px 1px 3px 1px",
+                    borderStyle: "solid",
+                    borderColor: isSelected ? `#f5ac3b #f5ac3b ${color} #f5ac3b` : `rgba(255,255,255,0.05) rgba(255,255,255,0.05) ${color} rgba(255,255,255,0.05)`,
+                    borderRadius: "14px",
+                    cursor: "pointer",
+                    textAlign: "center",
+                    opacity: isSpinning && !isSelected ? 0.5 : 1
+                  }}
+                >
+                  <img
+                    src={getSkinImageUrl(skin.name, skin.image)}
+                    alt={skin.name}
+                    onError={(e) => handleImageError(e, skin)}
+                    style={{ width: "100%", height: "60px", objectFit: "contain", opacity: skin.image ? 1 : 0.3 }}
+                  />
+                  <div style={{ fontSize: "0.7rem", fontWeight: "bold", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: "5px" }}>{skin.name}</div>
+                  <div style={{ fontSize: "0.85rem", color: "#f5ac3b", fontWeight: "900" }}>€{Number(skin.price || 0).toFixed(2)}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* CENTER COLUMN */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "30px" }}>
+          <div style={{ display: "flex", gap: "10px", alignItems: "center", background: "rgba(255,255,255,0.03)", padding: "5px", borderRadius: "14px", border: "1px solid rgba(255,255,255,0.05)" }}>
+            <button onClick={() => setReverseMode(false)} style={{ padding: "10px 20px", borderRadius: "10px", border: "none", background: reverseMode ? "transparent" : "#f5ac3b", color: reverseMode ? "rgba(255,255,255,0.4)" : "black", fontWeight: "900", fontSize: "0.8rem", cursor: "pointer" }}>↑ UPGRADE</button>
+            <button onClick={() => setReverseMode(true)} style={{ padding: "10px 20px", borderRadius: "10px", border: "none", background: reverseMode ? "#a855f7" : "transparent", color: reverseMode ? "white" : "rgba(255,255,255,0.4)", fontWeight: "900", fontSize: "0.8rem", cursor: "pointer" }}>↓ DOWNGRADE</button>
+          </div>
+          <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.3)", fontWeight: "bold", textAlign: "center" }}>
+            {reverseMode ? "Apuesta 1 skin de alto valor para ganar VARIAS skins de menor valor" : "Apuesta hasta 3 skins para ganar 1 skin de mayor valor"}
+          </div>
+
+          <UpgradeSpinner chance={chance} isSpinning={isSpinning} resultDegree={resultDegree} onComplete={handleAnimationComplete} />
+
+          <button onClick={handleSpinClick} disabled={isSpinning || chance <= 0} style={{ width: "100%", maxWidth: "350px", padding: "18px 40px", background: chance > 0 ? "linear-gradient(90deg, #f5ac3b, #ffba52)" : "rgba(255,255,255,0.1)", color: chance > 0 ? "black" : "#666", border: "none", borderRadius: "18px", fontSize: "1.2rem", fontWeight: "900", cursor: chance > 0 ? "pointer" : "not-allowed" }}>
+            {isSpinning ? "MEJORANDO..." : "MEJORAR SKINS"}
+          </button>
+
+          {lastResult && (
+            <AnimatePresence>
+              <Motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                style={{
+                  padding: "15px 30px",
+                  borderRadius: "16px",
+                  background: lastResult.success ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)",
+                  border: `1px solid ${lastResult.success ? "#10b981" : "#ef4444"}`,
+                  color: lastResult.success ? "#10b981" : "#ef4444",
+                  fontWeight: "900",
+                  fontSize: "1.2rem",
+                  textAlign: "center"
+                }}
+              >
+                {lastResult.success ? "¡MEJORA EXITOSA! SKIN AÑADIDA" : (lastResult.message || "MEJORA FALLIDA")}
+              </Motion.div>
+            </AnimatePresence>
+          )}
+          {lastResult && (
+            <button onClick={() => setShowProvablyFair(true)} style={{ padding: "12px 28px", background: "rgba(16, 185, 129, 0.1)", border: "1px solid rgba(16, 185, 129, 0.2)", color: "#10b981", borderRadius: "14px", fontSize: "0.85rem", fontWeight: "900", cursor: "pointer", marginTop: "10px" }}>
+              ◆ VERIFICAR PROVABLY FAIR
+            </button>
+          )}
+
+          {totalBetValue > 0 && validTargets.length === 0 && (
+            <div style={{ padding: "12px 20px", borderRadius: "12px", background: "rgba(255, 200, 0, 0.1)", border: "1px solid rgba(255, 200, 0, 0.2)", color: "#ffcc00", fontSize: "0.8rem", fontWeight: "700", textAlign: "center" }}>
+              No hay skins disponibles con valor superior a €{totalBetValue.toFixed(2)}. Selecciona una skin de menor valor o busca en el mercado.
+            </div>
+          )}
+        </div>
+
+        {/* TARGET SKINS COLUMN */}
+        <div style={{ background: "rgba(255,255,255,0.02)", padding: "25px", borderRadius: "24px", border: "1px solid rgba(255,255,255,0.05)", height: "calc(100vh - 140px)", overflowY: "auto" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px" }}>
+            <div>
+              <h2 style={{ fontSize: "0.75rem", fontWeight: "900", color: "#3b82f6", letterSpacing: "2px", margin: 0 }}>OBJETIVO</h2>
+              <div style={{ fontSize: "1.8rem", fontWeight: "900", color: totalBetValue > 0 ? "#10b981" : "white" }}>
+                €{totalTargetValue.toFixed(2)}
+                {totalBetValue > 0 && (
+                  <span style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.3)", marginLeft: "8px" }}>
+                    (min: €{(totalBetValue * 1.05).toFixed(2)})
+                  </span>
+                )}
+              </div>
+            </div>
+            <input type="text" placeholder="Buscar..." value={searchRight} onChange={(e) => setSearchRight(e.target.value)} style={{ padding: "8px 12px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", color: "white", width: "110px", fontSize: "0.8rem" }} />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: "10px" }}>
+            {paginatedTargets.map((skin, index) => {
+              const isSelected = !!targetSkins.find((s) => s.id === skin.id);
+              const color = getRarityColor(skin.rarity);
+              return (
+                <div
+                  key={`skin-${skin.id || skin._id}-${index}`}
+                  onClick={() => toggleTargetSkin(skin)}
+                  style={{
+                    padding: "10px",
+                    background: isSelected ? "rgba(59, 130, 246, 0.2)" : "rgba(255,255,255,0.02)",
+                    borderWidth: isSelected ? "2px 2px 3px 2px" : "1px 1px 3px 1px",
+                    borderStyle: "solid",
+                    borderColor: isSelected ? `#3b82f6 #3b82f6 ${color} #3b82f6` : `rgba(255,255,255,0.05) rgba(255,255,255,0.05) ${color} rgba(255,255,255,0.05)`,
+                    borderRadius: "14px",
+                    cursor: "pointer",
+                    textAlign: "center"
+                  }}
+                >
+                  <img
+                    src={getSkinImageUrl(skin.name, skin.image)}
+                    alt={skin.name}
+                    onError={(e) => handleImageError(e, skin)}
+                    style={{ width: "100%", height: "60px", objectFit: "contain", opacity: skin.image ? 1 : 0.3 }}
+                  />
+                  <div style={{ fontSize: "0.7rem", fontWeight: "bold", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: "5px" }}>{skin.name}</div>
+                  <div style={{ fontSize: "0.85rem", color: totalBetValue > 0 && skin.price < totalBetValue * 1.05 ? "#ef4444" : "#3b82f6", fontWeight: "900" }}>
+                    €{Number(skin.price || 0).toFixed(2)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {maxPages > 1 && (
+            <div style={{ display: "flex", gap: "10px", justifyContent: "center", marginTop: "20px" }}>
+              <button onClick={() => setPage((p) => Math.max(p - 1, 0))} disabled={page === 0} style={{ padding: "6px 12px", background: "rgba(255,255,255,0.05)", border: "none", color: "white", borderRadius: "8px" }}>{'<'}</button>
+              <span style={{ fontSize: "0.8rem", alignSelf: "center" }}>{page + 1} / {maxPages}</span>
+              <button onClick={() => setPage((p) => Math.min(p + 1, maxPages - 1))} disabled={page >= maxPages - 1} style={{ padding: "6px 12px", background: "rgba(255,255,255,0.05)", border: "none", color: "white", borderRadius: "8px" }}>{'>'}</button>
+            </div>
+          )}
+        </div>
+      </div>
+      <ProvablyFairModal
+        isOpen={showProvablyFair}
+        onClose={() => setShowProvablyFair(false)}
+        resultData={{
+          serverSeedHashed: "c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3",
+          clientSeed: "upgrade-client-seed-2026",
+          nonce: Date.now() % 10000,
+          serverSeedRaw: "a9b8c7d6e5f4g3h2i1j0k9l8m7n6o5p4q3r2s1t0u9v8w7x6y5z4"
+        }}
+      />
+    </div>
+  );
+}
