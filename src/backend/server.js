@@ -424,7 +424,14 @@ async function recordTransaction(usuario_id, tipo, monto, metodo, detalles = nul
 }
 
 const authenticateToken = (req, res, next) => {
-  if (req.isAuthenticated()) return next();
+  if (req.isAuthenticated()) {
+    // Passport session users carry the full DB row (usuario_id) instead of the
+    // JWT shape { id, email }. Normalize so downstream handlers can rely on req.user.id.
+    if (req.user && req.user.usuario_id && !req.user.id) {
+      req.user.id = req.user.usuario_id;
+    }
+    return next();
+  }
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
   if (!token) {
@@ -1548,22 +1555,57 @@ app.post("/api/upgrade/complete", authenticateToken, async (req, res) => {
   }
 });
 
+// ─── DB RETRY HELPER (Render free-tier Postgres cold-start) ──
+// The free-tier database suspends after inactivity. On cold start the first
+// queries can fail with connection timeouts / "Connection terminated
+// unexpectedly". This wrapper retries ONLY transient connection errors.
+async function dbQueryWithRetry(text, params, attempts = 3) {
+  let lastErr;
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      return await db.query(text, params);
+    } catch (err) {
+      lastErr = err;
+      const msg = err?.message || String(err);
+      const transient = /timeout|terminated|ECONNRESET|ETIMEDOUT|connect|closed|SSL|pool/i.test(msg);
+      if (!transient || i === attempts) throw err;
+      console.warn(`[DB] ⚠️ Error transitorio en consulta (intento ${i}/${attempts}):`, msg);
+      await new Promise(r => setTimeout(r, 1200 * i));
+    }
+  }
+  throw lastErr;
+}
+
 // ─── REAL WITHDRAW TO STEAM TRADE OFFER ──────────────────
 app.post("/api/inventory/withdraw", authenticateToken, withdrawLimiter, async (req, res) => {
   const { itemId } = req.body;
 
-  // [TRADE] Log de inicio de retiro
-  log(LOG_LEVELS.INFO, 'TRADE', `[TRADE] Iniciando retiro - ItemID: ${itemId} para usuario: ${req.user.id}`);
+  // [TRADE] Log de inicio de retiro (siempre en consola para diagnóstico en Render)
+  console.log(`[WITHDRAW] ➡️ Iniciando retiro - ItemID: ${itemId} | UserID: ${req.user?.id ?? req.user?.usuario_id ?? '?'}`);
 
   try {
-    const itemResult = await db.query("SELECT * FROM inventario WHERE item_id = $1 AND usuario_id = $2 AND status = 'on_site'", [itemId, req.user.id]);
+    // Resolve user id for both JWT ({ id }) and Passport session ({ usuario_id }) shapes
+    const userId = req.user?.id ?? req.user?.usuario_id;
+    if (!userId) {
+      console.error('[WITHDRAW] ❌ ID de usuario no resuelto. Token/sesión inválidos.');
+      return res.status(401).json({ success: false, error: 'Sesión inválida. Vuelve a iniciar sesión.', code: 'INVALID_SESSION' });
+    }
+    req.user.id = userId; // Normalize so rate-limit keys and later code see a consistent shape
+
+    const itemResult = await dbQueryWithRetry(
+      "SELECT * FROM inventario WHERE item_id = $1 AND usuario_id = $2 AND status = 'on_site'",
+      [itemId, userId]
+    );
     if (itemResult.rows.length === 0) {
-      log(LOG_LEVELS.WARN, 'TRADE', `[TRADE] Item ${itemId} no disponible para retiro (usuario: ${req.user.id})`);
+      log(LOG_LEVELS.WARN, 'TRADE', `[TRADE] Item ${itemId} no disponible para retiro (usuario: ${userId})`);
       return res.status(404).json({ error: "Objeto no disponible para retirar" });
     }
     const item = itemResult.rows[0];
 
-    const userResult = await db.query("SELECT link_intercambio, steam_id, trade_token FROM usuarios WHERE usuario_id = $1", [req.user.id]);
+    const userResult = await dbQueryWithRetry(
+      "SELECT link_intercambio, steam_id, trade_token FROM usuarios WHERE usuario_id = $1",
+      [userId]
+    );
     const user = userResult.rows[0];
 
     if (!user.steam_id || !user.trade_token) {
@@ -1739,7 +1781,10 @@ app.post("/api/inventory/withdraw", authenticateToken, withdrawLimiter, async (r
         });
       }
     }
-  } catch {
+  } catch (err) {
+    // IMPORTANTE: nunca ocultar el error real — siempre loggear en consola (visible en Render)
+    console.error('[WITHDRAW] ❌ Error no capturado en retiro:', err?.stack || err?.message || err);
+    log(LOG_LEVELS.ERROR, 'TRADE', `[TRADE] ❌ Error no capturado en retiro: ${err?.message} | ItemID: ${itemId} | UserID: ${req.user?.id ?? req.user?.usuario_id}`);
     res.status(500).json({ error: "Error al procesar el retiro" });
   }
 });
