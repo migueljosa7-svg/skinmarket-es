@@ -36,7 +36,9 @@ if (databaseUrl) {
 }
 
 // Configure SSL: for production (Render), use rejectUnauthorized: false for internal connections
-const useSSL = isProduction ? { rejectUnauthorized: false } : false;
+// Also enable SSL for external connections to Render databases
+const isRenderDatabase = databaseUrl.includes('render.com');
+const useSSL = isProduction || isRenderDatabase ? { rejectUnauthorized: false } : false;
 
 if (!databaseUrl) {
     console.error('[DB] DATABASE_URL no está configurada o está vacía.');
