@@ -1,13 +1,21 @@
-# ✅ ALL FIXES COMPLETED — "Cannot read properties of undefined (reading 'price')" + Avatar not showing
+# ✅ PLAN: Diagnosticar y mejorar el bot de intercambio (BOT_UNAVAILABLE)
 
-## Steps
+## Contexto
+El bot de Steam en producción (`skinmarket-backend-f0cb.onrender.com`) está desconfigurado/desconectado:
+`{"isLoggedIn":false,"loginAttempts":4,"accountName":"migueljosa","rateLimitExceeded":false}`.
+Al retirar, `ensureConnected()` devuelve `false` → `BOT_UNAVAILABLE` → "El bot de intercambio no está disponible".
 
-- [x] 1. `src/context/AuthContext.jsx` — Added `avatar: userData.avatar || null` to the `/api/me` handler's `updateUser` call
-- [x] 2. `src/pages/LoginSuccess.jsx` — Added `avatar: userData.avatar || null` to the `updateUser` call
-- [x] 3. `src/pages/UploadSkin.jsx` — Null-safe `s?.price || 0` in both `reduce()` calls
-- [x] 4. `src/pages/CaseView.jsx` — Null-safe `fallbackSkin?.price || 0.10` / `chosenSkin?.price || 0` with optional chaining
-- [x] 5. `src/pages/Contracts.jsx` — `skin.price?.toFixed(2)` → `Number(skin?.price || 0).toFixed(2)` everywhere
-- [x] 6. `src/components/Inventory.jsx` — Null-safe `s?.price || 0` in reduce and `resolvePriceSync` fallback
-- [x] 7. `src/constants/cases.js` — `pickWeightedSkin` already has exhaustive fallback tiers + final `sorted[0]` guard; never returns null/undefined for non-empty arrays
-- [x] 8. Verify changes and run build
+## Pasos
+
+- [ ] 1. `src/backend/steam/botEngine.js` — Añadir diagnóstico `lastError` / `lastErrorCode` / `lastErrorAt` al constructor y exponerlos en `getStatus()`.
+- [ ] 2. `src/backend/steam/botEngine.js` — Mejorar `_validateCredentialsStrict()` para detectar placeholders reales (`tu_contraseña_steam`, `tu_shared_secret`, `AQUI`, `your_*`).
+- [ ] 3. `src/backend/steam/botEngine.js` — `ensureConnected()` fail-fast: si `logIn()` falla devolver el error específico inmediatamente (sin esperar 30s). En timeout devolver código `LOGIN_TIMEOUT`.
+- [ ] 4. `src/backend/steam/botEngine.js` — Manejar `AccountLogonDenied` / `AccountLoginDenied` / `InvalidPassword` / `TwoFactorCodeMismatch` con códigos específicos (`STEAM_EMAIL_CODE_REQUIRED`, `INVALID_CREDENTIALS`, `INVALID_2FA`).
+- [ ] 5. `src/backend/steam/botEngine.js` — Añadir helpers `_setLastError()` / `_clearLastError()` y limpiar error al conectar con éxito.
+- [ ] 6. `src/backend/server.js` — Propagar `botDiagnostics` (lastError, lastErrorCode, lastErrorAt) en la respuesta de error del retiro.
+- [ ] 7. `src/context/AuthContext.jsx` — Mapear nuevos códigos de error a mensajes claros y accionables.
+- [ ] 8. `src/components/Inventory.jsx` — Añadir nuevos códigos a ambos mapas de mensajes (withdraw y saveTradeUrl).
+- [ ] 9. `src/pages/Dashboard.jsx` — Añadir nuevos códigos al manejador del botón "Retirar".
+- [ ] 10. Verificar: revisar `GET /api/bot/status` y probar retiro para confirmar mensaje específico.
+- [ ] 11. **Acción del usuario**: Corregir `BOT_PASSWORD`, `BOT_SHARED_SECRET`, `BOT_IDENTITY_SECRET` en el panel de Render para que el bot realmente conecte (cuenta Steam secundaria con Steam Guard Mobile Authenticator/SDA).
 

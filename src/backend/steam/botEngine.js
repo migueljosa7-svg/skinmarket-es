@@ -48,6 +48,11 @@ class BotEngine {
         this.isReady = false;
         this.loginAttempts = 0;
         this.maxLoginAttempts = 3;
+
+        // Last error diagnostics (exposed via /api/bot/status)
+        this.lastError = null;
+        this.lastErrorCode = null;
+        this.lastErrorAt = null;
         this.reconnectTimer = null;
         this.currentBackoff = 1000;
         this.maxBackoff = 60000;
@@ -104,20 +109,44 @@ class BotEngine {
             return true;
         }
 
-        // If rate limited, don't attempt
+// If rate limited, don't attempt
         if (this.rateLimitExceeded) {
             _warn('[BOT ENGINE] ⚠️ Límite de velocidad excedido. Esperando cooldown...');
-            return false;
+            return {
+                success: false,
+                code: 'RATE_LIMIT_EXCEEDED',
+                error: 'Steam está limitando las solicitudes del bot. Espera unos minutos e intenta de nuevo.'
+            };
         }
 
         if (!this._credentialsAreValid()) {
-            _warn('[BOT ENGINE] ⚠️ Credenciales no configuradas. Modo SIMULACIÓN activado.');
-            return false;
+            const missingFields = [];
+            if (!this.credentials.accountName || this.credentials.accountName === 'tu_usuario_steam') missingFields.push('BOT_USERNAME');
+            if (!this.credentials.password || this.credentials.password === 'tu_password_steam' || this.credentials.password === 'tu_contraseña_steam') missingFields.push('BOT_PASSWORD');
+            if (!this.credentials.sharedSecret || this.credentials.sharedSecret === 'tu_shared_secret') missingFields.push('BOT_SHARED_SECRET');
+            if (!this.credentials.identitySecret || this.credentials.identitySecret === 'tu_identity_secret') missingFields.push('BOT_IDENTITY_SECRET');
+            _warn(`[BOT ENGINE] ⚠️ Credenciales no configuradas: ${missingFields.join(', ')}`);
+            return {
+                success: false,
+                code: 'CONFIG_MISSING',
+                error: `El bot de Steam no está configurado. Variables faltantes o con valores placeholder: ${missingFields.join(', ')}. Contacta al administrador para configurar las credenciales reales de Steam.`
+            };
         }
 
         // Initiate login
         _log(`[BOT ENGINE] 🔑 Iniciando sesión bajo demanda como ${this.credentials.accountName}...`);
-        this.logIn();
+        const loginStarted = this.logIn();
+
+        // If login failed immediately (e.g. 2FA code generation error), return specific error
+        if (!loginStarted) {
+            const lastError = this._getLastError();
+            _error(`[BOT ENGINE] ❌ Login no iniciado: ${lastError?.code || 'LOGIN_FAILED'} - ${lastError?.error || 'Error al iniciar sesión en Steam.'}`);
+            return {
+                success: false,
+                code: lastError?.code || 'LOGIN_FAILED',
+                error: lastError?.error || 'Error al iniciar sesión en Steam.'
+            };
+        }
 
         // Wait for connection (up to 30 seconds)
         return new Promise((resolve) => {
@@ -129,12 +158,34 @@ class BotEngine {
                     _log('[BOT ENGINE] ✅ Conexión bajo demanda establecida');
                     resolve(true);
                 }
+
+                // Fail fast: if a login error was captured (invalid creds, 2FA, etc.)
+                // return the specific error instead of waiting for the full timeout.
+                if (this.lastError && this.lastErrorAt) {
+                    clearInterval(checkInterval);
+                    clearTimeout(timeout);
+                    const err = { code: this.lastErrorCode || 'LOGIN_FAILED', error: this.lastError };
+                    _warn(`[BOT ENGINE] ❌ Login falló: ${err.code} - ${err.error}`);
+                    resolve({
+                        success: false,
+                        code: err.code,
+                        error: err.error
+                    });
+                }
             }, 500);
 
             const timeout = setTimeout(() => {
                 clearInterval(checkInterval);
+                this._setLastError(
+                    'LOGIN_TIMEOUT',
+                    'El bot de Steam no respondió a tiempo. Es posible que Steam esté limitando solicitudes o que las credenciales del bot no sean válidas.'
+                );
                 _warn('[BOT ENGINE] ⏱️ Timeout esperando conexión bajo demanda');
-                resolve(false);
+                resolve({
+                    success: false,
+                    code: 'LOGIN_TIMEOUT',
+                    error: 'El bot de Steam no respondió a tiempo. Es posible que Steam esté limitando solicitudes o que las credenciales del bot no sean válidas.'
+                });
             }, 30000);
         });
     }
@@ -164,9 +215,14 @@ class BotEngine {
                 twoFactorCode: twoFactorCode
             });
             this.loginAttempts++;
+            this._clearLastError();
             return true;
         } catch (err) {
             _error('[BOT ENGINE] ❌ Error generando código 2FA:', err.message);
+            this._setLastError(
+                'INVALID_2FA',
+                `Error generando el código 2FA: ${err.message}. Verifica que BOT_SHARED_SECRET sea correcto (debe ser el shared_secret de Steam Desktop Authenticator).`
+            );
             return false;
         }
     }
@@ -398,19 +454,47 @@ try {
                 switch (err.eresult) {
                     case SteamUser.EResult.InvalidPassword:
                         _error('[BOT ENGINE] 🔴 ERROR: Contraseña o usuario incorrecto en .env');
+                        this._setLastError(
+                            'INVALID_CREDENTIALS',
+                            'El bot de Steam no pudo iniciar sesión: usuario o contraseña incorrectos. Verifica BOT_USERNAME y BOT_PASSWORD en la configuración.'
+                        );
                         break;
                     case SteamUser.EResult.TwoFactorCodeMismatch:
                         _error('[BOT ENGINE] 🔴 ERROR: Código 2FA incorrecto. Verifica BOT_SHARED_SECRET');
+                        this._setLastError(
+                            'INVALID_2FA',
+                            'El bot de Steam no pudo iniciar sesión: código 2FA incorrecto. Verifica que BOT_SHARED_SECRET sea el shared_secret real del autenticador móvil (SDA).'
+                        );
+                        break;
+                    case SteamUser.EResult.AccountLogonDenied:
+                    case SteamUser.EResult.AccountLoginDenied:
+                        _error('[BOT ENGINE] 🔴 ERROR: Steam requiere confirmación de nuevo dispositivo por email.');
+                        this._setLastError(
+                            'STEAM_EMAIL_CODE_REQUIRED',
+                            'Steam ha enviado un código de confirmación al email de la cuenta del bot. Es necesario confirmarlo (o usar Steam Guard Mobile Authenticator con BOT_SHARED_SECRET válido).'
+                        );
                         break;
                     case SteamUser.EResult.LoggedInElsewhere:
                         _warn('[BOT ENGINE] ⚠️ Sesión iniciada en otro lugar');
+                        this._setLastError(
+                            'LOGGED_IN_ELSEWHERE',
+                            'La cuenta del bot está conectada en otro lugar. Cierra la sesión de Steam del bot en otros dispositivos o cambia la contraseña.'
+                        );
                         break;
                     case SteamUser.EResult.RateLimitExceeded:
                         _error('[BOT ENGINE] 🔴 ERROR: Límite de velocidad excedido. Activando cooldown...');
+                        this._setLastError(
+                            'RATE_LIMIT_EXCEEDED',
+                            'Steam está limitando las solicitudes de inicio de sesión del bot. Espera unos minutos antes de reintentar.'
+                        );
                         this._activateRateLimitCooldown();
                         break;
                     default:
                         _error(`[BOT ENGINE] EResult: ${err.eresult} (${err.message})`);
+                        this._setLastError(
+                            'LOGIN_FAILED',
+                            `Steam rechazó el inicio de sesión del bot (EResult ${err.eresult}: ${err.message}).`
+                        );
                 }
             }
 
@@ -741,8 +825,43 @@ try {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    _isSessionValid() {
+_isSessionValid() {
         return this.isLoggedIn && this.isReady && this.client.steamID;
+    }
+
+    /**
+     * Set the last error diagnostic info.
+     * @param {string} code - Machine-readable error code
+     * @param {string} message - Human-readable error description
+     */
+    _setLastError(code, message) {
+        this.lastError = message;
+        this.lastErrorCode = code;
+        this.lastErrorAt = Date.now();
+        // Always log lastError to console.error for server diagnostics
+        _error(`[BOT DIAGNOSTIC] ${code}: ${message}`);
+    }
+
+    /**
+     * Clear the last error diagnostic info.
+     */
+    _clearLastError() {
+        this.lastError = null;
+        this.lastErrorCode = null;
+        this.lastErrorAt = null;
+    }
+
+    /**
+     * Get the last error as a structured object.
+     * @returns {{code: string, error: string}|null}
+     */
+    _getLastError() {
+        if (!this.lastError || !this.lastErrorCode) return null;
+        return {
+            code: this.lastErrorCode,
+            error: this.lastError,
+            at: this.lastErrorAt ? new Date(this.lastErrorAt).toISOString() : null
+        };
     }
 }
 
