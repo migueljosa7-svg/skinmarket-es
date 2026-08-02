@@ -1597,34 +1597,47 @@ app.post("/api/inventory/withdraw", authenticateToken, withdrawLimiter, async (r
         newBalance: balanceResult.rows[0].saldo,
         message: `✅ El bot de intercambio no está disponible. La skin se ha vendido automáticamente por €${parseFloat(item.price).toFixed(2)} en saldo (100% del valor).`
       });
-    } catch (botErr) {
+} catch (botErr) {
       log(LOG_LEVELS.ERROR, 'TRADE', `[TRADE] ❌ Error del bot en retiro - ${botErr.message} | Item: ${item.name}`);
 
-      // Determine specific error type for better user feedback
-      let errorMessage = "Error al procesar el retiro. ";
-      let errorCode = 'BOT_ERROR';
+      // AUTO-FALLBACK: Cualquier error del bot = vender skin al 100% del valor en saldo
+      // Esto reemplaza el antiguo return 500 para garantizar que el usuario nunca
+      // pierda su skin ni se quede sin compensación cuando el bot falle.
+      log(LOG_LEVELS.WARN, 'TRADE', `[TRADE] Auto-fallback por excepción del bot. Vendiendo ${item.name} por €${item.price}`);
 
-      if (botErr.message && botErr.message.includes('RateLimitExceeded')) {
-        errorMessage = "Steam está limitando las solicitudes. Espera 5 minutos e intenta de nuevo.";
-        errorCode = 'RATE_LIMIT_EXCEEDED';
-      } else if (botErr.message && (botErr.message.includes('no dispone') || botErr.message.includes('no tiene'))) {
-        errorMessage = "El bot no tiene esta skin en stock actualmente. Intenta más tarde o usa la opción de venta.";
-        errorCode = 'ITEM_OUT_OF_STOCK';
-      } else if (botErr.message && (botErr.message.includes('conexión') || botErr.message.includes('network') || botErr.message.includes('timeout'))) {
-        errorMessage = "Error de conexión con Steam. Verifica tu internet e intenta de nuevo.";
-        errorCode = 'CONNECTION_ERROR';
-      } else if (botErr.message && (botErr.message.includes('trade') || botErr.message.includes('intercambio'))) {
-        errorMessage = "Error en la oferta de intercambio. La skin puede no ser intercambiable o ya fue usada.";
-        errorCode = 'TRADE_ERROR';
+      try {
+        await db.withTransaction(async (client) => {
+          await client.query("UPDATE inventario SET status = 'sold' WHERE item_id = $1", [itemId]);
+          await client.query(
+            "UPDATE usuarios SET saldo = saldo + $1 WHERE usuario_id = $2",
+            [item.price, req.user.id]
+          );
+        });
+
+        await recordTransaction(req.user.id, 'venta_auto', item.price, 'fallback_bot_exception',
+          `Venta automática (excepción del bot: ${botErr.message}): ${item.name}`);
+        await logAction(req.user.id, 'RETIRO_FALLBACK_VENTA', { itemId, itemName: item.name, price: item.price, reason: 'EXCEPTION', details: botErr.message });
+
+        const balanceResult = await db.query("SELECT saldo FROM usuarios WHERE usuario_id = $1", [req.user.id]);
+
+        return res.json({
+          success: true,
+          autoFallback: true,
+          fallbackType: 'sell',
+          price: item.price,
+          newBalance: balanceResult.rows[0].saldo,
+          message: `✅ El bot de intercambio no está disponible. La skin se ha vendido automáticamente por €${parseFloat(item.price).toFixed(2)} en saldo (100% del valor).`
+        });
+      } catch (fallbackErr) {
+        // Si incluso el fallback falla, devolver error 500 como último recurso
+        log(LOG_LEVELS.ERROR, 'TRADE', `[TRADE] ❌ Error crítico: incluso el auto-fallback falló - ${fallbackErr.message}`);
+        return res.status(500).json({
+          success: false,
+          error: "Error al procesar el retiro. Por favor, contacta al soporte.",
+          code: 'CRITICAL_ERROR',
+          itemId
+        });
       }
-
-      return res.status(500).json({
-        success: false,
-        error: errorMessage,
-        code: errorCode,
-        itemId,
-        details: botErr.message
-      });
     }
   } catch {
     res.status(500).json({ error: "Error al procesar el retiro" });
