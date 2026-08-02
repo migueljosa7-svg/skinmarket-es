@@ -135,7 +135,7 @@ export default function Inventory() {
   const [steamError, setSteamError] = useState("");
 
   const inventory = user?.inventory || [];
-  const totalValue = inventory.reduce((acc, skin) => acc + (skin.price || 0), 0);
+  const totalValue = inventory.reduce((acc, skin) => acc + (skin?.price || 0), 0);
 
   // Extract SteamID64 from a Trade URL or return as-is if it's already a SteamID64
   const extractSteamId64 = (input) => {
@@ -609,7 +609,7 @@ export default function Inventory() {
                     color: "#f5ac3b",
                     fontWeight: "900"
                   }}>
-                    Valor estimado: €{steamInventory.reduce((acc, s) => acc + (s.price || 0), 0).toFixed(2)}
+                    Valor estimado: €{steamInventory.reduce((acc, s) => acc + (s?.price || 0), 0).toFixed(2)}
                   </div>
                 </div>
 

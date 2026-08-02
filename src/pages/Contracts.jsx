@@ -448,7 +448,7 @@ export default function Contracts() {
                       {skin.name}
                     </div>
                     <div style={{ fontSize: "0.85rem", color: "#f5ac3b", fontWeight: "900", marginTop: "4px" }}>
-                      €{skin.price?.toFixed(2) || "0.00"}
+                      €{Number(skin?.price || 0).toFixed(2)}
                     </div>
                   </div>
                 );
@@ -511,7 +511,7 @@ export default function Contracts() {
                           style={{ width: "100%", height: "35px", objectFit: "contain" }}
                         />
                         <div style={{ fontSize: "0.55rem", color: "rgba(255,255,255,0.5)", marginTop: "4px" }}>
-                          €{skin.price?.toFixed(2) || "0.00"}
+                          €{Number(skin?.price || 0).toFixed(2)}
                         </div>
                       </div>
                     );

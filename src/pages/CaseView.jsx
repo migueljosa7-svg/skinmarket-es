@@ -206,18 +206,18 @@ const totalWon = backendItems.reduce((acc, curr) => acc + (curr?.price || 0), 0)
         const fallbackSkin = validSkins[0];
         expectedResults.push({
           id: `won_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 4)}`,
-          name: fallbackSkin.name,
-          price: Number(fallbackSkin.price),
-          rarity: fallbackSkin.rarity,
-          image: fallbackSkin.image
+          name: fallbackSkin?.name || "Skin",
+          price: Number(fallbackSkin?.price || 0.10),
+          rarity: fallbackSkin?.rarity || "Mil-Spec Grade",
+          image: fallbackSkin?.image || ""
         });
       } else {
         expectedResults.push({
           id: `won_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 4)}`,
           name: chosenSkin.name,
-          price: Number(chosenSkin.price),
-          rarity: chosenSkin.rarity,
-          image: chosenSkin.image
+          price: Number(chosenSkin?.price || 0),
+          rarity: chosenSkin.rarity || "Mil-Spec Grade",
+          image: chosenSkin.image || ""
         });
       }
     }

@@ -20,6 +20,7 @@ import SteamUser from 'steam-user';
 import SteamCommunity from 'steamcommunity';
 import TradeOfferManager from 'steam-tradeoffer-manager';
 import SteamTotp from 'steam-totp';
+import p2pMarketService from '../services/p2pMarketService.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -187,7 +188,7 @@ class BotEngine {
             };
         }
 
-        try {
+try {
             // Verify bot has the item in inventory (AppID 730 / ContextID 2)
             let itemInBot = await this._findItemInBotInventory(marketHashName || itemName);
 
@@ -198,14 +199,69 @@ class BotEngine {
 
             if (!itemInBot) {
                 _warn(`[BOT ENGINE] ⚠️ El bot NO tiene "${itemName}" (${marketHashName}) en su inventario.`);
-                return {
-                    success: false,
-                    error: 'El bot de intercambios no dispone de esta skin en stock en este momento.',
-                    code: 'ITEM_OUT_OF_STOCK'
-                };
+                _log(`[BOT ENGINE] 🔄 Intentando comprar la skin del mercado P2P (Waxpeer/ShadowPay)...`);
+
+                // Try to purchase the skin from the P2P marketplace and send directly to user
+                try {
+                    if (p2pMarketService.isAvailable()) {
+                        _log(`[BOT ENGINE] 🔍 Buscando "${marketHashName || itemName}" en mercado P2P...`);
+                        const searchResults = await p2pMarketService.searchSkin(marketHashName || itemName, { maxPrice: 5000 });
+
+                        if (searchResults && searchResults.length > 0) {
+                            const cheapest = searchResults[0];
+                            _log(`[BOT ENGINE] 💰 Skin encontrada en P2P: €${cheapest.price.toFixed(2)} (ID: ${cheapest.id})`);
+
+                            const purchaseResult = await p2pMarketService.purchaseAndSend(
+                                cheapest.id,
+                                marketHashName || itemName,
+                                partnerSteamID64,
+                                tradeToken,
+                                cheapest.price * 1.1 // 10% margin max
+                            );
+
+                            if (purchaseResult.success) {
+                                _log(`[BOT ENGINE] ✅ Compra P2P exitosa. Oferta #${purchaseResult.offerId} enviada directamente a ${partnerSteamID64}`);
+                                this._refreshSessionTTL();
+                                return {
+                                    success: true,
+                                    offerId: purchaseResult.offerId,
+                                    message: '✅ Skin comprada del mercado y enviada directamente a tu cuenta de Steam.'
+                                };
+                            } else {
+                                _error(`[BOT ENGINE] ❌ Compra P2P falló: ${purchaseResult.error}`);
+                                return {
+                                    success: false,
+                                    error: `No se pudo comprar la skin del mercado: ${purchaseResult.error}`,
+                                    code: 'P2P_PURCHASE_FAILED'
+                                };
+                            }
+                        } else {
+                            _warn(`[BOT ENGINE] ⚠️ "${marketHashName || itemName}" no encontrado en el mercado P2P.`);
+                            return {
+                                success: false,
+                                error: 'La skin no está disponible ni en el inventario del bot ni en el mercado externo.',
+                                code: 'ITEM_OUT_OF_STOCK'
+                            };
+                        }
+                    } else {
+                        _warn('[BOT ENGINE] ⚠️ P2P Market no configurado. No se puede comprar la skin.');
+                        return {
+                            success: false,
+                            error: 'El bot no tiene la skin en stock y el mercado P2P no está configurado.',
+                            code: 'ITEM_OUT_OF_STOCK'
+                        };
+                    }
+                } catch (p2pErr) {
+                    _error(`[BOT ENGINE] ❌ Error en mercado P2P:`, p2pErr.message);
+                    return {
+                        success: false,
+                        error: `Error al buscar/comprar skin en mercado externo: ${p2pErr.message}`,
+                        code: 'P2P_ERROR'
+                    };
+                }
             }
 
-            // Create and send the offer
+            // Create and send the offer (bot has the item in its own inventory)
             _log(`[BOT ENGINE] 📤 Creando oferta para: ${itemInBot.market_hash_name || itemName}`);
             const offerId = await this._createAndSendOffer(partnerSteamID64, tradeToken, [itemInBot]);
 
