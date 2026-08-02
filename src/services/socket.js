@@ -14,14 +14,15 @@ const isProd = typeof process !== "undefined" && process.env && process.env.NODE
 const _log = isProd ? () => { } : () => { };
 const _warn = isProd ? () => { } : () => { };
 
-// Usar VITE_WS_URL en Render si está disponible, luego VITE_API_URL o VITE_BACKEND_URL.
+// Usar VITE_BACKEND_URL en Render si está disponible, luego VITE_WS_URL o VITE_API_URL.
+// Fallback a la URL de producción del backend en Render.
 // El valor debe construirse sin slash final para compatibilidad con Socket.IO.
 const SOCKET_URL = (
+    import.meta.env.VITE_BACKEND_URL ||
     import.meta.env.VITE_SOCKET_URL ||
     import.meta.env.VITE_WS_URL ||
     import.meta.env.VITE_API_URL ||
-    import.meta.env.VITE_BACKEND_URL ||
-    "http://localhost:3001"
+    "https://skinmarket-backend-f0cb.onrender.com"
 ).replace(/\/+$/, '');
 
 let socket = null;

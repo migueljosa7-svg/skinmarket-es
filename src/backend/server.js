@@ -165,8 +165,8 @@ app.use(hpp());
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   "https://skinmarket-frontend.onrender.com",
-  "http://localhost:5173",
-  process.env.BACKEND_URL
+  "https://skinmarket-backend-f0cb.onrender.com",
+  "http://localhost:5173"
 ].filter(Boolean);
 
 const localHostPattern = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
@@ -2229,22 +2229,14 @@ server.on('error', (err) => {
 });
 
 const io = new SocketIOServer(server, {
-  cors: {
-    origin: [
-      process.env.FRONTEND_URL,
-      "https://skinmarket-frontend.onrender.com",
-      "http://localhost:5173"
-    ],
-    methods: ["GET", "POST"],
-    credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization"]
-  },
-  transports: ['websocket', 'polling'],
-  pingTimeout: 30000,
+  pingTimeout: 60000,
   pingInterval: 25000,
-  allowEIO3: true,
-  connectTimeout: 45000,
-  maxHttpBufferSize: 1e6
+  cors: {
+    origin: allowedOrigins,
+    methods: ["GET", "POST"],
+    credentials: true
+  },
+  transports: ['websocket', 'polling']
 });
 
 io.on("connection", (socket) => {
