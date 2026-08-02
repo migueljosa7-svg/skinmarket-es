@@ -53,24 +53,15 @@ if (!isProduction) {
 const LOG_LEVELS = { INFO: 'INFO', WARN: 'WARN', ERROR: 'ERROR', DEBUG: 'DEBUG' };
 
 // ─── CDN IMAGE HELPER ────────────────────────────────
-// Generate a deterministic Steam economy image hash from a skin name.
-function generateIconUrlHash(skinName, seed) {
-  const baseChars = '-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHT4C56M69bqn225W62x34cbWfooUIDTnComB4qu3l0VdCMcvj_4g4p-1Q99K1R_2O2xM2w0iPGbVjJG4t2zlduKx6v3P7WFlT4D6pwk3-rE9Imsi1ayqRJqYTzzcYeQIFQ3YAvR-1K3ybvng5G9vsuYnXBm73Ur5Srdm0K0hEhsbvEr36KXVw';
-  const input = `${skinName}_${seed || Date.now()}_${skinName.length}_${skinName.charCodeAt(0) || 65}`;
-  let hash = '';
-  for (let i = 0; i < input.length; i++) {
-    const idx = (input.charCodeAt(i) + i * 7) % baseChars.length;
-    hash += baseChars[idx];
-  }
-  while (hash.length < 180) {
-    const idx = (hash.length * 13 + skinName.charCodeAt(hash.length % skinName.length)) % baseChars.length;
-    hash += baseChars[idx];
-  }
-  return hash;
-}
-
+// Build a REAL Steam economy CDN URL from a genuine hash resolved by
+// skinImageService (ByMykel/CSGO-API database).
+// BUG FIX (Bug 1): This previously returned an empty string, so every case
+// drop / daily reward item had no image URL at all. The fake hash generator
+// (`generateIconUrlHash`) has been removed entirely — only real hashes from
+// the CSGO-API skin database are used now.
 function buildAkamaiImageUrl(iconUrlHash) {
-  if (!iconUrlHash) return '';
+  if (!iconUrlHash || typeof iconUrlHash !== 'string') return '';
+  // Steam economy image CDN expects the raw hash followed by a size suffix.
   return `https://steamcommunity-a.akamaihd.net/economy/image/${iconUrlHash}/360fx360f`;
 }
 

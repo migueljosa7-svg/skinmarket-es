@@ -36,46 +36,52 @@ export function AuthProvider({ children }) {
   const [, setTokenState] = useState(() => localStorage.getItem("token") || null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const existingToken = localStorage.getItem("token");
-    if (existingToken && existingToken.length > 10) {
-      const API = import.meta.env.VITE_API_URL || "";
-      fetch(`${API}/api/me`, {
-        headers: { Authorization: `Bearer ${existingToken}` }
-      })
-        .then(res => {
-          if (!res.ok) throw new Error('Not authenticated');
-          return res.json();
-        })
-        .then(userData => {
-          if (userData) {
-            StorageService.updateUser({
-              nombre_usuario: userData.nombre_usuario || userData.name,
-              email: userData.email,
-              saldo: userData.saldo || 0,
-              balance: userData.saldo || userData.balance || 0,
-              nivel: userData.nivel || userData.level || 0,
-              experiencia: userData.experiencia || 0,
-              steam_id: userData.steam_id || null,
-              link_intercambio: userData.link_intercambio || null,
-              avatar: userData.avatar || null
-            });
-            // Bug 3 fix: sync server inventory into local cache so the UI
-            // shows the same inventory after login/logout cycles.
-            if (Array.isArray(userData.inventory)) {
-              StorageService.setInventory(userData.inventory);
-            }
-            setUser(StorageService.getUser());
-          }
-        })
-        .catch(() => {
-          // Token exists but backend fetch failed — user stays unauthenticated
-          localStorage.removeItem('token');
-          setTokenState(null);
-          setUser(null);
-        });
+  // ─── Bug 3 fix: sync the full user profile + server inventory into
+  // the local StorageService cache. Called on mount (existing token) and
+  // after login/register so the UI always reflects the server inventory,
+  // never a stale local snapshot from a previous session.
+  const syncUserFromServer = useCallback(async () => {
+    const token = localStorage.getItem("token");
+    if (!token || token.length <= 10) return null;
+    const API = import.meta.env.VITE_API_URL || "";
+    try {
+      const res = await fetch(`${API}/api/me`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Not authenticated');
+      const userData = await res.json();
+      if (!userData) return null;
+
+      StorageService.updateUser({
+        nombre_usuario: userData.nombre_usuario || userData.name,
+        email: userData.email,
+        saldo: userData.saldo || 0,
+        balance: userData.saldo || userData.balance || 0,
+        nivel: userData.nivel || userData.level || 0,
+        experiencia: userData.experiencia || 0,
+        steam_id: userData.steam_id || null,
+        link_intercambio: userData.link_intercambio || null,
+        avatar: userData.avatar || null
+      });
+      // Bug 3 fix: sync server inventory into local cache so the UI
+      // shows the same inventory after login/logout cycles.
+      if (Array.isArray(userData.inventory)) {
+        StorageService.setInventory(userData.inventory);
+      }
+      setUser(StorageService.getUser());
+      return userData;
+    } catch {
+      // Token exists but backend fetch failed — user stays unauthenticated
+      localStorage.removeItem('token');
+      setTokenState(null);
+      setUser(null);
+      return null;
     }
   }, []);
+
+  useEffect(() => {
+    syncUserFromServer();
+  }, [syncUserFromServer]);
 
   useEffect(() => {
     const unsubscribe = StorageService.subscribe((data) => {
@@ -116,7 +122,7 @@ export function AuthProvider({ children }) {
       localStorage.removeItem("guest_mode");
       localStorage.setItem("token", data.token);
       setTokenState(data.token);
-StorageService.updateUser({
+      StorageService.updateUser({
         ...data.user,
         nombre_usuario: data.user.nombre_usuario,
         email: data.user.email,
@@ -126,11 +132,14 @@ StorageService.updateUser({
         nivel: data.user.nivel || 0,
         experiencia: data.user.experiencia || 0
       });
+      // Bug 3 fix: fetch full profile + server inventory from /api/me so the
+      // local cache is not stale after a fresh login.
+      syncUserFromServer();
       return data.user;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [syncUserFromServer]);
 
   const register = useCallback(async (nombre_usuario, email, password) => {
     setLoading(true);
@@ -147,8 +156,6 @@ StorageService.updateUser({
       const data = await response.json();
       if (response.ok && data.success) {
         localStorage.removeItem("guest_mode");
-        localStorage.removeItem("guest_mode");
-        localStorage.removeItem("guest_mode");
         localStorage.setItem("token", data.token);
         setTokenState(data.token);
         StorageService.updateUser({
@@ -161,6 +168,9 @@ StorageService.updateUser({
           nivel: data.user.nivel || 0,
           experiencia: data.user.experiencia || 0
         });
+        // Bug 3 fix: fetch full profile + server inventory from /api/me so the
+        // local cache is not stale after a fresh registration.
+        syncUserFromServer();
         return data.user;
       }
       const errorMsg = data.error || "Error al registrar en el servidor";
@@ -176,7 +186,7 @@ StorageService.updateUser({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [syncUserFromServer]);
 
   const logout = useCallback(() => {
     StorageService.destroySession();

@@ -285,7 +285,7 @@ getInventory() {
     return items;
   }
 
-  sellSkin(skinId) {
+sellSkin(skinId) {
     if (!this.data) return false;
     const skinIndex = this.data.inventory.findIndex((s) => s.id === skinId);
     if (skinIndex === -1) return false;
@@ -295,18 +295,18 @@ getInventory() {
     return true;
   }
 
-  /**
-   * Destroy/consume a skin WITHOUT crediting any balance (Bug 4 fix).
-   * Used when a skin is lost in an upgrade/contract — the consumed skins
-   * are removed from inventory but their value must NOT be refunded.
-   * @param {string} skinId - Inventory item id to remove
-   * @returns {boolean} True if removed
+/**
+   * DESTROY a skin from inventory WITHOUT adding balance to the user.
+   * Used for upgrade consumption where the skin is lost on both success and failure.
+   * @param {string} skinId - The skin ID to destroy
+   * @returns {boolean} true if the skin was destroyed, false if not found
    */
   destroySkin(skinId) {
     if (!this.data) return false;
     const skinIndex = this.data.inventory.findIndex((s) => s.id === skinId);
     if (skinIndex === -1) return false;
     this.data.inventory.splice(skinIndex, 1);
+    // INTENTIONALLY NOT adding to balance — skin is consumed/destroyed
     this.persistAndNotify();
     return true;
   }

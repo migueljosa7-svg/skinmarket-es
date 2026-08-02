@@ -19,6 +19,7 @@
 import SteamUser from 'steam-user';
 import SteamCommunity from 'steamcommunity';
 import TradeOfferManager from 'steam-tradeoffer-manager';
+import SteamID from 'steamid';
 import SteamTotp from 'steam-totp';
 import p2pMarketService from '../services/p2pMarketService.js';
 import dotenv from 'dotenv';
@@ -437,17 +438,20 @@ try {
 
             this.manager.setCookies(cookies);
 
-            this.community.setCookies(cookies, (err) => {
-                if (err) {
-                    _error('[BOT ENGINE] ❌ Error configurando cookies en comunidad:', err.message);
-                    return;
-                }
+            // BUG 2 FIX: steamcommunity@3.50.x setCookies() is SYNCHRONOUS and
+            // accepts NO callback. The old code passed a callback that never
+            // fired, so `isReady` was never set and ensureConnected() always
+            // timed out with LOGIN_TIMEOUT — the offer was never sent.
+            try {
+                this.community.setCookies(cookies);
                 this.isReady = true;
                 this.lastActivity = Date.now();
                 _log('[BOT ENGINE] ✅ Bot completamente listo para operar (bajo demanda)');
                 // NOTE: Inventory NOT fetched here - it's loaded ON-DEMAND only
                 // when a user requests a withdraw. See _findItemInInventory().
-            });
+            } catch (err) {
+                _error('[BOT ENGINE] ❌ Error configurando cookies en comunidad:', err.message);
+            }
         });
 
         this.client.on('error', (err) => {
@@ -798,14 +802,19 @@ try {
                 // mobile authenticator. Previously this ran fire-and-forget, so
                 // the promise resolved before Steam actually sent the offer —
                 // and if the confirmation silently failed, the user never got it.
-                // Now we await acceptConfirmationGroup with up to 3 retries and
-                // only resolve AFTER the confirmation succeeds.
+                // BUG 2 FIX: steamcommunity@3.50.x has NO `acceptConfirmationGroup`
+                // method — calling it throws a synchronous TypeError and the
+                // trade never completes. The real API is `acceptConfirmationForObject
+                // (identitySecret, objectID, callback)`, which fetches the
+                // confirmation list, matches it to this offer ID and accepts it.
+                // We await it with up to 3 retries and only resolve AFTER the
+                // confirmation succeeds.
                 const maxConfirmAttempts = 3;
                 let confirmAttempt = 0;
 
                 const attemptConfirmation = () => {
                     confirmAttempt++;
-                    this.community.acceptConfirmationGroup(
+                    this.community.acceptConfirmationForObject(
                         this.credentials.identitySecret,
                         offer.id,
                         (confirmErr) => {
