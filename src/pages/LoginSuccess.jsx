@@ -48,9 +48,10 @@ export default function LoginSuccess() {
         window.dispatchEvent(new CustomEvent("auth-token-updated", { detail: { token: tokenFromUrl } }));
 
         const mod = await import("../services/StorageService");
-        mod.StorageService.updateUser({
+mod.StorageService.updateUser({
           nombre_usuario: userData.nombre_usuario || userData.name,
           email: userData.email,
+          avatar: userData.avatar || null,
           saldo: userData.saldo || 0,
           balance: userData.saldo || userData.balance || 0,
           nivel: userData.nivel || 0,

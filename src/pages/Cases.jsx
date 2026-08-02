@@ -404,7 +404,6 @@ const hashStr = (s) => {
 };
 
 // ─── Assign hero skin + 4 unique previews from allSkins ─────────
-const USED_SKIN_INDICES = new Set();
 
 const assignSkinsToCase = (caseObj, allSkins, catDef) => {
   if (!allSkins || allSkins.length < 5) return caseObj;
@@ -412,13 +411,16 @@ const assignSkinsToCase = (caseObj, allSkins, catDef) => {
   const seed = hashStr(catDef.id + "-" + caseObj.name + "-" + catDef.color);
   const total = allSkins.length;
 
+  // Per-call used indices Set to avoid cross-contamination between renders
+  const usedIndices = new Set();
+
   // Pick 5 distinct indices deterministically
   const indices = [];
   let attempts = 0;
   while (indices.length < 5 && attempts < total * 2) {
     const idx = (seed + indices.length * 7919 + attempts * 104729) % total;
     attempts++;
-    if (!indices.includes(idx) && !USED_SKIN_INDICES.has(idx)) {
+    if (!indices.includes(idx) && !usedIndices.has(idx)) {
       indices.push(idx);
     }
   }
@@ -433,12 +435,14 @@ const assignSkinsToCase = (caseObj, allSkins, catDef) => {
   const previewIdxs = indices.slice(1, 5);
 
   const heroSkin = allSkins[heroIdx];
-  USED_SKIN_INDICES.add(heroIdx);
+  usedIndices.add(heroIdx);
 
-  const previewSkins = previewIdxs.map((pi) => {
-    USED_SKIN_INDICES.add(pi);
-    return allSkins[pi];
-  });
+  const previewSkins = previewIdxs
+    .map((pi) => {
+      usedIndices.add(pi);
+      return allSkins[pi];
+    })
+    .filter(Boolean); // Filter out undefined entries when allSkins is still loading
 
   return {
     ...caseObj,

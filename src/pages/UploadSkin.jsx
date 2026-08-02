@@ -38,10 +38,10 @@ export default function UploadSkin() {
     }
   };
 
-  const handleDeposit = () => {
+const handleDeposit = () => {
     if (selectedSkins.length === 0) return;
 
-    const totalValue = selectedSkins.reduce((acc, s) => acc + s.price, 0);
+    const totalValue = selectedSkins.reduce((acc, s) => acc + (s?.price || 0), 0);
     StorageService.addBalance(totalValue);
     StorageService.addSkinsToInventory(selectedSkins);
 
@@ -52,7 +52,7 @@ export default function UploadSkin() {
     setSelectedSkins([]);
   };
 
-  const totalDepositValue = selectedSkins.reduce((acc, s) => acc + s.price, 0);
+const totalDepositValue = selectedSkins.reduce((acc, s) => acc + (s?.price || 0), 0);
 
   return (
     <div style={{ width: "100%", minHeight: "100vh", padding: "60px 20px", background: "#0f1115", color: "white", fontFamily: "'Inter', sans-serif" }}>

@@ -47,11 +47,12 @@ export function AuthProvider({ children }) {
           if (!res.ok) throw new Error('Not authenticated');
           return res.json();
         })
-        .then(userData => {
+.then(userData => {
           if (userData) {
             StorageService.updateUser({
               nombre_usuario: userData.nombre_usuario || userData.name,
               email: userData.email,
+              avatar: userData.avatar || null,
               saldo: userData.saldo || 0,
               balance: userData.saldo || userData.balance || 0,
               nivel: userData.nivel || userData.level || 0,

@@ -1,44 +1,14 @@
-# TODO - Fix PostgreSQL SSL Handshake & Render DB Deployment
+# Fix Plan
 
-## Objetivo
-Corregir de raíz los fallos de conexión PostgreSQL SSL entre el backend Node.js y Render ("Connection terminated unexpectedly" / "SSL connection has been closed unexpectedly").
+## Issues
+1. **Profile photo not showing** — `avatar` field not saved to StorageService
+2. **"Cannot read properties of undefined (reading 'price')"** — Unguarded `.price` access and undefined entries in skin arrays
 
-## Pasos
+## Steps
 
-### 1. Crear rama de corrección
-- [x] Crear rama `fix/postgres-ssl-render` desde `master`
+- [x] Step 1: Fix `AuthContext.jsx` — Add `avatar: userData.avatar` to updateUser() ✅
+- [x] Step 2: Fix `LoginSuccess.jsx` — Add `avatar: userData.avatar` to updateUser() ✅
+- [x] Step 3: Fix `Cases.jsx` — Guard against undefined entries in `assignSkinsToCase()` + local usedIndices Set ✅
+- [x] Step 4: Fix `UploadSkin.jsx` — Add optional chaining `s?.price || 0` in reduce calls ✅
 
-### 2. Corregir `src/backend/db.js`
-- [x] Reemplazar `ensureSslMode()` por `sanitizeDatabaseUrl()` usando WHATWG URL API
-  - [x] Eliminar `sslmode`, `ssl`, `sslrootcert`, `sslcert`, `sslkey` de DATABASE_URL
-  - [x] Evitar la advertencia de deprecación de `pg-connection-string`
-  - [x] Evitar que `parse()` sobrescriba `ssl: { rejectUnauthorized: false }` con `ssl: {}`
-- [x] Mantener `ssl: { rejectUnauthorized: false }` explícito en producción/Render
-- [x] Añadir `keepAlive: true` + `keepAliveInitialDelayMillis` al Pool
-- [x] Mejorar `waitForDatabase()` con logging clasificado de errores SSL/cold-start
-
-### 3. Corregir `src/backend/init_db.js`
-- [x] Añadir logging del error en el bloque `catch`
-- [x] Mantener lógica de reintentos (`maxRetries: 6, baseDelayMs: 3000`)
-
-### 4. Mejorar `scripts/render-start.sh`
-- [x] Mejorar paso 4b: detectar/advertir `sslmode`/`ssl` residuales en DATABASE_URL
-
-### 5. Verificación y compilación
-- [x] `node --check src/backend/db.js`
-- [x] `node --check src/backend/init_db.js`
-- [x] `node --check src/backend/server.js`
-
-### 6. Commit y push
-- [x] Commit con mensaje descriptivo
-- [x] Push a `origin fix/postgres-ssl-render` (dispara auto-deploy en Render)
-- [ ] Verificar logs del deploy en Render (conexión DB exitosa, sin warning pg-connection-string)
-
-## Notas de verificación
-- La sanitización elimina `sslmode=require` de `DATABASE_URL` correctamente
-  - Con `sslmode=require`: `pg-connection-string` → `ssl = {}` (BUG confirmado)
-  - Sin parámetros SSL: `pg-connection-string` → `ssl = undefined` (nuestra config `ssl:{rejectUnauthorized:false}` gana)
-- `node --check` pasa en `db.js`, `init_db.js` y `server.js`
-- Rama creada: `fix/postgres-ssl-render` → push exitoso a `origin`
-- Pendiente: monitorizar Render Dashboard → Deploys → logs (conexión DB exitosa, sin warning pg-connection-string)
-
+## All fixes applied!
