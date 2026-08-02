@@ -19,17 +19,19 @@ let databaseUrl = (process.env.DATABASE_URL || '')
     .replace(/^["']|["']$/g, '') // Remove surrounding single/double quotes
     .replace(/\s+/g, '');        // Remove all whitespace
 
-// Fix DNS resolution: append full domain for Render PostgreSQL hosts without dots
-if (databaseUrl && isProduction) {
+// Log the final database host used for connection diagnostics
+if (databaseUrl) {
     try {
         const dbUrl = new URL(databaseUrl);
-        const protocol = dbUrl.protocol.toLowerCase();
-        if ((protocol === 'postgres:' || protocol === 'postgresql:') && dbUrl.hostname && !dbUrl.hostname.includes('.')) {
-            dbUrl.hostname = `${dbUrl.hostname}.oregon-postgres.render.com`;
-            databaseUrl = dbUrl.toString();
-        }
+        console.log('[DB] Usando DATABASE_URL en producción:', {
+            protocol: dbUrl.protocol,
+            host: dbUrl.hostname,
+            port: dbUrl.port || '5432',
+            database: dbUrl.pathname.replace(/^\//, ''),
+            user: dbUrl.username ? '***' : null
+        });
     } catch (err) {
-        console.warn('[DB] No se pudo parsear DATABASE_URL para corrección de host:', err.message);
+        console.warn('[DB] No se pudo parsear DATABASE_URL para logging:', err.message);
     }
 }
 
