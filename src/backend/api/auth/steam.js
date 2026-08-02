@@ -118,7 +118,8 @@ export function setupSteamStrategy(passport, db, log, logAction, jwtSecret, env)
 
 export function registerSteamRoutes(app, passport, db, log, logAction, jwtSecret, env) {
   const strategyEnabled = setupSteamStrategy(passport, db, log, logAction, jwtSecret, env);
-  const frontendUrl = env.FRONTEND_URL || 'https://skinmarket-frontend.onrender.com';
+  // Sanitize trailing slashes before building redirect URLs to avoid double slashes
+  const frontendUrl = normalizeUrl(env.FRONTEND_URL || 'https://skinmarket-frontend.onrender.com');
 
   if (strategyEnabled) {
     app.get('/api/auth/steam', passport.authenticate('steam'));
@@ -139,6 +140,8 @@ export function registerSteamRoutes(app, passport, db, log, logAction, jwtSecret
       passport.authenticate('steam', { session: false }, (err, user, info) => {
         if (err) {
           log('ERROR', 'AUTH', 'Error en callback Steam:', JSON.stringify({ error: err.message || err, info }));
+          // Debug: log the full error object to audit the exact failure reason
+          console.error('Auth Error Details:', err);
           return respond(`${frontendUrl}/login?error=steam_callback_failed`);
         }
 

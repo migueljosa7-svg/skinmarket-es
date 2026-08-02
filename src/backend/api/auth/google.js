@@ -73,6 +73,8 @@ export function registerGoogleRoutes(app, db, log, logAction, jwtSecret, env) {
       });
     } catch (err) {
       log('ERROR', 'AUTH', 'Error en Google OAuth:', err.message || err);
+      // Debug: log the full error object to audit the exact failure reason
+      console.error('Auth Error Details:', err);
       res.status(401).json({ error: 'Error al verificar el token de Google. Intenta de nuevo.' });
     }
   });
