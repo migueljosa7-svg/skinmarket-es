@@ -1495,6 +1495,54 @@ app.post("/api/inventory/withdraw", authenticateToken, withdrawLimiter, async (r
     const botStatus = botEngine.isLoggedIn ? 'Conectado' : 'Desconectado (bajo demanda)';
     log(LOG_LEVELS.INFO, 'TRADE', `[TRADE] Estado del Bot: ${botStatus} | Solicitando retiro on-demand: ${item.name} (${item.market_hash_name || item.name}) para SteamID: ${user.steam_id}`);
 
+// Check if bot is configured before attempting the withdraw
+    // If bot is NOT configured (CONFIG_MISSING), auto-fallback to sell for 100% balance
+    const botConfigCheck = (() => {
+      try {
+        const check = botEngine._validateCredentialsStrict();
+        return check.valid;
+      } catch {
+        return false;
+      }
+    })();
+
+    if (!botConfigCheck) {
+      log(LOG_LEVELS.WARN, 'TRADE', `[TRADE] Bot no configurado. Auto-fallback a venta para item: ${item.name} (usuario: ${req.user.id})`);
+
+      // Auto-sell the skin for 100% balance
+      await db.withTransaction(async (client) => {
+        await client.query("UPDATE inventario SET status = 'sold' WHERE item_id = $1", [itemId]);
+        await client.query(
+          "UPDATE usuarios SET saldo = saldo + $1 WHERE usuario_id = $2",
+          [item.price, req.user.id]
+        );
+      });
+
+      await recordTransaction(req.user.id, 'venta_auto', item.price, 'fallback_bot_no_config',
+        `Venta automática (bot no configurado): ${item.name}`);
+      await logAction(req.user.id, 'RETIRO_FALLBACK_VENTA', { itemId, itemName: item.name, price: item.price });
+
+      const balanceResult = await db.query("SELECT saldo FROM usuarios WHERE usuario_id = $1", [req.user.id]);
+
+      log(LOG_LEVELS.INFO, 'TRADE', `[TRADE] ✅ Fallback completado: ${item.name} vendida por €${item.price} - Nuevo saldo: €${balanceResult.rows[0].saldo}`);
+
+      if (req.app.get('io')) {
+        req.app.get('io').to(req.user.id.toString()).emit('withdrawal_update', {
+          itemId, status: 'sold', price: item.price,
+          message: `✅ Skin vendida automáticamente por €${parseFloat(item.price).toFixed(2)} en saldo (el bot de Steam no está configurado).`
+        });
+      }
+
+      return res.json({
+        success: true,
+        autoFallback: true,
+        fallbackType: 'sell',
+        price: item.price,
+        newBalance: balanceResult.rows[0].saldo,
+        message: `✅ El bot de Steam no está configurado. La skin se ha vendido automáticamente por €${parseFloat(item.price).toFixed(2)} en saldo (100% del valor). Puedes retirar este saldo o recargar para abrir más cajas.`
+      });
+    }
+
     // ON-DEMAND: sendWithdrawOffer handles login internally via ensureConnected()
     try {
       log(LOG_LEVELS.INFO, 'TRADE', `[TRADE] Solicitando retiro de item: ${item.market_hash_name || item.name} para SteamID: ${user.steam_id}`);
@@ -1521,15 +1569,34 @@ app.post("/api/inventory/withdraw", authenticateToken, withdrawLimiter, async (r
         }
 
         return res.json({ success: true, offerId: result.offerId, message: `Oferta #${result.offerId} enviada a Steam. Revisa tu inventario.` });
-      } else {
-        log(LOG_LEVELS.ERROR, 'TRADE', `[TRADE] ❌ Fallo al enviar oferta - Error: ${result.error} | Item: ${item.name}`);
-        return res.status(400).json({
-          success: false,
-          error: result.error || "No se pudo enviar la oferta real. Inténtalo más tarde.",
-          code: result.code || 'TRADE_OFFER_FAILED',
-          itemId
-        });
       }
+
+// Bot responded but failed — auto-fallback to sell for ANY bot error
+      // This ensures users can always withdraw value, even when the Steam bot is down
+      log(LOG_LEVELS.WARN, 'TRADE', `[TRADE] Bot devolvió error (${result.code}). Auto-fallback a venta para: ${item.name}`);
+
+      await db.withTransaction(async (client) => {
+        await client.query("UPDATE inventario SET status = 'sold' WHERE item_id = $1", [itemId]);
+        await client.query(
+          "UPDATE usuarios SET saldo = saldo + $1 WHERE usuario_id = $2",
+          [item.price, req.user.id]
+        );
+      });
+
+      await recordTransaction(req.user.id, 'venta_auto', item.price, 'fallback_bot_no_disponible',
+        `Venta automática (bot no disponible: ${result.code}): ${item.name}`);
+      await logAction(req.user.id, 'RETIRO_FALLBACK_VENTA', { itemId, itemName: item.name, price: item.price, reason: result.code });
+
+      const balanceResult = await db.query("SELECT saldo FROM usuarios WHERE usuario_id = $1", [req.user.id]);
+
+      return res.json({
+        success: true,
+        autoFallback: true,
+        fallbackType: 'sell',
+        price: item.price,
+        newBalance: balanceResult.rows[0].saldo,
+        message: `✅ El bot de intercambio no está disponible. La skin se ha vendido automáticamente por €${parseFloat(item.price).toFixed(2)} en saldo (100% del valor).`
+      });
     } catch (botErr) {
       log(LOG_LEVELS.ERROR, 'TRADE', `[TRADE] ❌ Error del bot en retiro - ${botErr.message} | Item: ${item.name}`);
 

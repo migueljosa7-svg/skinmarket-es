@@ -2,7 +2,7 @@
  * ImageService - Unified image loading service with multi-CDN fallback
  *
  * Architecture:
- * - 4-tier CDN fallback chain (Steam CloudFlare → Steam Akamai → ByMykel GitHub API → CS2 Stash)
+ * - 4-tier CDN fallback chain (Steam CloudFlare → Steam Akamai → Steam CloudFlare Alt → Steam Community)
  * - data-try-index attribute on <img> elements for tracking fallback progress
  * - Silent SVG placeholder as last resort (no console 404 errors)
  * - Per-session failed URL cache (no infinite loops)
@@ -189,13 +189,6 @@ function extractSteamImageHash(url) {
   return match ? match[1] : null;
 }
 
-/**
- * Clean a skin name for CDN URLs: remove wear/quality suffixes,
- * replace special characters, format as expected by external APIs.
- * Example: "AK-47 | Redline (Field-Tested)" → "ak-47_redline"
- */
-
-
 // ---------------------------------------------------------------------------
 // Public API: getSkinImageSources(skin) — returns ordered array of fallback URLs
 // ---------------------------------------------------------------------------
@@ -307,26 +300,6 @@ export function getSkinImageUrlSilent(skinName, originalImage) {
 }
 
 // ---------------------------------------------------------------------------
-// Emergency Skin Replacement System (PURE onError - NO HEAD requests)
-// ---------------------------------------------------------------------------
-
-/**
- * Get emergency skin URL by name (synchronous, no HTTP HEAD requests)
- * Uses a deterministic path based on skin name hash
- * @param {string} skinName - The skin name to generate path for
- * @returns {string|null} Emergency image URL or null
- */
-function getEmergencySkinUrl(skinName) {
-  if (!skinName) return null;
-  // Generate a deterministic filename from skin name
-  const baseName = skinName
-    .replace(/[^a-zA-Z0-9_-]/g, '_')
-    .toLowerCase()
-    .slice(0, 50);
-  return `/images/emergency-skins/${baseName}.png`;
-}
-
-// ---------------------------------------------------------------------------
 // Public API: getSafeImageUrl — validates URL before returning
 // ---------------------------------------------------------------------------
 
@@ -360,8 +333,8 @@ export function getSafeImageUrl(skinName, originalImage) {
 }
 
 // ---------------------------------------------------------------------------
-// Public API: handleImageError — ultra-aggressive multi-tier fallback handler
-// with emergency skin support (5 tiers total)
+// Public API: handleImageError — multi-tier CDN fallback handler
+// Falls back to SVG placeholder when all CDNs are exhausted (no 404 errors).
 // ---------------------------------------------------------------------------
 
 export async function handleImageError(event, skin) {
@@ -378,16 +351,6 @@ export async function handleImageError(event, skin) {
   // ─── ANTI-BUCLE INFINITO: Máximo 2 reintentos totales ──────────────
   var tryCount = parseInt(img.getAttribute('data-try-count'), 10) || 0;
   if (tryCount >= 2) {
-    // Before giving up entirely, try emergency skin path (sync lookup, no HEAD request)
-    var emergencyUrl = getEmergencySkinUrl(skin && skin.name);
-    if (emergencyUrl && !failedUrls.has(emergencyUrl)) {
-      img.setAttribute('data-try-count', tryCount + 1);
-      img.src = emergencyUrl;
-      img.style.opacity = '1';
-      img.style.objectFit = 'contain';
-      return;
-    }
-
     // Cancelar TODOS los eventos de error futuros y poner placeholder silencioso
     img.onerror = null;
     img.removeAttribute('data-try-index');
@@ -429,17 +392,7 @@ export async function handleImageError(event, skin) {
     img.setAttribute('data-try-index', tryIndex);
   }
 
-  // All CDNs exhausted: try emergency skin before SVG placeholder (sync, no HEAD)
-   emergencyUrl = getEmergencySkinUrl(skin && skin.name);
-  if (emergencyUrl && !failedUrls.has(emergencyUrl)) {
-    failedUrls.add(emergencyUrl);
-    img.src = emergencyUrl;
-    img.style.opacity = '1';
-    img.style.objectFit = 'contain';
-    return;
-  }
-
-  // All fallbacks exhausted: silent SVG placeholder
+  // All CDNs exhausted: silent SVG placeholder
   // Disable further error handling to prevent infinite loops
   img.onerror = null;
   img.removeAttribute('data-try-index');
@@ -453,11 +406,6 @@ export async function handleImageError(event, skin) {
   img.style.opacity = '0.4';
   img.style.objectFit = 'contain';
 }
-
-/**
- * Get current user ID from localStorage
- * @returns {string|null} User ID or null
- */
 
 // ---------------------------------------------------------------------------
 // Public API: Utility functions
