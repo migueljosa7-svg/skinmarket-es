@@ -163,8 +163,9 @@ app.use(helmet());
 app.use(hpp());
 
 const allowedOrigins = [
-  "https://skinmarket-frontend.onrender.com",
   process.env.FRONTEND_URL,
+  "https://skinmarket-frontend.onrender.com",
+  "http://localhost:5173",
   process.env.BACKEND_URL
 ].filter(Boolean);
 
@@ -2229,13 +2230,11 @@ server.on('error', (err) => {
 
 const io = new SocketIOServer(server, {
   cors: {
-    origin: function (origin, callback) {
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin) || localHostPattern.test(origin)) {
-        return callback(null, true);
-      }
-      return callback(new Error(`Origen no permitido por Socket.IO: ${origin}`), false);
-    },
+    origin: [
+      process.env.FRONTEND_URL,
+      "https://skinmarket-frontend.onrender.com",
+      "http://localhost:5173"
+    ],
     methods: ["GET", "POST"],
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization"]

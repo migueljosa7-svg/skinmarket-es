@@ -2,8 +2,9 @@
  * Socket.io Client Service
  *
  * Creates a singleton Socket.io client instance with progressive reconnection.
- * Uses polling-first transport to avoid WebSocket handshake failures on restrictive networks.
- * Automatically upgrades to WebSocket after connection is established.
+ * Uses WebSocket as primary transport (with polling as fallback) for reliable
+ * real-time connections and to avoid HTTP polling timeout issues.
+ * Sends cookies with cross-origin requests (withCredentials: true).
  *
  * PRODUCCIÓN: Todos los logs silenciados completamente (0 salida a consola).
  */
@@ -43,7 +44,8 @@ export function getSocket() {
     }
 
     socket = io(SOCKET_URL, {
-        transports: ["polling", "websocket"], // polling first, then upgrade to websocket
+        transports: ["websocket", "polling"], // WebSocket primary transport, polling as fallback
+        withCredentials: true,                // Send cookies with cross-origin requests
         reconnectionAttempts: 15,             // More attempts for Render cold starts
         reconnectionDelay: 1000,              // Start with 1s
         reconnectionDelayMax: 30000,          // Max 30s between attempts (exponential backoff)

@@ -72,32 +72,10 @@ echo "  → Ejecutando init_db.js..."
 node init_db.js && echo "  ✓ Migraciones completadas (init_db.js terminó correctamente)" || echo "  ⚠️  init_db.js no terminó — continuando sin detener el despliegue."
 
 # ── 4a. Fallback (only if init_db.js is unavailable) ──
-if command -v psql &> /dev/null; then
-  # Use Node.js URL parser to safely handle special chars in password
-  DB_PARAMS=$(node -e "
-  const { URL } = require('url');
-  const url = new URL(process.env.DATABASE_URL);
-  console.log(JSON.stringify({
-    user: url.username,
-    pass: url.password || '',
-    host: url.hostname,
-    port: url.port || '5432',
-    dbname: url.pathname.replace(/^\//, '')
-  }));
-  ")
-
-  DB_USER=$(echo "$DB_PARAMS" | node -e "const d=require('fs').readFileSync(0,'utf8');const j=JSON.parse(d);console.log(j.user);")
-  DB_PASS=$(echo "$DB_PARAMS" | node -e "const d=require('fs').readFileSync(0,'utf8');const j=JSON.parse(d);console.log(j.pass);")
-  DB_HOST=$(echo "$DB_PARAMS" | node -e "const d=require('fs').readFileSync(0,'utf8');const j=JSON.parse(d);console.log(j.host);")
-  DB_PORT=$(echo "$DB_PARAMS" | node -e "const d=require('fs').readFileSync(0,'utf8');const j=JSON.parse(d);console.log(j.port);")
-  DB_NAME=$(echo "$DB_PARAMS" | node -e "const d=require('fs').readFileSync(0,'utf8');const j=JSON.parse(d);console.log(j.dbname);")
-
-  # Use explicit flags to force TCP/IP connection with SSL
-  # Render PostgreSQL requires SSL; sslmode=require is the safest option.
-  PGPASSWORD="$DB_PASS" psql "postgresql://$DB_HOST:$DB_PORT/$DB_NAME?sslmode=require" -U "$DB_USER" -f "$(dirname "$0")/init-db.sql" 2>&1 | tail -20 || echo "  ⚠️  psql fallback no crítico (init_db.js ya es el método principal)."
-else
-  echo "  ✓ psql no disponible — init_db.js es el método principal de migración."
-fi
+# NOTE: El archivo init-db.sql no existe y NO se usa. init_db.js se encarga
+# de TODA la inicialización de la base de datos (tablas, índices, seeds).
+# La línea psql fue eliminada para evitar errores de archivo no encontrado.
+# ── (psql fallback eliminado — init_db.js es el único método de migración) ──
 
 # ── 4b. Verify DATABASE_URL parsing (debug) ────────
 echo ""
