@@ -1,30 +1,36 @@
-# TODO: Fix Render Deployment - Database & Startup Issues
+# TODO - Fix PostgreSQL SSL Handshake & Render DB Deployment
 
-## Task List
+## Objetivo
+Corregir de raíz los fallos de conexión PostgreSQL SSL entre el backend Node.js y Render ("Connection terminated unexpectedly" / "SSL connection has been closed unexpectedly").
 
-### 1. Fix `render-start.sh` regex for postgresql:// URLs ✅
-- [x] Step [4b/5] now uses WHATWG `new URL()` parser — handles both `postgres://` and `postgresql://` automatically
-- [x] psql fallback command uses `?sslmode=require` flags
+## Pasos
 
-### 2. Fix `init_db.js` invalid syntax ✅
-- [x] Inline `//` comments inside array literals are valid JS (comments allowed wherever whitespace is); `node --check` passes
-- [x] Proper error handling via `waitForDatabase` retry + `process.exit(1)` on failure
+### 1. Crear rama de corrección
+- [x] Crear rama `fix/postgres-ssl-render` desde `master`
 
-### 3. Fix `db.js` SSL & connection resilience ✅
-- [x] `sslmode=require` added to connection string via `ensureSslMode()`
-- [x] Pool error event handler with logging added
-- [x] Connection retry logic (`waitForDatabase`) with backoff added
-- [x] Pool validation query (`SELECT 1`) on startup
+### 2. Corregir `src/backend/db.js`
+- [x] Reemplazar `ensureSslMode()` por `sanitizeDatabaseUrl()` usando WHATWG URL API
+  - [x] Eliminar `sslmode`, `ssl`, `sslrootcert`, `sslcert`, `sslkey` de DATABASE_URL
+  - [x] Evitar la advertencia de deprecación de `pg-connection-string`
+  - [x] Evitar que `parse()` sobrescriba `ssl: { rejectUnauthorized: false }` con `ssl: {}`
+- [x] Mantener `ssl: { rejectUnauthorized: false }` explícito en producción/Render
+- [x] Añadir `keepAlive: true` + `keepAliveInitialDelayMillis` al Pool
+- [x] Mejorar `waitForDatabase()` con logging clasificado de errores SSL/cold-start
 
-### 4. Fix `render-start.sh` error handling ✅
-- [x] `set -e` for proper error propagation
-- [x] Diagnostic logging of env vars, DB URL parsing, and startup steps
+### 3. Corregir `src/backend/init_db.js`
+- [x] Añadir logging del error en el bloque `catch`
+- [x] Mantener lógica de reintentos (`maxRetries: 6, baseDelayMs: 3000`)
 
-### 5. Fix `server.js` startup (syntax error from `startServer()` wrapper) ✅
-- [x] Replaced broken `async function startServer() { ... }` wrapper (which left the rest of the file outside the function) with **top-level `await`** (ESM)
-- [x] `waitForDatabase({ maxRetries: 8, baseDelayMs: 3000 })` now blocks HTTP server startup until DB is reachable (or degrades gracefully)
-- [x] `node --check src/backend/server.js` passes — no syntax errors
+### 4. Mejorar `scripts/render-start.sh`
+- [x] Mejorar paso 4b: detectar/advertir `sslmode`/`ssl` residuales en DATABASE_URL
 
-### 6. Update `render.yaml` placeholder URLs ⚠️
-- [ ] Placeholders remain (`your-backend-service.onrender.com`, etc.) — must be replaced with the real URLs after first deploy in the Render dashboard (or set as env vars)
+### 5. Verificación y compilación
+- [x] `node --check src/backend/db.js`
+- [x] `node --check src/backend/init_db.js`
+- [x] `node --check src/backend/server.js`
+
+### 6. Commit y push
+- [ ] Commit con mensaje descriptivo
+- [ ] Push a `origin fix/postgres-ssl-render` (dispara auto-deploy en Render)
+- [ ] Verificar logs del deploy en Render (conexión DB exitosa, sin warning pg-connection-string)
 
