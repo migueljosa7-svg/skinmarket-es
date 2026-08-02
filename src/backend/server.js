@@ -24,9 +24,12 @@ import crypto from "crypto";
 import PriceEngine from "./services/PriceEngine.js";
 
 const envPath = path.resolve(process.cwd(), '.env');
-dotenv.config({ path: envPath, override: true });
+const dotenvOverride = process.env.NODE_ENV !== 'production';
+dotenv.config({ path: envPath, override: dotenvOverride });
 if (!fs.existsSync(envPath)) {
   console.warn('[SYSTEM] .env file not found in project root. Copy .env.example to .env and configure STEAM_API_KEY, JWT_SECRET, DATABASE_URL, BACKEND_URL, FRONTEND_URL, etc.');
+} else if (!dotenvOverride) {
+  console.log('[SYSTEM] Producción detectada; .env no se usará para sobrescribir variables de entorno.');
 }
 
 // ─────────────────────────────────────────────────
@@ -655,9 +658,39 @@ app.post("/api/login", loginLimiter, async (req, res) => {
     const token = jwt.sign({ id: user.usuario_id, email: user.email }, JWT_SECRET, { expiresIn: '8h' });
     await logAction(user.usuario_id, 'LOGIN', { email: cleanEmail });
     res.json({ user: { usuario_id: user.usuario_id, nombre_usuario: user.nombre_usuario, email: user.email, saldo: user.saldo, nivel: user.nivel, experiencia: user.experiencia }, token });
-  } catch {
+  } catch (err) {
+    log(LOG_LEVELS.ERROR, 'LOGIN', 'Error al iniciar sesión', { error: err.message, stack: err.stack });
+    if (err.code === 'ECONNREFUSED' || err.code === 'ENOTFOUND' || err.message?.includes('connect')) {
+      return res.status(503).json({ error: "No se pudo conectar con la base de datos. Intenta nuevamente más tarde.", code: "DB_CONNECTION_ERROR" });
+    }
     res.status(500).json({ error: "Error al iniciar sesión" });
   }
+});
+
+app.get('/api/debug/health', async (req, res) => {
+  const healthReport = {
+    backendUrl: process.env.BACKEND_URL || null,
+    frontendUrl: process.env.FRONTEND_URL || null,
+    steamRealm: process.env.STEAM_REALM || null,
+    steamReturnUrl: process.env.STEAM_RETURN_URL || null,
+    viteApiUrl: process.env.VITE_API_URL || null,
+    viteBackendUrl: process.env.VITE_BACKEND_URL || null,
+    viteWsUrl: process.env.VITE_WS_URL || null,
+    jwtSecretConfigured: !!process.env.JWT_SECRET,
+    steamApiKeyConfigured: !!process.env.STEAM_API_KEY,
+    databaseUrlConfigured: !!process.env.DATABASE_URL,
+    nodeEnv: process.env.NODE_ENV || null
+  };
+
+  try {
+    await db.query('SELECT 1');
+    healthReport.dbOk = true;
+  } catch (err) {
+    healthReport.dbOk = false;
+    healthReport.dbError = err.message;
+  }
+
+  res.json(healthReport);
 });
 
 // ─── LEVEL SYSTEM ────────────────────────────────────
