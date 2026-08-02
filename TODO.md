@@ -30,7 +30,15 @@ Corregir de raíz los fallos de conexión PostgreSQL SSL entre el backend Node.j
 - [x] `node --check src/backend/server.js`
 
 ### 6. Commit y push
-- [ ] Commit con mensaje descriptivo
-- [ ] Push a `origin fix/postgres-ssl-render` (dispara auto-deploy en Render)
+- [x] Commit con mensaje descriptivo
+- [x] Push a `origin fix/postgres-ssl-render` (dispara auto-deploy en Render)
 - [ ] Verificar logs del deploy en Render (conexión DB exitosa, sin warning pg-connection-string)
+
+## Notas de verificación
+- La sanitización elimina `sslmode=require` de `DATABASE_URL` correctamente
+  - Con `sslmode=require`: `pg-connection-string` → `ssl = {}` (BUG confirmado)
+  - Sin parámetros SSL: `pg-connection-string` → `ssl = undefined` (nuestra config `ssl:{rejectUnauthorized:false}` gana)
+- `node --check` pasa en `db.js`, `init_db.js` y `server.js`
+- Rama creada: `fix/postgres-ssl-render` → push exitoso a `origin`
+- Pendiente: monitorizar Render Dashboard → Deploys → logs (conexión DB exitosa, sin warning pg-connection-string)
 
