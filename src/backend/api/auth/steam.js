@@ -16,7 +16,7 @@ function normalizeSteamRealm(steamRealm) {
 }
 
 function buildSteamUrls(env, log) {
-  const backendUrl = normalizeUrl(env.BACKEND_URL || 'http://localhost:3001');
+  const backendUrl = normalizeUrl(env.BACKEND_URL || 'https://skinmarket-backend-f0cb.onrender.com');
   const steamReturnURL = env.STEAM_RETURN_URL
     ? normalizeUrl(env.STEAM_RETURN_URL)
     : `${backendUrl}/api/auth/steam/return`;
@@ -118,7 +118,7 @@ export function setupSteamStrategy(passport, db, log, logAction, jwtSecret, env)
 
 export function registerSteamRoutes(app, passport, db, log, logAction, jwtSecret, env) {
   const strategyEnabled = setupSteamStrategy(passport, db, log, logAction, jwtSecret, env);
-  const frontendUrl = env.FRONTEND_URL || 'http://localhost:5173';
+  const frontendUrl = env.FRONTEND_URL || 'https://skinmarket-frontend.onrender.com';
 
   if (strategyEnabled) {
     app.get('/api/auth/steam', passport.authenticate('steam'));
@@ -149,7 +149,7 @@ export function registerSteamRoutes(app, passport, db, log, logAction, jwtSecret
 
         try {
           const token = createJwtToken(user, jwtSecret);
-          return respond(`${frontendUrl}/login?token=${token}`);
+          return respond(`${frontendUrl}/login-success?token=${token}`);
         } catch (jwtErr) {
           log('ERROR', 'AUTH', 'Error generando JWT en Steam:', jwtErr.message || jwtErr);
           return respond(`${frontendUrl}/login?error=token_generation_failed`);

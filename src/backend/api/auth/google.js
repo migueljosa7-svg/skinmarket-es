@@ -14,7 +14,6 @@ export function registerGoogleRoutes(app, db, log, logAction, jwtSecret, env) {
   const googleClientId = env.GOOGLE_CLIENT_ID;
   const googleClientSecret = env.GOOGLE_CLIENT_SECRET;
   const googleClient = googleClientId ? new OAuth2Client(googleClientId, googleClientSecret) : null;
-  const frontendUrl = env.FRONTEND_URL || 'http://localhost:5173';
 
   if (!googleClient) {
     log('WARN', 'AUTH', 'Google OAuth no configurado. Falta GOOGLE_CLIENT_ID o GOOGLE_CLIENT_SECRET.');

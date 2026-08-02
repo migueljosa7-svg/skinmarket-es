@@ -38,6 +38,7 @@ const lazyWithRetry = (componentImportFn) =>
 
 const Home = lazyWithRetry(() => import("./pages/Home"));
 const Login = lazyWithRetry(() => import("./pages/Login"));
+const LoginSuccess = lazyWithRetry(() => import("./pages/LoginSuccess"));
 const Dashboard = lazyWithRetry(() => import("./pages/Dashboard"));
 const UploadSkin = lazyWithRetry(() => import("./pages/UploadSkin"));
 const Cases = lazyWithRetry(() => import("./pages/Cases"));
@@ -72,6 +73,7 @@ export default function App() {
                     <Route path="/about" element={<About />} />
                     <Route path="/faq" element={<FAQ />} />
                     <Route path="/login" element={<Login />} />
+                    <Route path="/login-success" element={<LoginSuccess />} />
                     <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                     <Route path="/upload" element={<ProtectedRoute><UploadSkin /></ProtectedRoute>} />
                     <Route path="/cases" element={<ProtectedRoute><Cases /></ProtectedRoute>} />

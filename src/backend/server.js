@@ -274,7 +274,9 @@ app.use(session({
   cookie: {
     secure: process.env.NODE_ENV === "production",
     httpOnly: true,
-    sameSite: process.env.NODE_ENV === "production" ? "lax" : "lax",
+    // SameSite None + Secure required for cross-subdomain cookies between
+    // skinmarket-frontend.onrender.com and skinmarket-backend-f0cb.onrender.com over HTTPS.
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
     maxAge: 24 * 60 * 60 * 1000
   }
 }));
