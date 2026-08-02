@@ -126,23 +126,33 @@ export function registerSteamRoutes(app, passport, db, log, logAction, jwtSecret
     app.get('/api/auth/steam/return', (req, res, next) => {
       captureSteamCallback(req);
       log('INFO', 'AUTH', 'Steam callback received', JSON.stringify({ query: req.query, body: req.body }));
+      
+      // Prevent multiple response attempts
+      let responded = false;
+      const respond = (url) => {
+        if (!responded) {
+          responded = true;
+          return res.redirect(url);
+        }
+      };
+      
       passport.authenticate('steam', { session: false }, (err, user, info) => {
         if (err) {
           log('ERROR', 'AUTH', 'Error en callback Steam:', JSON.stringify({ error: err.message || err, info }));
-          return res.redirect(`${frontendUrl}/login?error=steam_callback_failed`);
+          return respond(`${frontendUrl}/login?error=steam_callback_failed`);
         }
 
         if (!user) {
           log('WARN', 'AUTH', 'Callback Steam recibido sin usuario válido', JSON.stringify({ info, query: req.query }));
-          return res.redirect(`${frontendUrl}/login?error=steam_login_cancelled`);
+          return respond(`${frontendUrl}/login?error=steam_login_cancelled`);
         }
 
         try {
           const token = createJwtToken(user, jwtSecret);
-          return res.redirect(`${frontendUrl}/login?token=${token}`);
+          return respond(`${frontendUrl}/login?token=${token}`);
         } catch (jwtErr) {
           log('ERROR', 'AUTH', 'Error generando JWT en Steam:', jwtErr.message || jwtErr);
-          return res.redirect(`${frontendUrl}/login?error=token_generation_failed`);
+          return respond(`${frontendUrl}/login?error=token_generation_failed`);
         }
       })(req, res, next);
     });
