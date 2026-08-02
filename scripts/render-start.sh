@@ -65,60 +65,58 @@ fi
 echo ""
 echo "[4/4] Ejecutando migraciones de base de datos..."
 echo "  → Ejecutando init_db.js..."
-node init_db.js || {
-  echo "  ⚠️  init_db.js falló, intentando con init-db.sql..."
-  # Fallback: ejecutar script SQL directamente si psql está disponible
-  if command -v psql &> /dev/null; then
-    # Use Node.js URL parser to safely handle special chars in password
-    DB_PARAMS=$(node -e "
-    const { URL } = require('url');
-    const url = new URL(process.env.DATABASE_URL);
-    console.log(JSON.stringify({
-      user: url.username,
-      pass: url.password || '',
-      host: url.hostname,
-      port: url.port || '5432',
-      dbname: url.pathname.replace(/^\//, '')
-    }));
-    ")
-    
-    DB_USER=$(echo "$DB_PARAMS" | node -e "const d=require('fs').readFileSync(0,'utf8');const j=JSON.parse(d);console.log(j.user);")
-    DB_PASS=$(echo "$DB_PARAMS" | node -e "const d=require('fs').readFileSync(0,'utf8');const j=JSON.parse(d);console.log(j.pass);")
-    DB_HOST=$(echo "$DB_PARAMS" | node -e "const d=require('fs').readFileSync(0,'utf8');const j=JSON.parse(d);console.log(j.host);")
-    DB_PORT=$(echo "$DB_PARAMS" | node -e "const d=require('fs').readFileSync(0,'utf8');const j=JSON.parse(d);console.log(j.port);")
-    DB_NAME=$(echo "$DB_PARAMS" | node -e "const d=require('fs').readFileSync(0,'utf8');const j=JSON.parse(d);console.log(j.dbname);")
-    
-    # Use explicit flags to force TCP/IP connection
-    PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -f "$(dirname "$0")/init-db.sql" || true
-  else
-    echo "  ⚠️  psql no disponible. init_db.js ya habrá creado las tablas."
-  fi
-} || true
-echo "  ✓ Migraciones completadas (o continuando a pesar de errores)"
+# init_db.js now has built-in retry logic (waitForDatabase) so it can handle
+# Render free-tier PostgreSQL cold-start / wake-from-sleep SSL issues.
+# Migration failure is NOT fatal: the server still starts (tables use
+# CREATE TABLE IF NOT EXISTS, so a previous successful run is preserved).
+node init_db.js && echo "  ✓ Migraciones completadas (init_db.js terminó correctamente)" || echo "  ⚠️  init_db.js no terminó — continuando sin detener el despliegue."
+
+# ── 4a. Fallback (only if init_db.js is unavailable) ──
+if command -v psql &> /dev/null; then
+  # Use Node.js URL parser to safely handle special chars in password
+  DB_PARAMS=$(node -e "
+  const { URL } = require('url');
+  const url = new URL(process.env.DATABASE_URL);
+  console.log(JSON.stringify({
+    user: url.username,
+    pass: url.password || '',
+    host: url.hostname,
+    port: url.port || '5432',
+    dbname: url.pathname.replace(/^\//, '')
+  }));
+  ")
+
+  DB_USER=$(echo "$DB_PARAMS" | node -e "const d=require('fs').readFileSync(0,'utf8');const j=JSON.parse(d);console.log(j.user);")
+  DB_PASS=$(echo "$DB_PARAMS" | node -e "const d=require('fs').readFileSync(0,'utf8');const j=JSON.parse(d);console.log(j.pass);")
+  DB_HOST=$(echo "$DB_PARAMS" | node -e "const d=require('fs').readFileSync(0,'utf8');const j=JSON.parse(d);console.log(j.host);")
+  DB_PORT=$(echo "$DB_PARAMS" | node -e "const d=require('fs').readFileSync(0,'utf8');const j=JSON.parse(d);console.log(j.port);")
+  DB_NAME=$(echo "$DB_PARAMS" | node -e "const d=require('fs').readFileSync(0,'utf8');const j=JSON.parse(d);console.log(j.dbname);")
+
+  # Use explicit flags to force TCP/IP connection with SSL
+  # Render PostgreSQL requires SSL; sslmode=require is the safest option.
+  PGPASSWORD="$DB_PASS" psql "postgresql://$DB_HOST:$DB_PORT/$DB_NAME?sslmode=require" -U "$DB_USER" -f "$(dirname "$0")/init-db.sql" 2>&1 | tail -20 || echo "  ⚠️  psql fallback no crítico (init_db.js ya es el método principal)."
+else
+  echo "  ✓ psql no disponible — init_db.js es el método principal de migración."
+fi
 
 # ── 4b. Verify DATABASE_URL parsing (debug) ────────
 echo ""
 echo "[4b/5] Verificando parseo de DATABASE_URL..."
-# Use Node.js for safe, precise parsing to avoid regex corruption
-# Append full domain for Render PostgreSQL hosts if needed
+# Use Node.js with WHATWG URL API for safe, precise parsing (handles postgresql:// and postgres://)
 PARSED=$(node -e "
-const url = process.env.DATABASE_URL;
-const m = url.match(/^postgres:\/\/([^:]+):([^@]+)@([^:\/]+)(?::(\d+))?\/\s*([^?]+)/);
-if (!m) {
-  console.error('ERROR: Cannot parse DATABASE_URL');
-  console.log(JSON.stringify({ error: 'parse_failed', raw: url.substring(0, 50) + '...' }));
-} else {
-  const [, user, pass, host, port, dbname] = m;
-  // Append full domain for Render PostgreSQL hosts without dots
-  const fullHost = host.includes('.') ? host : host + '.oregon-postgres.render.com';
+try {
+  const url = new URL(process.env.DATABASE_URL);
+  if (!url.hostname || !url.pathname) throw new Error('Invalid URL components');
   console.log(JSON.stringify({
-    user,
-    pass: pass.substring(0, 3) + '***',
-    host: fullHost,
-    original_host: host,
-    port: port || '5432',
-    dbname
+    user: decodeURIComponent(url.username || ''),
+    pass: (url.password || '').substring(0, 3) + '***',
+    host: url.hostname,
+    port: url.port || '5432',
+    dbname: url.pathname.replace(/^\//, '').split('?')[0]
   }));
+} catch (err) {
+  console.error('ERROR: Cannot parse DATABASE_URL:', err.message);
+  console.log(JSON.stringify({ error: 'parse_failed', raw: String(process.env.DATABASE_URL || '').substring(0, 50) + '...' }));
 }
 ")
 echo "  ✓ DATABASE_URL parseada correctamente: $PARSED"

@@ -1,38 +1,30 @@
-# SkinMarket ES - Remaining Phases Implementation Plan
+# TODO: Fix Render Deployment - Database & Startup Issues
 
-## PHASE 3.b: BATTLES BACKEND ENDPOINTS
-- [x] 3.b.1 Add battleRooms Map + TTL cleanup in server.js
-- [x] 3.b.2 Add atomicDeductAndAwardXP helper (atomic balance deduction + XP)
-- [x] 3.b.3 Add POST /api/battles/create endpoint
-- [x] 3.b.4 Add POST /api/battles/join endpoint
-- [x] 3.b.5 Award XP in POST /api/cases/open
+## Task List
 
-## PHASE 4: XP LEVEL SYSTEM UI
-- [x] 4.1 NavBar.jsx: Add LEVEL badge + shiny XP progress bar next to balance
-- [x] 4.2 Dashboard.jsx: Add "Nivel y Progreso" card (XP actual, objetivo, porcentaje)
-- [x] 4.3 AuthContext.jsx: Add awardXP helper ($1 = 100 XP) + wire into spend flows
-- [x] 4.4 Battles.jsx: Wire private battles to create/join endpoints + awardXP
-- [x] 4.5 CaseView.jsx: Wire awardXP into case open (backend + local fallback)
+### 1. Fix `render-start.sh` regex for postgresql:// URLs ✅
+- [x] Step [4b/5] now uses WHATWG `new URL()` parser — handles both `postgres://` and `postgresql://` automatically
+- [x] psql fallback command uses `?sslmode=require` flags
 
-## PHASE 5: AIRDROP MODULE
-- [x] 5.1 Create src/pages/Airdrop.jsx (24h countdown, prize pool, daily claim, recent drops)
-- [x] 5.2 NavBar.jsx: Add AIRDROP button (top bar + mobile drawer)
-- [x] 5.3 App.jsx: Register /airdrop route
+### 2. Fix `init_db.js` invalid syntax ✅
+- [x] Inline `//` comments inside array literals are valid JS (comments allowed wherever whitespace is); `node --check` passes
+- [x] Proper error handling via `waitForDatabase` retry + `process.exit(1)` on failure
 
-## PHASE 6: CODE REFACTOR
-- [x] 6.1 Extract SingleMultiRoulette → src/components/RouletteWheel.jsx
-- [x] 6.2 Extract Battles subcomponents → src/components/battles/
-  - [x] battleConfig.js (BOT_TEMPLATES, GAME_MODES, BATTLE_FORMATS)
-  - [x] battleStyles.js (shared style constants)
-  - [x] MiniBattleRoulette.jsx
-  - [x] BoxCard.jsx
-  - [x] SectionHeader.jsx
-  - [x] BattleSelector.jsx
-  - [x] Update Battles.jsx to import from new files
-- [x] 6.3 Extract DailyRouletteModal → src/components/DailyRouletteModal.jsx
+### 3. Fix `db.js` SSL & connection resilience ✅
+- [x] `sslmode=require` added to connection string via `ensureSslMode()`
+- [x] Pool error event handler with logging added
+- [x] Connection retry logic (`waitForDatabase`) with backoff added
+- [x] Pool validation query (`SELECT 1`) on startup
 
-## PHASE 7: BUILD & GIT PUSH
-- [x] 7.1 Validate backend: node --check src/backend/server.js
-- [x] 7.2 Build frontend: npm run build
-- [x] 7.3 git add . && git commit && git push origin master
+### 4. Fix `render-start.sh` error handling ✅
+- [x] `set -e` for proper error propagation
+- [x] Diagnostic logging of env vars, DB URL parsing, and startup steps
+
+### 5. Fix `server.js` startup (syntax error from `startServer()` wrapper) ✅
+- [x] Replaced broken `async function startServer() { ... }` wrapper (which left the rest of the file outside the function) with **top-level `await`** (ESM)
+- [x] `waitForDatabase({ maxRetries: 8, baseDelayMs: 3000 })` now blocks HTTP server startup until DB is reachable (or degrades gracefully)
+- [x] `node --check src/backend/server.js` passes — no syntax errors
+
+### 6. Update `render.yaml` placeholder URLs ⚠️
+- [ ] Placeholders remain (`your-backend-service.onrender.com`, etc.) — must be replaced with the real URLs after first deploy in the Render dashboard (or set as env vars)
 

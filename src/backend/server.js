@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import db from "./db.js";
+import db, { waitForDatabase } from "./db.js";
 import botEngine from "./steam/botEngine.js";
 import dotenv from "dotenv";
 import session from "express-session";
@@ -2191,6 +2191,20 @@ if (fs.existsSync(distPath)) {
   });
 } else {
   log(LOG_LEVELS.WARN, 'SYSTEM', 'Directorio dist/ no encontrado. Sirviendo solo API.');
+}
+
+// ─── DATABASE CONNECTION GATE ─────────────────────
+// Wait for PostgreSQL to be reachable before accepting HTTP traffic.
+// Render free-tier PostgreSQL can be suspended when idle; on cold start
+// the first connections can fail with "SSL connection has been closed
+// unexpectedly". Retrying with backoff prevents crash-on-boot.
+try {
+  await waitForDatabase({ maxRetries: 8, baseDelayMs: 3000 });
+  log(LOG_LEVELS.INFO, 'SYSTEM', '✅ Base de datos conectada. Iniciando HTTP server...');
+} catch (err) {
+  log(LOG_LEVELS.ERROR, 'SYSTEM', '❌ No se pudo conectar a la base de datos tras varios intentos.', err.message);
+  // Still start the server (degraded mode) so health checks respond
+  log(LOG_LEVELS.WARN, 'SYSTEM', 'Arrancando en modo degradado: algunas funciones requerirán la BD.');
 }
 
 // ─── SOCKET.IO ────────────────────────────────────

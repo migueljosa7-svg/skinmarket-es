@@ -1,20 +1,13 @@
-import db from './db.js';
-
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+import db, { waitForDatabase } from './db.js';
 
 const initDb = async () => {
-  const maxRetries = 3;
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      await db.query('SELECT 1');
-      break;
-  } catch {
-    if (attempt === maxRetries) {
-      process.exit(1);
-    }
-    const delay = attempt * 2000;
-    await sleep(delay);
-  }
+  // Use the robust retry helper from db.js (handles Render free-tier
+  // PostgreSQL cold-start / wake-from-sleep SSL issues)
+  try {
+    await waitForDatabase({ maxRetries: 6, baseDelayMs: 3000 });
+  } catch (err) {
+    console.error('[INIT_DB] No se pudo conectar a la base de datos tras varios intentos:', err.message);
+    process.exit(1);
   }
 
   // ── STEP 1: CREATE ALL TABLES FIRST (in order of dependencies) ──
