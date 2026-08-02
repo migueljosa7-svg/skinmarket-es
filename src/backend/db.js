@@ -21,18 +21,24 @@ let databaseUrl = (process.env.DATABASE_URL || '')
 
 // Fix DNS resolution: append full domain for Render PostgreSQL hosts without dots
 if (databaseUrl && isProduction) {
-    const urlMatch = databaseUrl.match(/^postgres:\/\/([^:]+):([^@]+)@([^:/]+)(?::(\d+))?\/\s*([^?]+)/);
-    if (urlMatch) {
-        const host = urlMatch[3];
-        // If host doesn't contain a dot, it's a short Render hostname - append full domain
-        if (host && !host.includes('.')) {
-            databaseUrl = databaseUrl.replace(host, host + '.oregon-postgres.render.com');
+    try {
+        const dbUrl = new URL(databaseUrl);
+        const protocol = dbUrl.protocol.toLowerCase();
+        if ((protocol === 'postgres:' || protocol === 'postgresql:') && dbUrl.hostname && !dbUrl.hostname.includes('.')) {
+            dbUrl.hostname = `${dbUrl.hostname}.oregon-postgres.render.com`;
+            databaseUrl = dbUrl.toString();
         }
+    } catch (err) {
+        console.warn('[DB] No se pudo parsear DATABASE_URL para corrección de host:', err.message);
     }
 }
 
 // Configure SSL: for production (Render), use rejectUnauthorized: false for internal connections
 const useSSL = isProduction ? { rejectUnauthorized: false } : false;
+
+if (!databaseUrl) {
+    console.error('[DB] DATABASE_URL no está configurada o está vacía.');
+}
 
 const pool = new Pool({
     connectionString: databaseUrl,
